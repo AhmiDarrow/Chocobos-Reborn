@@ -1,6 +1,6 @@
 # Chocobos Reborn — session handoff (internal)
 
-Date: 2026-09-16 (evening). Repo: `C:\Users\Administrator\Projects\chocobos-reborn`
+Date: 2026-09-16 (evening). Repo: the checkout root (Windows dev box)
 (no git; this file is the state). Mod id `chocobosreborn`, package
 `tk.darrow.chocobosreborn`, jar `chocobosreborn-1.0.0.jar`, NeoForge 1.21.1 / 21.1.249.
 Next agent: read this, then `docs/SPEC.md`, then `.grok/skills/chocobo-art/SKILL.md`.
@@ -18,7 +18,7 @@ atlases (`paint_albedo.recolor_plumage` on `isPlumage` texels, then `pad_atlases
 (`tools/ncgb_export.py` + `tools/chocobo_gait.py`). No remesh, no re-bake, no
 repaint. 31,164 tris, `chocobo.ncgb` 6.4 MB.
 
-Commands (repo root; Blender at `C:\Users\Administrator\scoop\apps\blender\current\blender.exe`,
+Commands (repo root; Blender from scoop (`scoop\apps\blender\current\blender.exe`),
 its bundled Python needs `scipy` + `pillow`, installed here):
 
 ```
