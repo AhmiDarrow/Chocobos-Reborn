@@ -32,3 +32,6 @@ art/atlases/
 
 # Art pipeline inputs and outputs (Meshy glbs, blends, masters, previews): not needed to build the mod
 art/
+
+# publishing credentials
+tools/secrets/

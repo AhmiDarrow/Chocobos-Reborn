@@ -748,6 +748,27 @@ and every island is relaid in place on its next use (old paint sits on road cell
 the relay repaints). Bump it whenever `RaceCourseLayout` changes; the village version is
 separate.
 
+## Shipping 1.0.0 (2026-09-17 10:40)
+
+Ahmi: "enough testing, fix all the direction arrows for all tracks and then push to gh and
+curseforge; update the branding page; only ship what is actually needed for the mod,
+gitignore everything else."
+
+* Jar: `./gradlew build` -> `build/libs/chocobosreborn-1.0.0.jar` (~82 MB). GameTests are
+  excluded (`exclude 'tk/darrow/chocobosreborn/gametest/**'`; the old exclude named a
+  package that never existed). Atlases ship at 1024 (Lanczos from the 2048 masters, which
+  now live in `art/atlases/<variant>/`, git-ignored); the jar holds only classes, assets,
+  data, icon and pack.mcmeta.
+* Git: repository initialised, `art/` and `tools/secrets/` ignored (only what builds the
+  mod is tracked: src, gradle, docs, tools). Pushed to
+  https://github.com/AhmiDarrow/Chocobos-Reborn with release v1.0.0 carrying the jar.
+* Branding: `docs/public/store-description.md` rewritten for 1.0.0 (Whiskerwind, timed
+  heats, 24 courses, equipment, almanac, End / Nether feathers) and rendered to
+  `store-description.html` by `tools/render_store_html.py`; changelog
+  `docs/RELEASE_1.0.0.md`; publishing notes `docs/curseforge.md`. There is no CurseForge
+  project yet and no token on this machine: creating the project is Ahmi's Author Console
+  step; after that the ID goes in `docs/curseforge.md` and a token in `tools/secrets/.env`.
+
 ## Mod state (Java)
 
 Verified locally on 2026-09-16 (and in the cloud workspace before that):
