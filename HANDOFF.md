@@ -765,9 +765,10 @@ gitignore everything else."
 * Branding: `docs/public/store-description.md` rewritten for 1.0.0 (Whiskerwind, timed
   heats, 24 courses, equipment, almanac, End / Nether feathers) and rendered to
   `store-description.html` by `tools/render_store_html.py`; changelog
-  `docs/RELEASE_1.0.0.md`; publishing notes `docs/curseforge.md`. There is no CurseForge
-  project yet and no token on this machine: creating the project is Ahmi's Author Console
-  step; after that the ID goes in `docs/curseforge.md` and a token in `tools/secrets/.env`.
+  `docs/RELEASE_1.0.0.md`; publishing notes `docs/curseforge.md`. CurseForge project
+  **1699008** (Ahmi): `tools/upload_curseforge.py` uploaded the jar as file 8903892
+  (release, 1.21.1 / NeoForge / Client+Server), awaiting approval; the author token sits
+  in `tools/secrets/.env` (ignored).
 
 ## Mod state (Java)
 
