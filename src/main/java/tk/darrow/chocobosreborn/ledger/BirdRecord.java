@@ -1,0 +1,81 @@
+package tk.darrow.chocobosreborn.ledger;
+
+import java.util.UUID;
+
+import net.minecraft.nbt.CompoundTag;
+import org.jetbrains.annotations.Nullable;
+import tk.darrow.chocobosreborn.entity.ChocoboEntity;
+
+/** One tamed chocobo as the almanac remembers it (works while the bird's chunk is unloaded). */
+public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGrade, int grade, boolean male,
+                         int raceClass, int wins, int trSpeed, int trStamina, int trIntel, int trCoop,
+                         @Nullable UUID parentA, @Nullable UUID parentB, int parentColorA, int parentColorB,
+                         int nut, long bornDay, boolean alive, String pendingName) {
+
+	public static BirdRecord of(ChocoboEntity b, @Nullable UUID parentA, @Nullable UUID parentB,
+	                            int parentColorA, int parentColorB, int nut, long bornDay, boolean alive) {
+		UUID owner = b.getOwnerUUID() == null ? new UUID(0L, 0L) : b.getOwnerUUID();
+		String name = b.hasCustomName() ? b.getCustomName().getString() : "";
+		return new BirdRecord(b.getUUID(), owner, name, b.color().getId(), b.bornGrade().getRank(), b.grade().getRank(),
+				b.male(), b.raceClass().getId(), b.raceWins(), b.trainedSpeed(), b.trainedStamina(),
+				b.trainedIntelligence(), b.trainedCooperation(), parentA, parentB, parentColorA, parentColorB, nut,
+				bornDay, alive, "");
+	}
+
+	/**
+	 * Fresh stats from a live bird, keeping the lineage fields of the old record. A
+	 * pending rename (made from the almanac while the bird was unloaded) is applied
+	 * to the entity now.
+	 */
+	public BirdRecord refreshed(ChocoboEntity b) {
+		if (pendingName != null && !pendingName.isEmpty() && !pendingName.equals(b.hasCustomName() ? b.getCustomName().getString() : "")) {
+			b.setCustomName(net.minecraft.network.chat.Component.literal(pendingName));
+			b.setCustomNameVisible(true);
+		}
+		return of(b, parentA, parentB, parentColorA, parentColorB, nut, bornDay, b.isAlive());
+	}
+
+	public BirdRecord dead() {
+		return new BirdRecord(id, owner, name, color, bornGrade, grade, male, raceClass, wins, trSpeed, trStamina,
+				trIntel, trCoop, parentA, parentB, parentColorA, parentColorB, nut, bornDay, false, pendingName);
+	}
+
+	public CompoundTag save() {
+		CompoundTag t = new CompoundTag();
+		t.putUUID("Id", id);
+		t.putUUID("Owner", owner);
+		t.putString("Name", name);
+		t.putInt("Color", color);
+		t.putInt("BornGrade", bornGrade);
+		t.putInt("Grade", grade);
+		t.putBoolean("Male", male);
+		t.putInt("Class", raceClass);
+		t.putInt("Wins", wins);
+		t.putInt("TrSpeed", trSpeed);
+		t.putInt("TrStamina", trStamina);
+		t.putInt("TrIntel", trIntel);
+		t.putInt("TrCoop", trCoop);
+		if (parentA != null) {
+			t.putUUID("ParentA", parentA);
+		}
+		if (parentB != null) {
+			t.putUUID("ParentB", parentB);
+		}
+		t.putInt("ParentColorA", parentColorA);
+		t.putInt("ParentColorB", parentColorB);
+		t.putInt("Nut", nut);
+		t.putLong("BornDay", bornDay);
+		t.putBoolean("Alive", alive);
+		t.putString("Pending", pendingName == null ? "" : pendingName);
+		return t;
+	}
+
+	public static BirdRecord load(CompoundTag t) {
+		return new BirdRecord(t.getUUID("Id"), t.getUUID("Owner"), t.getString("Name"), t.getInt("Color"),
+				t.getInt("BornGrade"), t.getInt("Grade"), t.getBoolean("Male"), t.getInt("Class"), t.getInt("Wins"),
+				t.getInt("TrSpeed"), t.getInt("TrStamina"), t.getInt("TrIntel"), t.getInt("TrCoop"),
+				t.hasUUID("ParentA") ? t.getUUID("ParentA") : null, t.hasUUID("ParentB") ? t.getUUID("ParentB") : null,
+				t.getInt("ParentColorA"), t.getInt("ParentColorB"), t.getInt("Nut"), t.getLong("BornDay"),
+				!t.contains("Alive") || t.getBoolean("Alive"), t.getString("Pending"));
+	}
+}

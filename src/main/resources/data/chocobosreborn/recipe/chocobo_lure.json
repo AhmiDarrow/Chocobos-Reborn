@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " A ",
+    "AYA",
+    " A "
+  ],
+  "key": {
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "Y": {
+      "item": "chocobosreborn:gysahl_green"
+    }
+  },
+  "result": {
+    "id": "chocobosreborn:chocobo_lure",
+    "count": 1
+  }
+}

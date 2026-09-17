@@ -1,0 +1,29 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:black_chocobo_spawn_egg"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.black"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.black.desc"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "black": {
+      "trigger": "minecraft:bred_animals",
+      "conditions": {
+        "child": {
+          "type": "chocobosreborn:chocobo",
+          "nbt": "{Plumage:4}"
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:green_or_blue"
+}

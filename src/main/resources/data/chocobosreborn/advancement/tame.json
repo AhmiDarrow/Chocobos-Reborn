@@ -1,0 +1,28 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:gysahl_green"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.tame"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.tame.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "tame": {
+      "trigger": "minecraft:tame_animal",
+      "conditions": {
+        "entity": {
+          "type": "chocobosreborn:chocobo"
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:root"
+}

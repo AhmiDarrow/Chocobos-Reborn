@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "chocobosreborn:diamond_chocobo_armor"
+    },
+    {
+      "item": "minecraft:netherite_ingot"
+    }
+  ],
+  "result": {
+    "id": "chocobosreborn:netherite_chocobo_armor",
+    "count": 1
+  }
+}

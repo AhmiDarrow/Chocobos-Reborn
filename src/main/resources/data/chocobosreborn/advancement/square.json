@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:gp"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.square"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.square.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "enter": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "chocobosreborn:ride"
+}

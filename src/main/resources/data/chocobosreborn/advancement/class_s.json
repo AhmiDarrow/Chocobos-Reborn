@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:sylkis_green"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.class_s"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.class_s.desc"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "s": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "chocobosreborn:first_place"
+}

@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:square_gate"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.first_place"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.first_place.desc"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "win": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "parent": "chocobosreborn:square"
+}

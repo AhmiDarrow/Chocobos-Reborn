@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/crop",
+  "textures": {
+    "crop": "chocobosreborn:block/gysahl_green3"
+  },
+  "render_type": "minecraft:cutout"
+}

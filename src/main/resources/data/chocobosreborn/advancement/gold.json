@@ -1,0 +1,29 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:zeio_nut"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.gold"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.gold.desc"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "gold": {
+      "trigger": "minecraft:bred_animals",
+      "conditions": {
+        "child": {
+          "type": "chocobosreborn:chocobo",
+          "nbt": "{Plumage:5}"
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:black"
+}

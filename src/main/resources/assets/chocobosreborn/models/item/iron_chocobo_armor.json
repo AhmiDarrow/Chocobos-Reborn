@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "chocobosreborn:item/iron_chocobo_armor"
+  }
+}

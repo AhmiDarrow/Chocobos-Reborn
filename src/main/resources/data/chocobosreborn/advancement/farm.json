@@ -1,0 +1,30 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:hay_block"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.farm"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.farm.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "farm": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": {
+          "location": {
+            "structures": "chocobosreborn:chocobo_farm"
+          }
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:root"
+}

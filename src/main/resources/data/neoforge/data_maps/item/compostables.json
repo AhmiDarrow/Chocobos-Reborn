@@ -1,0 +1,31 @@
+{
+  "values": {
+    "chocobosreborn:gysahl_green_seeds": {
+      "chance": 0.3
+    },
+    "chocobosreborn:gysahl_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:krakka_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:tantal_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:pahsana_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:curiel_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:mimett_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:reagan_green": {
+      "chance": 0.65
+    },
+    "chocobosreborn:sylkis_green": {
+      "chance": 0.65
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "entity.chocobo.kweh": {
+    "sounds": [
+      "chocobosreborn:entity/chocobo/kweh"
+    ],
+    "subtitle": "chocobosreborn.subtitle.kweh"
+  },
+  "entity.chocobo.kweh_follow": {
+    "sounds": [
+      "chocobosreborn:entity/chocobo/kweh_follow"
+    ],
+    "subtitle": "chocobosreborn.subtitle.kweh"
+  },
+  "entity.chocobo.kweh_stay": {
+    "sounds": [
+      "chocobosreborn:entity/chocobo/kweh_stay"
+    ],
+    "subtitle": "chocobosreborn.subtitle.kweh"
+  },
+  "entity.chocobo.kweh_wander": {
+    "sounds": [
+      "chocobosreborn:entity/chocobo/kweh_wander"
+    ],
+    "subtitle": "chocobosreborn.subtitle.kweh"
+  },
+  "music.race.chocobo_dash": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/chocobo_dash",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.chocobo_race_gallop": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/chocobo_race_gallop",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.gallop_of_adventure": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/gallop_of_adventure",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.gallop_of_heroes": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/gallop_of_heroes",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.rune_dash": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/rune_dash",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.speed_of_the_dragon": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/speed_of_the_dragon",
+        "stream": true
+      }
+    ]
+  },
+  "music.race.victory_stinger": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/victory_stinger",
+        "stream": true
+      }
+    ]
+  },
+  "entity.chocobo.wark": {
+    "sounds": [
+      "chocobosreborn:entity/chocobo/wark"
+    ],
+    "subtitle": "chocobosreborn.subtitle.wark"
+  },
+  "music.village.woodland_pastoral": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/woodland_pastoral",
+        "stream": true
+      }
+    ]
+  },
+  "music.village.village_night_song": {
+    "sounds": [
+      {
+        "name": "chocobosreborn:music/village_night_song",
+        "stream": true
+      }
+    ]
+  }
+}

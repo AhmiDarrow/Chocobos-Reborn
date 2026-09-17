@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "kind=entry": {
+      "model": "chocobosreborn:block/square_gate"
+    },
+    "kind=short_course": {
+      "model": "chocobosreborn:block/square_gate_short"
+    },
+    "kind=long_course": {
+      "model": "chocobosreborn:block/square_gate_long"
+    },
+    "kind=return_gate": {
+      "model": "chocobosreborn:block/square_gate_return"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " N ",
+    "NCN",
+    " Y "
+  ],
+  "key": {
+    "N": {
+      "item": "minecraft:gold_nugget"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "Y": {
+      "item": "chocobosreborn:gysahl_green"
+    }
+  },
+  "result": {
+    "id": "chocobosreborn:chocobo_pocketwatch",
+    "count": 1
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:gysahl_green"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.root"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.root.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "minecraft:textures/block/hay_block_side.png"
+  },
+  "criteria": {
+    "seeds": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "chocobosreborn:gysahl_green_seeds"
+          }
+        ]
+      }
+    }
+  }
+}

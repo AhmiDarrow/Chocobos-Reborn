@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:book"
+    },
+    {
+      "item": "chocobosreborn:gysahl_green"
+    }
+  ],
+  "result": {
+    "id": "chocobosreborn:chocobo_almanac",
+    "count": 1
+  }
+}

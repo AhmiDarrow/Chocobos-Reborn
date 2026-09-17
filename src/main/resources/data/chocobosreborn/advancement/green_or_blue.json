@@ -1,0 +1,44 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:carob_nut"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.green_or_blue"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.green_or_blue.desc"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "green": {
+      "trigger": "minecraft:bred_animals",
+      "conditions": {
+        "child": {
+          "type": "chocobosreborn:chocobo",
+          "nbt": "{Plumage:1}"
+        }
+      }
+    },
+    "blue": {
+      "trigger": "minecraft:bred_animals",
+      "conditions": {
+        "child": {
+          "type": "chocobosreborn:chocobo",
+          "nbt": "{Plumage:2}"
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:hatch",
+  "requirements": [
+    [
+      "green",
+      "blue"
+    ]
+  ]
+}

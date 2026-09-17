@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "chocobosreborn:block/square_gate_long"
+  }
+}

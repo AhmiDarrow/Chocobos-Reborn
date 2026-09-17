@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "chocobosreborn:gysahl_green"
+    },
+    {
+      "item": "chocobosreborn:gysahl_green"
+    },
+    {
+      "item": "minecraft:sugar"
+    }
+  ],
+  "result": {
+    "id": "chocobosreborn:tantal_green",
+    "count": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:pepio_nut"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.hatch"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.hatch.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "bred": {
+      "trigger": "minecraft:bred_animals",
+      "conditions": {
+        "child": {
+          "type": "chocobosreborn:chocobo"
+        }
+      }
+    }
+  },
+  "parent": "chocobosreborn:tame"
+}

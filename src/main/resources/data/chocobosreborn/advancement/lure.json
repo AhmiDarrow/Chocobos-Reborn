@@ -1,0 +1,30 @@
+{
+  "display": {
+    "icon": {
+      "id": "chocobosreborn:chocobo_lure"
+    },
+    "title": {
+      "translate": "advancement.chocobosreborn.lure"
+    },
+    "description": {
+      "translate": "advancement.chocobosreborn.lure.desc"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "lure": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "chocobosreborn:chocobo_lure"
+          }
+        ]
+      }
+    }
+  },
+  "parent": "chocobosreborn:root"
+}

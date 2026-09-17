@@ -1,0 +1,34 @@
+.gradle/
+build/
+out/
+run/
+runs/
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+Thumbs.db
+Desktop.ini
+.DS_Store
+**/logs/
+**/crash-reports/
+**/saves/
+**/options.txt
+**/usercache.json
+**/usernamecache.json
+src/generated/resources/.cache/
+__pycache__/
+*.pyc
+.grok/
+Claude outputs/
+
+# 2048 atlas masters (repaint_atlases.py reads and rewrites them; the jar ships 1024)
+art/atlases/
+
+# Art pipeline inputs and outputs (Meshy glbs, blends, masters, previews): not needed to build the mod
+art/
