@@ -1,6 +1,7 @@
 package tk.darrow.chocobosreborn.gametest;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +17,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.breed.ChocoboGrade;
+import tk.darrow.chocobosreborn.breed.ChocoboGreen;
 import tk.darrow.chocobosreborn.breed.ChocoboNut;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.entity.ModEntities;
@@ -43,6 +45,11 @@ public class ChocobosRebornGameTests {
 		bird.setAge(0);
 		bird.setGrade(ChocoboGrade.GOOD);
 		return bird;
+	}
+
+	/** Feeds of one green recorded on the bird (its {@code GreensFed} save data). */
+	private static int fed(ChocoboEntity bird, ChocoboGreen green) {
+		return bird.saveWithoutId(new CompoundTag()).getIntArray("GreensFed")[green.ordinal()];
 	}
 
 	private static Player owner(GameTestHelper helper, ChocoboEntity... birds) {
@@ -83,13 +90,19 @@ public class ChocobosRebornGameTests {
 		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
 		Player p = owner(helper, bird);
 		p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.KRAKKA_GREEN.get(), 64));
+		// survival: one feed lands and is eaten, the next waits out the training cooldown
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		helper.assertTrue(p.getMainHandItem().getCount() == 63, "cooldown after a feed, hand=" + p.getMainHandItem().getCount());
+		helper.assertTrue(fed(bird, ChocoboGreen.KRAKKA) == 1, "one krakka fed");
+		// creative skips the cooldown: sated after 40, the rest refused
+		p.getAbilities().instabuild = true;
 		for (int i = 0; i < 45; i++) {
 			bird.mobInteract(p, InteractionHand.MAIN_HAND);
 		}
 		helper.assertTrue(bird.trainedIntelligence() > 0, "krakka trains intelligence");
 		helper.assertTrue(bird.trainedIntelligence() <= 100, "training capped");
-		// Sated after 40 krakka: 64 - 40 = 24 left in hand
-		helper.assertTrue(p.getMainHandItem().getCount() == 24, "sated at 40 feeds, hand=" + p.getMainHandItem().getCount());
+		helper.assertTrue(fed(bird, ChocoboGreen.KRAKKA) == 40, "sated at 40 feeds, fed=" + fed(bird, ChocoboGreen.KRAKKA));
 		helper.succeed();
 	}
 

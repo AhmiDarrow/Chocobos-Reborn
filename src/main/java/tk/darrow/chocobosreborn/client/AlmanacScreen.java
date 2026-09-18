@@ -51,6 +51,8 @@ public class AlmanacScreen extends Screen {
 	private static final int LEFT_W = 112;
 	private static final int PAD = 8;
 	private static final int LINE = 10;
+	/** The journal's frame is 12 px of wood plus a margin: page content stays this far inside its edge. */
+	private static final int INSET = 20;
 	private static final ResourceLocation PAGE = ResourceLocation.fromNamespaceAndPath(
 			ChocobosReborn.MOD_ID, "textures/gui/almanac.png");
 
@@ -117,7 +119,8 @@ public class AlmanacScreen extends Screen {
 		}
 		addRenderableWidget(Button.builder(Component.translatable("chocobosreborn.almanac.stable.title"),
 				b -> select(CHAPTERS.length)).bounds(PAD, y, LEFT_W, 18).build());
-		pageTop = PAD + 14;
+		chapterBottom = y + 20;
+		pageTop = frameY() + INSET;
 		UUID keep = shown == null ? null : shown.id();
 		if (keep == null || chapter != CHAPTERS.length) {
 			rebuild();
@@ -156,12 +159,37 @@ public class AlmanacScreen extends Screen {
 		return false;
 	}
 
-	private int pageX() {
+	/** Where the chapter buttons end; Back and Release sit under them. */
+	private int chapterBottom;
+
+	/** The journal frame: right of the chapter column, from under the title row to the bottom margin. */
+	private int frameY() {
+		return PAD + 14;
+	}
+
+	private int frameX() {
 		return PAD + LEFT_W + PAD;
 	}
 
+	private int frameW() {
+		return Math.max(32 + 2 * INSET, width - frameX() - PAD);
+	}
+
+	private int frameH() {
+		return Math.max(32 + 2 * INSET, height - PAD - frameY());
+	}
+
+	/** Content area inside the frame. */
+	private int pageX() {
+		return frameX() + INSET;
+	}
+
 	private int pageW() {
-		return Math.max(80, width - pageX() - PAD - 68);
+		return frameW() - 2 * INSET;
+	}
+
+	private int pageBottom() {
+		return frameY() + frameH() - INSET;
 	}
 
 	private void clearPage() {
@@ -316,17 +344,18 @@ public class AlmanacScreen extends Screen {
 		ChocoboColor[] colors = ChocoboColor.values();
 		return new Block() {
 			public int height() {
-				return 2 * 78;
+				return 2 * 90;
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
 				int cell = Math.max(40, w / 4);
 				for (int i = 0; i < colors.length; i++) {
 					int cx = x + (i % 4) * cell + cell / 2;
-					int cy = y + (i / 4) * 78;
-					g.fill(cx - cell / 2 + 2, cy, cx + cell / 2 - 2, cy + 74, 0x33FFFFFF);
-					drawBird(g, colors[i], false, cx, cy + 60, 22, mx, my);
-					g.drawCenteredString(font, Component.translatable("chocobosreborn.color." + colors[i].id()), cx, cy + 64, 0xFFFFFFFF);
+					int cy = y + (i / 4) * 90;
+					g.fill(cx - cell / 2 + 2, cy, cx + cell / 2 - 2, cy + 84, 0x33FFFFFF);
+					// an adult is ADULT_H blocks tall: 18 px per block keeps the crest under the cell's top
+					drawBird(g, colors[i], false, cx, cy + 68, 18, mx, my);
+					g.drawCenteredString(font, Component.translatable("chocobosreborn.color." + colors[i].id()), cx, cy + 72, 0xFFFFFFFF);
 				}
 			}
 		};
@@ -414,7 +443,7 @@ public class AlmanacScreen extends Screen {
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
 				int tw = Math.max(40, w - 104);
 				g.fill(x, y, x + 96, y + 96, 0x33FFFFFF);
-				drawBird(g, c, true, x + 48, y + 84, 30, mx, my);
+				drawBird(g, c, true, x + 48, y + 88, 24, mx, my);
 				int tx = x + 104;
 				int yy = y + 4;
 				g.drawString(font, label(r), tx, yy, 0xFFFFFFFF, true);
@@ -517,7 +546,7 @@ public class AlmanacScreen extends Screen {
 			}
 			confirmRelease = false;
 			rebuild();
-		}).bounds(width - PAD - 60, PAD + 22, 60, 18).build();
+		}).bounds(PAD, Math.max(chapterBottom + 26, height - PAD - 18), LEFT_W, 18).build();
 		pageWidgets.add(addRenderableWidget(holder[0]));
 		chromeWidgets.add(holder[0]);
 		Button back = Button.builder(Component.translatable("gui.back"), b -> {
@@ -525,7 +554,7 @@ public class AlmanacScreen extends Screen {
 			shown = null;
 			scroll = 0;
 			rebuild();
-		}).bounds(width - PAD - 60, PAD, 60, 18).build();
+		}).bounds(PAD, chapterBottom + 4, LEFT_W, 18).build();
 		pageWidgets.add(addRenderableWidget(back));
 		chromeWidgets.add(back);
 	}
@@ -631,7 +660,7 @@ public class AlmanacScreen extends Screen {
 		super.render(g, mouseX, mouseY, partial);
 		g.drawString(font, title, PAD, PAD, 0xFFE8A416, true);
 		int x = pageX();
-		int bottom = height - PAD;
+		int bottom = pageBottom();
 		Component heading = chapter < CHAPTERS.length
 				? Component.translatable("chocobosreborn.almanac." + CHAPTERS[chapter] + ".title")
 				: Component.translatable("chocobosreborn.almanac.stable.title");
@@ -645,16 +674,22 @@ public class AlmanacScreen extends Screen {
 			y += b.height();
 		}
 		g.disableScissor();
+		int visible = bottom - pageTop;
+		int content = contentHeight();
+		if (content > visible) {
+			// scrollbar in the frame's right margin
+			int track = x + pageW() + 6;
+			int thumbH = Math.max(12, visible * visible / content);
+			int thumbY = pageTop + (int) ((visible - thumbH) * (scroll / (content - visible)));
+			g.fill(track, pageTop, track + 3, bottom, 0x40000000);
+			g.fill(track, thumbY, track + 3, thumbY + thumbH, 0xFFE8A416);
+		}
 	}
 
 	@Override
 	public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partial) {
 		super.renderBackground(g, mouseX, mouseY, partial);
-		int x = pageX() - 6;
-		int y = PAD + 10;
-		int w = Math.max(32, pageW() + 12);
-		int h = Math.max(32, height - PAD * 2 - 10);
-		blitJournal(g, x, y, w, h);
+		blitJournal(g, frameX(), frameY(), frameW(), frameH());
 	}
 
 	/** Nine-slice the 256 journal so the gold frame stays 16px on any page size. */
@@ -681,7 +716,7 @@ public class AlmanacScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double dx, double dy) {
-		int visible = height - PAD - pageTop;
+		int visible = pageBottom() - pageTop;
 		double max = Math.max(0, contentHeight() - visible);
 		double before = scroll;
 		scroll = Math.max(0.0D, Math.min(max, scroll - dy * 14.0D));
@@ -691,6 +726,8 @@ public class AlmanacScreen extends Screen {
 				continue;
 			}
 			w.setY(w.getY() + shift);
+			// widgets are not scissored: hide any that scrolled off the page
+			w.visible = w.getY() >= pageTop && w.getY() + w.getHeight() <= pageBottom();
 		}
 		return true;
 	}

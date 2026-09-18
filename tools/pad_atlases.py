@@ -12,7 +12,7 @@ from PIL import Image
 from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXDIR = ROOT / "src/main/resources/assets/chocobosreborn/textures/entity/chocobo"
+TEXDIR = ROOT / "art/atlases/chocobo"   # the 2048 masters (ship_atlases.py makes the jar copies)
 
 
 def pad(path: Path):

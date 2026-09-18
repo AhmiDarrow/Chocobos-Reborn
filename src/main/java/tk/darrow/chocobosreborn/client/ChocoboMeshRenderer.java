@@ -15,8 +15,14 @@ import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Skinned chocobo (Meshy mesh of still-8, tools/fresh_ship.py). White vertex colours × breed atlas.
+ * The 31k-triangle bird is skinned on the CPU every frame: the pose is folded into the bone
+ * matrices ({@link MeshSkinner}) and vertex colours are cached per breed, so the per-vertex
+ * work is one weighted transform and one raw emit.
  */
 public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private static final ResourceLocation WHITE = ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "textures/white.png");
@@ -24,7 +30,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private static final ResourceLocation[] SKINS = skins("chocobo");
 	/** Saddle, bridle and reins are baked into a second Meshy mesh (tools/fresh_ship.py --tag saddled). */
 	private static final ResourceLocation[] SKINS_SADDLED = skins("chocobo_saddled");
-	private static final java.util.Map<String, ResourceLocation[]> SKINS_ARMOR = new java.util.HashMap<>();
+	private static final Map<String, ResourceLocation[]> SKINS_ARMOR = new HashMap<>();
 
 	/** Mesh id for this bird's outfit: armour tier mesh if it has one, else saddled, else plain. */
 	private static String meshId(ChocoboEntity e) {
@@ -53,9 +59,14 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	};
 	private static final int[] YELLOW = {245, 184, 18};
 
-	private float[] bones = new float[0];
-	private float[] skinPos = new float[0], skinNrm = new float[0];
-	private boolean[] skinHidden = new boolean[0];
+	/** Sampled bone matrices for the frame and two scratch copies for the gait crossfade. */
+	private float[] bones = new float[0], idleBones = new float[0], walkBones = new float[0];
+	private final MeshSkinner skinner = new MeshSkinner();
+	private boolean[] hidden = new boolean[0];
+	private boolean anyHidden;
+	/** Packed vertex colours per part and breed (the tint never changes per frame). */
+	private static final Map<WhiskerMesh.Part, int[][]> COLORS = new HashMap<>();
+	private static final Map<WhiskerMesh.Part, int[]> GLOW = new HashMap<>();
 
 	public ChocoboMeshRenderer(EntityRendererProvider.Context ctx) {
 		super(ctx);
@@ -66,13 +77,19 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	public ResourceLocation getTextureLocation(ChocoboEntity e) {
 		int id = Math.min(e.color().getId(), SKINS.length - 1);
 		String mesh = meshId(e);
+		ResourceLocation[] set;
 		if (mesh.equals("chocobo_saddled")) {
-			return SKINS_SADDLED[id];
+			set = SKINS_SADDLED;
+		} else if (mesh.startsWith("chocobo_armor_")) {
+			set = SKINS_ARMOR.computeIfAbsent(mesh, ChocoboMeshRenderer::skins);
+		} else {
+			set = SKINS;
 		}
-		if (mesh.startsWith("chocobo_armor_")) {
-			return SKINS_ARMOR.computeIfAbsent(mesh, ChocoboMeshRenderer::skins)[id];
+		if (ChocoboColor.values()[id].derivedAtlas()) {
+			// the jar ships yellow, End and Nether; the solid breeds are recoloured from yellow at load
+			DerivedAtlasTexture.ensure(set[id], set[ChocoboColor.YELLOW.getId()], PLUMAGE[id]);
 		}
-		return SKINS[id];
+		return set[id];
 	}
 
 	@Override
@@ -116,22 +133,27 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 			runAmt = Mth.clamp((spd - 0.48F) / 0.40F, 0.0F, 1.0F);
 			runAmt = runAmt * runAmt * (3.0F - 2.0F * runAmt);
 		}
+		int nb = idle.bones;
 		sampleClip(idle, time, 0.0F);
 		if (walkAmt > 0.001F && walk != idle) {
-			float[] idleBones = java.util.Arrays.copyOf(bones, bones.length);
+			idleBones = swap(idleBones, bones, nb * 12);
 			sampleClip(walk, time, stride);
-			for (int i = 0; i < Math.min(bones.length, idleBones.length); i++) {
+			for (int i = 0; i < nb * 12; i++) {
 				bones[i] = Mth.lerp(walkAmt, idleBones[i], bones[i]);
 			}
 		}
 		if (runAmt > 0.001F && run != null && run != walk) {
-			float[] walkBones = java.util.Arrays.copyOf(bones, bones.length);
+			walkBones = swap(walkBones, bones, nb * 12);
 			sampleClip(run, time, stride);
-			for (int i = 0; i < Math.min(bones.length, walkBones.length); i++) {
+			for (int i = 0; i < nb * 12; i++) {
 				bones[i] = Mth.lerp(runAmt, walkBones[i], bones[i]);
 			}
 		}
+		if (hidden.length != m.boneNames.length) {
+			hidden = new boolean[m.boneNames.length];
+		}
 		java.util.Arrays.fill(hidden, false);
+		anyHidden = false;
 		if (!e.saddled()) {
 			hideBone(m, "saddle");
 			hideBone(m, "bridle");
@@ -145,31 +167,39 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		ps.mulPose(Axis.YP.rotationDegrees(-bodyYaw));
 		ps.scale(grow, grow, grow);
 		PoseStack.Pose pose = ps.last();
+		skinner.compose(bones, nb, pose.pose(), pose.normal());
 		boolean hurt = e.hurtTime > 0;
 		int overlay = OverlayTexture.pack(0, hurt);
-		int[] tint = PLUMAGE[Math.min(e.color().getId(), PLUMAGE.length - 1)];
+		int breed = Math.min(e.color().getId(), PLUMAGE.length - 1);
 		ResourceLocation tex = getTextureLocation(e);
-		VertexConsumer vc = buf.getBuffer(RenderType.entityCutoutNoCull(tex));
+		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
+		boolean quads = e.isCurrentlyGlowing();
+		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
 		for (WhiskerMesh.Part part : m.parts) {
-			skin(part);
-			emit(vc, part, pose, light, overlay, tint);
-			if (hasEmit(part)) {
-				emit(buf.getBuffer(RenderType.eyes(tex)), part, pose, 0xF000F0, OverlayTexture.NO_OVERLAY, null);
+			skinner.skin(part, hidden, anyHidden);
+			emit(vc, part, colors(part, breed), light, overlay, quads);
+			if (part.emissiveTri.length > 0) {
+				emitGlow(buf.getBuffer(RenderType.eyes(tex)), part, glow(part));
 			}
 		}
 		ps.popPose();
 		super.render(e, yaw, partial, ps, buf, light);
 	}
 
-	private boolean[] hidden = new boolean[0];
+	/** Copy {@code n} floats of {@code src} into {@code dst} (grown if needed) and return it. */
+	private static float[] swap(float[] dst, float[] src, int n) {
+		if (dst.length < n) {
+			dst = new float[n];
+		}
+		System.arraycopy(src, 0, dst, 0, n);
+		return dst;
+	}
 
 	private void hideBone(WhiskerMesh m, String name) {
 		for (int i = 0; i < m.boneNames.length; i++) {
 			if (name.equals(m.boneNames[i])) {
-				if (hidden.length <= i) {
-					hidden = java.util.Arrays.copyOf(hidden, m.boneNames.length);
-				}
 				hidden[i] = true;
+				anyHidden = true;
 				return;
 			}
 		}
@@ -208,119 +238,78 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		}
 	}
 
-	private static boolean hasEmit(WhiskerMesh.Part p) {
-		for (byte b : p.emit) {
-			if (b != 0) {
-				return true;
+	/** Packed ARGB vertex colours of a part for one breed: plumage-coloured vertices take the breed tint. */
+	private static int[] colors(WhiskerMesh.Part p, int breed) {
+		int[][] perBreed = COLORS.computeIfAbsent(p, k -> new int[PLUMAGE.length][]);
+		int[] out = perBreed[breed];
+		if (out == null) {
+			int[] tint = PLUMAGE[breed];
+			out = new int[p.vertexCount];
+			for (int v = 0; v < p.vertexCount; v++) {
+				int r = p.rgb[v * 3] & 0xFF, g = p.rgb[v * 3 + 1] & 0xFF, b = p.rgb[v * 3 + 2] & 0xFF;
+				if (isPlumage(r, g, b)) {
+					r = clamp(r * tint[0] / YELLOW[0]);
+					g = clamp(g * tint[1] / Math.max(1, YELLOW[1]));
+					b = clamp(b * tint[2] / Math.max(1, YELLOW[2]));
+				}
+				out[v] = 0xFF000000 | r << 16 | g << 8 | b;
 			}
+			perBreed[breed] = out;
 		}
-		return false;
+		return out;
 	}
 
-	private void skin(WhiskerMesh.Part p) {
-		int nv = p.vertexCount;
-		if (skinPos.length < nv * 3) {
-			skinPos = new float[nv * 3];
-			skinNrm = new float[nv * 3];
-		}
-		if (skinHidden.length < nv) {
-			skinHidden = new boolean[nv];
-		}
-		for (int v = 0; v < nv; v++) {
-			float x = p.pos[v * 3], y = p.pos[v * 3 + 1], z = p.pos[v * 3 + 2];
-			float nx = p.normal[v * 3], ny = p.normal[v * 3 + 1], nz = p.normal[v * 3 + 2];
-			float px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0;
-			// Hidden bones (tack, the male crest): a vertex that mostly belongs to one
-			// is parked far below the bird; soft-joint neighbours renormalise over the
-			// visible bones instead of being dragged along with it.
-			float visible = 0, best = 0;
-			boolean bestHidden = false;
-			for (int k = 0; k < 4; k++) {
-				float w = p.weight[v * 4 + k];
-				int b = p.bone[v * 4 + k];
-				boolean h = b < hidden.length && hidden[b];
-				if (!h) {
-					visible += w;
-				}
-				if (w > best) {
-					best = w;
-					bestHidden = h;
-				}
+	private static int[] glow(WhiskerMesh.Part p) {
+		return GLOW.computeIfAbsent(p, k -> {
+			int[] out = new int[p.vertexCount];
+			for (int v = 0; v < p.vertexCount; v++) {
+				out[v] = 0xFF000000 | (p.emit[v * 3] & 0xFF) << 16 | (p.emit[v * 3 + 1] & 0xFF) << 8 | (p.emit[v * 3 + 2] & 0xFF);
 			}
-			skinHidden[v] = bestHidden || visible <= 1e-6F;
-			if (skinHidden[v]) {
-				// triangles touching this vertex are skipped in emit(); never stretch them
-				skinPos[v * 3] = x;
-				skinPos[v * 3 + 1] = y;
-				skinPos[v * 3 + 2] = z;
-				skinNrm[v * 3] = nx;
-				skinNrm[v * 3 + 1] = ny;
-				skinNrm[v * 3 + 2] = nz;
-				continue;
+			return out;
+		});
+	}
+
+	private void emit(VertexConsumer vc, WhiskerMesh.Part p, int[] color, int light, int overlay, boolean quads) {
+		final int[] tri = p.tri;
+		final boolean[] hide = skinner.hidden;
+		for (int t = 0; t < p.triCount; t++) {
+			int a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+			if (hide[a] || hide[b] || hide[c]) {
+				continue;   // a hidden-bone triangle is never stretched
 			}
-			for (int k = 0; k < 4; k++) {
-				float w = p.weight[v * 4 + k];
-				int b = p.bone[v * 4 + k];
-				if (w <= 0 || (b < hidden.length && hidden[b])) {
-					continue;
-				}
-				w /= visible;
-				int o = b * 12;
-				if (o + 11 >= bones.length) {
-					continue;
-				}
-				px += w * (bones[o] * x + bones[o + 1] * y + bones[o + 2] * z + bones[o + 3]);
-				py += w * (bones[o + 4] * x + bones[o + 5] * y + bones[o + 6] * z + bones[o + 7]);
-				pz += w * (bones[o + 8] * x + bones[o + 9] * y + bones[o + 10] * z + bones[o + 11]);
-				qx += w * (bones[o] * nx + bones[o + 1] * ny + bones[o + 2] * nz);
-				qy += w * (bones[o + 4] * nx + bones[o + 5] * ny + bones[o + 6] * nz);
-				qz += w * (bones[o + 8] * nx + bones[o + 9] * ny + bones[o + 10] * nz);
+			vertex(vc, p, a, color[a], light, overlay);
+			vertex(vc, p, b, color[b], light, overlay);
+			vertex(vc, p, c, color[c], light, overlay);
+			if (quads) {
+				vertex(vc, p, c, color[c], light, overlay);   // vanilla entity render types are quads
 			}
-			float l = Mth.sqrt(qx * qx + qy * qy + qz * qz);
-			if (l < 1e-6F) {
-				qx = 0;
-				qy = 1;
-				qz = 0;
-			} else {
-				qx /= l;
-				qy /= l;
-				qz /= l;
-			}
-			skinPos[v * 3] = px;
-			skinPos[v * 3 + 1] = py;
-			skinPos[v * 3 + 2] = pz;
-			skinNrm[v * 3] = qx;
-			skinNrm[v * 3 + 1] = qy;
-			skinNrm[v * 3 + 2] = qz;
 		}
 	}
 
-	private void emit(VertexConsumer vc, WhiskerMesh.Part p, PoseStack.Pose pose, int light, int overlay, int[] tint) {
-		for (int i = 0; i < p.triCount * 4; i++) {
-			int tri = i / 4;
-			if (i % 4 == 0 && (skinHidden[p.tri[tri * 3]] || skinHidden[p.tri[tri * 3 + 1]] || skinHidden[p.tri[tri * 3 + 2]])) {
-				i += 3;   // whole quad of a hidden-bone triangle
+	private void emitGlow(VertexConsumer vc, WhiskerMesh.Part p, int[] color) {
+		final int[] tri = p.tri;
+		final boolean[] hide = skinner.hidden;
+		for (int t : p.emissiveTri) {
+			int a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+			if (hide[a] || hide[b] || hide[c]) {
 				continue;
 			}
-			int v = p.tri[tri * 3 + Math.min(i % 4, 2)];
-			int r = p.rgb[v * 3] & 0xFF, g = p.rgb[v * 3 + 1] & 0xFF, b = p.rgb[v * 3 + 2] & 0xFF;
-			int er = p.emit[v * 3] & 0xFF, eg = p.emit[v * 3 + 1] & 0xFF, eb = p.emit[v * 3 + 2] & 0xFF;
-			if (tint == null) {
-				r = er;
-				g = eg;
-				b = eb;
-			} else if (isPlumage(r, g, b)) {
-				r = clamp(r * tint[0] / YELLOW[0]);
-				g = clamp(g * tint[1] / Math.max(1, YELLOW[1]));
-				b = clamp(b * tint[2] / Math.max(1, YELLOW[2]));
-			}
-			vc.addVertex(pose, skinPos[v * 3], skinPos[v * 3 + 1], skinPos[v * 3 + 2])
-					.setColor(r, g, b, 255)
-					.setUv(p.uv[v * 2], p.uv[v * 2 + 1])
-					.setOverlay(overlay)
-					.setLight(light)
-					.setNormal(pose, skinNrm[v * 3], skinNrm[v * 3 + 1], skinNrm[v * 3 + 2]);
+			vertex(vc, p, a, color[a], 0xF000F0, OverlayTexture.NO_OVERLAY);
+			vertex(vc, p, b, color[b], 0xF000F0, OverlayTexture.NO_OVERLAY);
+			vertex(vc, p, c, color[c], 0xF000F0, OverlayTexture.NO_OVERLAY);
+			vertex(vc, p, c, color[c], 0xF000F0, OverlayTexture.NO_OVERLAY);
 		}
+	}
+
+	private void vertex(VertexConsumer vc, WhiskerMesh.Part p, int v, int color, int light, int overlay) {
+		final float[] pos = skinner.pos, nrm = skinner.nrm;
+		int u = p.posIndex[v] * 3;
+		vc.addVertex(pos[u], pos[u + 1], pos[u + 2])
+				.setColor(color)
+				.setUv(p.uv[v * 2], p.uv[v * 2 + 1])
+				.setOverlay(overlay)
+				.setLight(light)
+				.setNormal(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
 	}
 
 	private static boolean isPlumage(int r, int g, int b) {

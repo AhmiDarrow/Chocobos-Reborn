@@ -1,8 +1,8 @@
-"""Re-derive every breed atlas from the shipped yellow atlas, no Blender needed.
+"""Re-derive every breed atlas master from the yellow master, no Blender needed.
 
 fresh_ship.py writes <variant>/yellow.png straight from the Meshy albedo; the other
 breeds are paint_albedo.paint_breed() over it. Run this after changing the palette,
-the plumage guard or the End / Nether textures:
+the plumage guard or the End / Nether textures (then python tools/ship_atlases.py):
 
     python tools/repaint_atlases.py            # all variants
     python tools/repaint_atlases.py chocobo    # one variant folder
@@ -18,7 +18,7 @@ import pad_atlases  # noqa: E402
 from paint_albedo import PLUMAGE, paint_breed  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXDIR = ROOT / "src/main/resources/assets/chocobosreborn/textures/entity"
+TEXDIR = ROOT / "art/atlases"
 VARIANTS = ["chocobo", "chocobo_saddled", "chocobo_armor_iron", "chocobo_armor_diamond"]
 
 

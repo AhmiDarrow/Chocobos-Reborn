@@ -8,8 +8,10 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 ## What to upload
 
 - Jar: `build/libs/chocobosreborn-<version>.jar` from `./gradlew build` (GameTests are
-  excluded from the jar; atlases ship at 1024, masters stay in `art/atlases`, ignored).
-  1.0.0 is about 82 MB.
+  excluded from the jar; `python tools/ship_atlases.py` writes the yellow / End /
+  Nether atlases at 1024 RGB from the masters in `art/atlases`, ignored; the five
+  solid breeds are recoloured from yellow on the client). 1.0.0 was about 82 MB; the
+  jar is now about 49 MB.
 - Icon: `docs/public/chocobos-reborn-icon-400.png` (400x400).
 - Description: `docs/public/store-description.md` (`store-description.html` is the same
   text rendered for the console's HTML editor).

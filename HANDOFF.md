@@ -754,7 +754,7 @@ Ahmi: "enough testing, fix all the direction arrows for all tracks and then push
 curseforge; update the branding page; only ship what is actually needed for the mod,
 gitignore everything else."
 
-* Jar: `./gradlew build` -> `build/libs/chocobosreborn-1.0.0.jar` (~82 MB). GameTests are
+* Jar: `./gradlew build` -> `build/libs/chocobosreborn-<version>.jar` (~82 MB). GameTests are
   excluded (`exclude 'tk/darrow/chocobosreborn/gametest/**'`; the old exclude named a
   package that never existed). Atlases ship at 1024 (Lanczos from the 2048 masters, which
   now live in `art/atlases/<variant>/`, git-ignored); the jar holds only classes, assets,
@@ -769,6 +769,60 @@ gitignore everything else."
   **1699008** (Ahmi): `tools/upload_curseforge.py` uploaded the jar as file 8903892
   (release, 1.21.1 / NeoForge / Client+Server), awaiting approval; the author token sits
   in `tools/secrets/.env` (ignored).
+
+## Optimisation pass (2026-09-17 21:30, Ahmi: "optimize")
+
+* **Renderer** (`client/ChocoboMeshRenderer` + new `client/MeshSkinner`): the bird is
+  31k tris / 93k flat-shaded verts skinned on the CPU every frame. The pose (model-view,
+  yaw, age scale) is now folded into the 18 bone matrices once per frame and vertices
+  are emitted raw (`addVertex(x,y,z)`), so vanilla's per-vertex `addVertex(pose, ...)`
+  matrix transform is gone; positions are skinned once per unique position
+  (`Part.posIndex` / `upos`: 15.4k slots, identical weights, ~6 verts each) and only
+  normals per vertex; influences are sorted heaviest-first with zero weights trimmed at
+  load (`Part.ucount`), weights normalised at load so the no-hidden-bone path skips the
+  visibility rescale; vertex colours are cached per part and breed (the vertex tint
+  never changes per frame - shipped vcol is (254,254,254), so `isPlumage` never
+  matches); the glow pass only runs over `Part.emissiveTri` (empty for every shipped
+  mesh - it used to re-emit the whole bird whenever a vertex glowed); the gait
+  crossfade reuses scratch arrays instead of `Arrays.copyOf` twice a frame. Skinning
+  one bird: ~1.9 ms -> ~1.3 ms in the JUnit timing (pose transform savings on top).
+  `client/ModRenderTypes.entityCutoutNoCullTriangles` is vanilla's cutout-no-cull state
+  in TRIANGLES mode, 93k vertices instead of 124k (entity quads need a fourth,
+  duplicated vertex); a glowing bird (`isCurrentlyGlowing`) falls back to the quad
+  type because the outline pass is quads. Pixel-identical output by construction;
+  `MeshSkinnerTest` checks the folded path against model-space skinning + pose on the
+  shipped mesh.
+* **Jar**: the 32 breed atlases were RGBA with alpha all 255; `tools/ship_atlases.py`
+  now ships them (Lanczos from the 2048 masters in `art/atlases/`, which reproduces the
+  approved 1024s byte for byte, then RGB): 82.1 MB -> 76.4 MB, no pixel changed. Run it
+  after `fresh_ship.py` / `repaint_atlases.py`. What is left: the four `.ncgb` meshes
+  (6.4 MB each, 2.5 MB zipped; NCGB v1 is shared with Ninjacat, left alone) and 14 MB
+  of music.
+* **Derived breed atlases** (Ahmi saw the shipped-vs-derived render sheet, "if it
+  comes out looking ok we move forward" -> go): the jar ships only `yellow`, `purple`
+  and `flame` per mesh (12 atlases, 19 MB). Green / Blue / White / Black / Gold are
+  `client/DerivedAtlasTexture`: an `AbstractTexture` registered under the old path
+  (`textures/entity/<variant>/<breed>.png`) on first use from
+  `ChocoboMeshRenderer.getTextureLocation` (`ChocoboColor.derivedAtlas()`), whose
+  `load` reads the yellow atlas, recolours it with `client/AtlasTint` (float32
+  replica of `paint_albedo.recolor_plumage`; `AtlasTintTest` shows 0 texels differ
+  from the Python derivation across all 20 atlases when `CR_DERIVED_DIR` points at
+  them, and pins known texels otherwise) and uploads it; the texture manager re-runs
+  `load` on every resource reload, so packs replacing yellow carry through. The
+  rendered difference against the approved files was 0.02-0.16 % of pixels at the
+  beak / eye rim (island edges after the Lanczos), invisible at 1x. Jar 76 MB -> 49 MB.
+  Tools: masters (2048 RGBA, all eight breeds) live in `art/atlases/<variant>/` and
+  `stills.write_breed_atlases`, `repaint_atlases.py`, `pad_atlases.py` now write
+  there; `ship_atlases.py` makes the three jar copies (1024 RGB) and deletes stale
+  solid-breed files; `render_breeds.py` derives a missing solid breed from the shipped
+  yellow (and takes `--atlases <dir> --prefix --out` for comparisons). Not yet seen
+  in a client here (headless box): first in-game check = every breed on the almanac
+  breed row and a wild Green; a magenta bird or "Could not load texture" in the log
+  means the derived texture failed.
+* **Gate fix**: `greensTrainAndSate` had been red since 1.0.1 added the 5-minute
+  greens cooldown (`ChocoboGreen.trainReady`): 45 feeds in one tick landed once. It now
+  checks one survival feed + cooldown refusal, then feeds in creative (no cooldown) and
+  reads satiety from the `GreensFed` save data. 120 JUnit, 10/10 GameTests, build.
 
 ## Mod state (Java)
 

@@ -118,6 +118,15 @@ public enum ChocoboColor {
 		return this == FLAME;
 	}
 
+	/**
+	 * Solid breeds have no atlas in the jar: the client recolours the yellow one at load
+	 * (client/DerivedAtlasTexture). Yellow is the source; End and Nether carry textured
+	 * feathers and ship as files.
+	 */
+	public boolean derivedAtlas() {
+		return this != YELLOW && this != PURPLE && this != FLAME;
+	}
+
 	public boolean spaceBird() {
 		return this == GREEN || this == BLACK || this == GOLD || this == WHITE || this == PURPLE;
 	}

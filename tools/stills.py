@@ -18,7 +18,8 @@ from paint_albedo import PLUMAGE, accent_plumage, recolor_plumage, paint_breed
 
 ROOT = Path(__file__).resolve().parents[1]
 PREVIEW = ROOT / "art/preview"
-TEXDIR = ROOT / "src/main/resources/assets/chocobosreborn/textures/entity"
+# 2048 masters; tools/ship_atlases.py writes the 1024 jar copies (yellow, purple, flame)
+TEXDIR = ROOT / "art/atlases"
 # Variant = mesh id + texture folder + still prefix. "chocobo" = the plain bird,
 # "chocobo_saddled" = the Meshy bird with the saddle / bridle / reins baked in.
 VARIANT = "chocobo"

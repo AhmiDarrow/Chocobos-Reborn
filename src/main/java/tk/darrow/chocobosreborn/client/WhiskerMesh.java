@@ -26,6 +26,19 @@ public final class WhiskerMesh {
 		public final byte[] rgb, emit;
 		public final short[] bone;
 		public final int[] tri;
+		/** Triangles with an emissive vertex; the glow pass draws only these (empty for every shipped bird). */
+		public int[] emissiveTri = new int[0];
+		/**
+		 * The mesh is flat shaded, so ~6 vertices share each position (and its skin weights):
+		 * {@code posIndex[v]} is the vertex's slot in {@code upos} / {@code uweight} / {@code ubone},
+		 * and positions are skinned once per slot.
+		 */
+		public int[] posIndex;
+		public int uniqueCount;
+		public float[] upos, uweight;
+		public short[] ubone;
+		/** Influences per slot: {@code uweight} is sorted descending, zero weights trimmed. */
+		public byte[] ucount;
 
 		Part(String name, boolean textured, int nv, int nt) {
 			this.name = name;
@@ -160,6 +173,7 @@ public final class WhiskerMesh {
 			for (int t = 0; t < nt * 3; t++) {
 				p.tri[t] = b.getInt();
 			}
+			finish(p);
 			parts[i] = p;
 		}
 		int nc = b.getInt();
@@ -176,6 +190,85 @@ public final class WhiskerMesh {
 		}
 		float height = b.getFloat(), width = b.getFloat();
 		return new WhiskerMesh(names, parent, parts, clips, height, width);
+	}
+
+	/** Normalise the weights (the fast skinning path assumes they sum to 1) and list the emissive triangles. */
+	static void finish(Part p) {
+		for (int v = 0; v < p.vertexCount; v++) {
+			float sum = 0;
+			for (int k = 0; k < 4; k++) {
+				sum += Math.max(0.0F, p.weight[v * 4 + k]);
+			}
+			for (int k = 0; k < 4; k++) {
+				p.weight[v * 4 + k] = sum > 1e-6F ? Math.max(0.0F, p.weight[v * 4 + k]) / sum : (k == 0 ? 1.0F : 0.0F);
+			}
+		}
+		boolean[] glows = new boolean[p.vertexCount];
+		int lit = 0;
+		for (int v = 0; v < p.vertexCount; v++) {
+			glows[v] = p.emit[v * 3] != 0 || p.emit[v * 3 + 1] != 0 || p.emit[v * 3 + 2] != 0;
+		}
+		int[] tris = new int[p.triCount];
+		for (int t = 0; t < p.triCount; t++) {
+			if (glows[p.tri[t * 3]] || glows[p.tri[t * 3 + 1]] || glows[p.tri[t * 3 + 2]]) {
+				tris[lit++] = t;
+			}
+		}
+		p.emissiveTri = java.util.Arrays.copyOf(tris, lit);
+		dedupePositions(p);
+	}
+
+	/** Group vertices with the same position, bones and weights so each is skinned once. */
+	private static void dedupePositions(Part p) {
+		int nv = p.vertexCount;
+		Map<PosKey, Integer> slots = new HashMap<>(nv * 2);
+		p.posIndex = new int[nv];
+		float[] upos = new float[nv * 3], uwt = new float[nv * 4];
+		short[] ubn = new short[nv * 4];
+		int n = 0;
+		for (int v = 0; v < nv; v++) {
+			PosKey key = new PosKey(p, v);
+			Integer slot = slots.get(key);
+			if (slot == null) {
+				slot = n++;
+				slots.put(key, slot);
+				System.arraycopy(p.pos, v * 3, upos, slot * 3, 3);
+				System.arraycopy(p.weight, v * 4, uwt, slot * 4, 4);
+				System.arraycopy(p.bone, v * 4, ubn, slot * 4, 4);
+			}
+			p.posIndex[v] = slot;
+		}
+		p.uniqueCount = n;
+		p.upos = java.util.Arrays.copyOf(upos, n * 3);
+		p.uweight = java.util.Arrays.copyOf(uwt, n * 4);
+		p.ubone = java.util.Arrays.copyOf(ubn, n * 4);
+		p.ucount = new byte[n];
+		for (int u = 0; u < n; u++) {
+			// heaviest influence first, so the skinner stops at the first zero weight
+			for (int i = 1; i < 4; i++) {
+				for (int j = i; j > 0 && p.uweight[u * 4 + j] > p.uweight[u * 4 + j - 1]; j--) {
+					float w = p.uweight[u * 4 + j];
+					p.uweight[u * 4 + j] = p.uweight[u * 4 + j - 1];
+					p.uweight[u * 4 + j - 1] = w;
+					short b = p.ubone[u * 4 + j];
+					p.ubone[u * 4 + j] = p.ubone[u * 4 + j - 1];
+					p.ubone[u * 4 + j - 1] = b;
+				}
+			}
+			int c = 0;
+			while (c < 4 && p.uweight[u * 4 + c] > 0) {
+				c++;
+			}
+			p.ucount[u] = (byte) c;
+		}
+	}
+
+	private record PosKey(float x, float y, float z, short b0, short b1, short b2, short b3, float w0, float w1, float w2, float w3) {
+		PosKey(Part p, int v) {
+			this(p.pos[v * 3], p.pos[v * 3 + 1], p.pos[v * 3 + 2],
+					p.bone[v * 4], p.bone[v * 4 + 1], p.bone[v * 4 + 2], p.bone[v * 4 + 3],
+					p.weight[v * 4], p.weight[v * 4 + 1], p.weight[v * 4 + 2], p.weight[v * 4 + 3]);
+		}
 	}
 
 	private static String str(ByteBuffer b) {
