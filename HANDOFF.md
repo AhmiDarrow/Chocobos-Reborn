@@ -824,6 +824,20 @@ gitignore everything else."
   checks one survival feed + cooldown refusal, then feeds in creative (no cooldown) and
   reads satiety from the `GreensFed` save data. 120 JUnit, 10/10 GameTests, build.
 
+## Wild sources (2026-09-17, Ahmi: "normal gysahl greens should be the only one you can find, everything is gated behind the shops in whiskerwind")
+
+* Gysahl is the only green or nut outside Whiskerwind. The gysahl crop loot table
+  drops greens and seeds only (the 8% Krakka/Tantal and 5% Pepio pools are gone).
+  Seeds from grass stay (`gysahl_seeds_from_grass`, the only global loot modifier).
+* `carob_from_ravager` and `zeio_from_piglin_brute` are deleted; Carob and Zeio are
+  Bilo's stock (90 / 128 GP) and A/S prizes only, so colour breeding needs the town.
+* The farm Stablehand (`RaceShops`, role `stablehand`) sells Gysahl and seeds only.
+* Krakka and Tantal crafting recipes kept as the one cheap bridge (Ahmi's call).
+* `tools/write_datapack.py` matches the committed data again (it also emits
+  `survives_explosion` on block loot now); rerunning it only changes line endings.
+* README, SPEC, store description (md + html) and the almanac greens / nuts / farm /
+  items pages say so.
+
 ## Mod state (Java)
 
 Verified locally on 2026-09-16 (and in the cloud workspace before that):

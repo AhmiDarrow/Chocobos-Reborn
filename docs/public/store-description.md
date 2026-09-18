@@ -14,7 +14,7 @@ Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice.
 
 ## Greens (training)
 
-Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a wild bird (about one try in three) and heals a hurt one. Every green trains speed, stamina, intelligence or cooperation; a bird takes one training green every five minutes, and gets sated on each kind, so move up the ladder. Speed training makes a real difference: a fully trained bird runs a third faster. Gysahl grows from seeds found in grass; the better greens come from Sage Wynn in Whiskerwind, race prizes and lucky harvests.
+Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a wild bird (about one try in three) and heals a hurt one. Every green trains speed, stamina, intelligence or cooperation; a bird takes one training green every five minutes, and gets sated on each kind, so move up the ladder. Speed training makes a real difference: a fully trained bird runs a third faster. Gysahl grows from seeds found in grass and is the only green found in the wild; Krakka and Tantal can be crafted from it, and every other green comes from Sage Wynn in Whiskerwind or race prizes.
 
 ## Nuts (mating)
 
@@ -24,7 +24,7 @@ Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of t
 2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
 3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. Carob Nuts fall from ravagers, Zeio Nuts from piglin brutes.
+As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class A up pay out Carob, with a rare Zeio at Class S.
 
 ## Riding and fighting
 
@@ -63,7 +63,7 @@ Classes run C → B → A → S. Three first-place finishes promote; a bird neve
 
 ## Chocobo Farm
 
-Farms dot the plains, meadows, savannas and cherry groves: a barn, a paddock with a couple of wild Yellows, a gysahl patch, a Stablehand who sells greens and nuts, and a Farmhand at the gate who sends you to Whiskerwind.
+Farms dot the plains, meadows, savannas and cherry groves: a barn, a paddock with a couple of wild Yellows, a gysahl patch, a Stablehand who sells Gysahl and seeds, and a Farmhand at the gate who sends you to Whiskerwind.
 
 ## Start your journey
 

@@ -85,60 +85,6 @@
           ]
         }
       ]
-    },
-    {
-      "rolls": 1,
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        },
-        {
-          "condition": "minecraft:block_state_property",
-          "block": "chocobosreborn:gysahl_green",
-          "properties": {
-            "age": "4"
-          }
-        },
-        {
-          "condition": "minecraft:random_chance",
-          "chance": 0.08
-        }
-      ],
-      "entries": [
-        {
-          "type": "minecraft:item",
-          "name": "chocobosreborn:krakka_green"
-        },
-        {
-          "type": "minecraft:item",
-          "name": "chocobosreborn:tantal_green"
-        }
-      ]
-    },
-    {
-      "rolls": 1,
-      "conditions": [
-        {
-          "condition": "minecraft:survives_explosion"
-        },
-        {
-          "condition": "minecraft:block_state_property",
-          "block": "chocobosreborn:gysahl_green",
-          "properties": {
-            "age": "4"
-          }
-        },
-        {
-          "condition": "minecraft:random_chance",
-          "chance": 0.05
-        }
-      ],
-      "entries": [
-        {
-          "type": "minecraft:item",
-          "name": "chocobosreborn:pepio_nut"
-        }
-      ]
     }
   ]
 }

@@ -35,9 +35,6 @@ public final class RaceShops {
 				new Line("fair", 8, "minecraft:lead", 1),
 				new Line("stablehand", 2, "chocobosreborn:gysahl_green", 6),
 				new Line("stablehand", 2, "chocobosreborn:gysahl_green_seeds", 3),
-				new Line("stablehand", 10, "chocobosreborn:krakka_green", 1),
-				new Line("stablehand", 5, "chocobosreborn:pepio_nut", 1),
-				new Line("stablehand", 8, "chocobosreborn:luchile_nut", 1),
 				// Marl's GP Exchange: GP for everyday goods (a C-class win is 20 GP, an S-class win 150)
 				new Line("exchange", 3, "minecraft:bread", 4),
 				new Line("exchange", 3, "minecraft:hay_block", 2),

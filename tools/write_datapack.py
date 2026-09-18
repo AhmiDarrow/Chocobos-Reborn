@@ -39,8 +39,11 @@ def item_entry(item, count=None, extra_funcs=None, conditions=None):
     return e
 
 
+SURVIVES = {"condition": "minecraft:survives_explosion"}
+
+
 def block_loot(block, entries, block_type="minecraft:block"):
-    return {"type": block_type, "pools": [{"rolls": 1, "entries": entries}]}
+    return {"type": block_type, "pools": [{"rolls": 1, "conditions": [SURVIVES], "entries": entries}]}
 
 
 def main():
@@ -48,21 +51,17 @@ def main():
     w(f"{NS}/loot_table/blocks/square_gate.json", block_loot("square_gate", [item_entry(f"{NS}:square_gate")]))
     w(f"{NS}/loot_table/blocks/boost_pad.json", block_loot("boost_pad", [item_entry(f"{NS}:boost_pad")]))
     # crop: seeds always; greens only when grown (age 4). Fortune adds seeds.
-    grown = [{"condition": "minecraft:block_state_property", "block": f"{NS}:gysahl_green",
-              "properties": {"age": "4"}}]
+    grown = [SURVIVES, {"condition": "minecraft:block_state_property", "block": f"{NS}:gysahl_green",
+                        "properties": {"age": "4"}}]
     w(f"{NS}/loot_table/blocks/gysahl_green.json", {
         "type": "minecraft:block",
         "pools": [
-            {"rolls": 1, "entries": [item_entry(f"{NS}:gysahl_green_seeds")]},
+            {"rolls": 1, "conditions": [SURVIVES], "entries": [item_entry(f"{NS}:gysahl_green_seeds")]},
             {"rolls": 1, "conditions": grown, "entries": [item_entry(f"{NS}:gysahl_green", (1, 2))]},
             {"rolls": 1, "conditions": grown, "entries": [item_entry(f"{NS}:gysahl_green_seeds", (0, 2), [
                 {"function": "minecraft:apply_bonus", "enchantment": "minecraft:fortune",
                  "formula": "minecraft:binomial_with_bonus_count", "parameters": {"extra": 3, "probability": 0.5714286}}])]},
-            # a gysahl patch sometimes throws a better green, or a Pepio nut (FF7 farm luck)
-            {"rolls": 1, "conditions": grown + [{"condition": "minecraft:random_chance", "chance": 0.08}],
-             "entries": [item_entry(f"{NS}:krakka_green"), item_entry(f"{NS}:tantal_green")]},
-            {"rolls": 1, "conditions": grown + [{"condition": "minecraft:random_chance", "chance": 0.05}],
-             "entries": [item_entry(f"{NS}:pepio_nut")]},
+            # Gysahl is the only green found in the wild; the rest are Whiskerwind stock or prizes.
         ],
     })
 
@@ -81,7 +80,7 @@ def main():
     # Chocobo Lure: a materia-like orb; amethyst around a gysahl green
     shaped("chocobo_lure", [" A ", "AYA", " A "], {"A": {"item": "minecraft:amethyst_shard"},
                                                     "Y": {"item": f"{NS}:gysahl_green"}}, f"{NS}:chocobo_lure")
-    # cheap greens can be grown up from gysahl; the good ones come from the Sage, prizes, and farm luck
+    # cheap greens can be grown up from gysahl; the good ones come from the Sage and prizes
     shapeless("krakka_green", [{"item": f"{NS}:gysahl_green"}, {"item": f"{NS}:gysahl_green"},
                                {"item": "minecraft:bone_meal"}], f"{NS}:krakka_green")
     shapeless("tantal_green", [{"item": f"{NS}:gysahl_green"}, {"item": f"{NS}:gysahl_green"},
@@ -138,23 +137,9 @@ def main():
     })
 
     # ------------------------------------------------- gysahl seeds from grass
+    # No nut drops in the wild: Carob and Zeio are Bilo's stock and race prizes only.
     w("neoforge/loot_modifiers/global_loot_modifiers.json", {"replace": False,   # NeoForge reads only this path
-                                                           "entries": [f"{NS}:gysahl_seeds_from_grass",
-                                                                       f"{NS}:carob_from_ravager",
-                                                                       f"{NS}:zeio_from_piglin_brute"]})
-    # FF7: Carob Nuts come from the Vlakorados, Zeio Nuts from the goblins of Goblin Island.
-    w(f"{NS}/loot_modifiers/carob_from_ravager.json", {
-        "type": f"{NS}:add_item",
-        "conditions": [{"condition": "minecraft:entity_properties", "entity": "this",
-                        "predicate": {"type": "minecraft:ravager"}}],
-        "item": f"{NS}:carob_nut", "count": 1, "chance": 0.5,
-    })
-    w(f"{NS}/loot_modifiers/zeio_from_piglin_brute.json", {
-        "type": f"{NS}:add_item",
-        "conditions": [{"condition": "minecraft:entity_properties", "entity": "this",
-                        "predicate": {"type": "minecraft:piglin_brute"}}],
-        "item": f"{NS}:zeio_nut", "count": 1, "chance": 0.12,
-    })
+                                                           "entries": [f"{NS}:gysahl_seeds_from_grass"]})
     w(f"{NS}/loot_modifiers/gysahl_seeds_from_grass.json", {
         "type": f"{NS}:add_item",
         "conditions": [{"condition": "minecraft:any_of", "terms": [
