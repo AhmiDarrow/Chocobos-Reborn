@@ -148,6 +148,7 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		TownRole role = role();
 		if (role.shops()) {
 			if (tradingPlayer != null) {
+				sp.displayClientMessage(Component.translatable("chocobosreborn.shop.busy"), true);
 				return InteractionResult.CONSUME;
 			}
 			setTradingPlayer(sp);
@@ -166,6 +167,9 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		}
 		if (role.fans()) {
 			sp.displayClientMessage(Component.translatable("chocobosreborn.fan.cheer." + random.nextInt(4)), true);
+			return InteractionResult.CONSUME;
+		}
+		if (role.jockey()) {
 			return InteractionResult.CONSUME;
 		}
 		return steward(sp);
@@ -187,19 +191,29 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			return InteractionResult.CONSUME;
 		}
 		if (bird == null) {
-			RaceManager.leaveSquare(player);
+			if (player.isSecondaryUseActive()) {
+				RaceManager.leaveSquare(player);
+			} else {
+				player.displayClientMessage(Component.translatable("chocobosreborn.square.home_hint"), true);
+			}
 			return InteractionResult.CONSUME;
 		}
 		if (RaceManager.sessionOf(player.getUUID()) != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
 			return InteractionResult.CONSUME;
 		}
-		if (!bird.saddled() || bird.isBaby()) {
+		if (!bird.saddled() || bird.isBaby()
+				|| (!bird.isOwnedBy(player) && !player.getAbilities().instabuild)) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
 			return InteractionResult.CONSUME;
 		}
 		if (bird.armor() != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
+			return InteractionResult.CONSUME;
+		}
+		if (player.isSecondaryUseActive() && tk.darrow.chocobosreborn.race.HeatSchedule.entered(player.getUUID())) {
+			tk.darrow.chocobosreborn.race.HeatSchedule.drop(player);
+			tk.darrow.chocobosreborn.race.RaceManager.refundPendingBet(player);
 			return InteractionResult.CONSUME;
 		}
 		// a heat of this class already on the timetable: join it; otherwise pick its course
@@ -226,23 +240,19 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			}
 			return InteractionResult.CONSUME;
 		}
-		if (RaceManager.sessionOf(player.getUUID()) != null) {
-			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
-			return InteractionResult.CONSUME;
-		}
 		if (player.isSecondaryUseActive() && DuelDesk.mine(player.getUUID()) != null) {
 			DuelDesk.withdraw(player);
+			return InteractionResult.CONSUME;
+		}
+		if (RaceManager.sessionOf(player.getUUID()) != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
 			return InteractionResult.CONSUME;
 		}
 		if (bird.armor() != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return InteractionResult.CONSUME;
 		}
-		if (!DuelDesk.others(player.getUUID()).isEmpty()) {
-			DuelDesk.Challenge c = DuelDesk.others(player.getUUID()).get(0);
-			player.displayClientMessage(Component.translatable("chocobosreborn.duel.accepting", c.name(),
-					Component.translatable("chocobosreborn.track." + c.track().id()), c.stake()), false);
-			DuelDesk.accept(player, bird);
+		if (DuelDesk.accept(player, bird)) {
 			return InteractionResult.CONSUME;
 		}
 		net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
@@ -252,7 +262,11 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 
 	/** Bookie: hand over GP with a pick in mind. Empty hand cycles the pick. */
 	private InteractionResult bookie(ServerPlayer player) {
-		RaceSession s = RaceManager.sessionOf(player.getUUID());
+		if (player.isSecondaryUseActive() && RaceManager.hasPendingBet(player)) {
+			RaceManager.refundPendingBet(player);
+			return InteractionResult.CONSUME;
+		}
+		RaceSession s = RaceManager.sessionForBet(player.getUUID());
 		if (s != null && !RaceScoring.booksOpen(true, s.running())) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.closed"), true);
 			return InteractionResult.CONSUME;
@@ -265,13 +279,30 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		int classId = s != null ? s.track().getRaceClass().getId()
 				: player.getVehicle() instanceof ChocoboEntity b2 ? b2.raceClass().getId() : 0;
 		ItemStack hand = player.getMainHandItem();
-		RaceScoring.BetPick pick = pickFor(player);
 		if (!hand.is(ModItems.GP.get())) {
-			pick = RaceScoring.nextPick(pick, ranked, teioh);
+			hand = player.getOffhandItem();
+		}
+		RaceScoring.BetPick pick = pickFor(player);
+		if (s != null) {
+			pick = s.legalPick(pick, player.getUUID());
+		} else {
+			pick = RaceScoring.legalize(pick, ranked, teioh);
+		}
+		setPick(player, pick);
+		if (!hand.is(ModItems.GP.get())) {
+			pick = s != null ? s.nextPick(pick, player.getUUID()) : RaceScoring.nextPick(pick, ranked, teioh);
 			setPick(player, pick);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.pick",
 					Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT)),
 					RaceScoring.odds(pick, classId)), true);
+			return InteractionResult.CONSUME;
+		}
+		if (s != null && RaceManager.hasPendingBet(player)) {
+			int moved = RaceManager.settlePendingOnto(player, s);
+			if (moved > 0) {
+				player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", moved,
+						Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT))), false);
+			}
 			return InteractionResult.CONSUME;
 		}
 		int stake = RaceScoring.clampStake(hand.getCount());
@@ -279,6 +310,9 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			hand.shrink(stake);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", stake,
 					Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT))), false);
+			if (s == null) {
+				player.displayClientMessage(Component.translatable("chocobosreborn.bet.no_heat"), false);
+			}
 		} else {
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refused"), true);
 		}
@@ -312,9 +346,13 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 	public void aiStep() {
 		super.aiStep();
 		if (!level().isClientSide && tradingPlayer != null && tickCount % 20 == 0
-				&& (tradingPlayer.isRemoved()
+				&& (tradingPlayer.isRemoved() || tradingPlayer.distanceTo(this) > 8.0F
 				|| !(tradingPlayer.containerMenu instanceof net.minecraft.world.inventory.MerchantMenu))) {
-			setTradingPlayer(null);   // the screen went away without telling us (teleport, discard)
+			if (tradingPlayer instanceof ServerPlayer sp
+					&& sp.containerMenu instanceof net.minecraft.world.inventory.MerchantMenu) {
+				sp.closeContainer();
+			}
+			setTradingPlayer(null);
 		}
 	}
 
@@ -384,6 +422,16 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 
 
 	// ------------------------------------------------------------- hardiness
+
+	@Override
+	public boolean canBeLeashed() {
+		return false;
+	}
+
+	@Override
+	public boolean canBeHitByProjectile() {
+		return false;
+	}
 
 	@Override
 	public boolean isInvulnerableTo(DamageSource source) {

@@ -19,8 +19,14 @@ public final class ChocobosRebornClient {
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
-		tk.darrow.chocobosreborn.net.AlmanacPayload.CLIENT_OPENER =
-				data -> net.minecraft.client.Minecraft.getInstance().setScreen(new AlmanacScreen(data));
+		tk.darrow.chocobosreborn.net.AlmanacPayload.CLIENT_OPENER = data -> {
+			var mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc.screen instanceof AlmanacScreen open) {
+				open.reload(data);
+			} else {
+				mc.setScreen(new AlmanacScreen(data));
+			}
+		};
 		tk.darrow.chocobosreborn.net.RacePayloads.OpenCourseSelect.CLIENT_OPENER = CourseSelectScreen::open;
 		tk.darrow.chocobosreborn.entity.ChocoboEntity.LOCAL_RIDER = bird -> {
 			var p = net.minecraft.client.Minecraft.getInstance().player;

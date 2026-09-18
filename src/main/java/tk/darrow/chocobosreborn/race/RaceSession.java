@@ -26,9 +26,10 @@ import tk.darrow.chocobosreborn.sound.ModSounds;
 /**
  * One heat at Whiskerwind: countdown at the stalls, laps, finish order,
  * awards (class wins, GP prizes, bets, duel stakes) and the walk back to the
- * paddock. A ranked heat has one human and five AI racers; a duel has two
- * humans and four AI pace birds. The course's chunks are force-loaded for the
- * duration so the field keeps running out of the riders' sight.
+ * paddock. A ranked heat has one human and five named AI regulars (Jolo and
+ * Teiyo from Class B); a duel has two humans and four named pace birds. The
+ * course's chunks are force-loaded for the duration so the field keeps running
+ * out of the riders' sight.
  */
 public class RaceSession {
 	public enum State { HOLD, RUNNING, DONE }
@@ -37,6 +38,8 @@ public class RaceSession {
 	private static final int HOLD_TICKS = 260;
 	private static final int COUNTDOWN_TICKS = 100;
 	private static final int FINISH_GRACE_TICKS = 1200;
+	/** Hard cap from GO so an AFK human cannot occupy a course forever. */
+	private static final int RUN_CAP_TICKS = 12000;
 	static final String NAME_TEIYO = "Teiyo";
 	static final String NAME_JOLO = "Jolo";
 	public static final int FIELD = 6;
@@ -78,7 +81,7 @@ public class RaceSession {
 
 		/** The bird even if it is dead: teardown must clear racing on a corpse or its rider is stuck on it. */
 		@Nullable ChocoboEntity anyEntity() {
-			if (!ref.isRemoved() || !ref.isAlive()) {
+			if (!ref.isRemoved()) {
 				return ref;
 			}
 			Entity e = level.getEntity(bird);
@@ -110,6 +113,76 @@ public class RaceSession {
 	/** Duel: GP each side put up; the winner takes both. */
 	private int duelStake;
 	private boolean duelPaid;
+	private boolean aborting;
+	/** Ranked bookie bets (one per human in a shared heat). */
+	private final List<BookieBet> bets = new ArrayList<>();
+	@Nullable private UUID bettor;
+
+	private static final class BookieBet {
+		final UUID player;
+		final RaceScoring.BetPick pick;
+		int stake;
+
+		BookieBet(UUID player, RaceScoring.BetPick pick, int stake) {
+			this.player = player;
+			this.pick = pick;
+			this.stake = stake;
+		}
+	}
+
+	@Nullable
+	private BookieBet betOf(UUID player) {
+		for (BookieBet b : bets) {
+			if (b.player.equals(player) && b.stake > 0) {
+				return b;
+			}
+		}
+		return null;
+	}
+
+	boolean hasBookieBet(UUID player) {
+		return betOf(player) != null;
+	}
+
+	public RaceScoring.BetPick legalPick(RaceScoring.BetPick pick, UUID bettor) {
+		return legalLivePick(pick, bettor);
+	}
+
+	public RaceScoring.BetPick nextPick(RaceScoring.BetPick pick, UUID bettor) {
+		return RaceScoring.nextLivePick(pick, ranked, hasPlayer(bettor), hasJolo(), hasTeiyo(),
+				humans().size() > 1);
+	}
+
+	void takeBookieBet(UUID player, RaceScoring.BetPick pick, int amount) {
+		RaceScoring.BetPick legal = legalLivePick(pick, player);
+		bets.add(new BookieBet(player, legal, amount));
+		if (this.bet == null) {
+			this.bet = legal;
+			this.stake = amount;
+			this.bettor = player;
+		}
+	}
+
+	private boolean hasJolo() {
+		return racers.stream().anyMatch(r -> NAME_JOLO.equals(r.name));
+	}
+
+	private boolean hasTeiyo() {
+		return racers.stream().anyMatch(r -> NAME_TEIYO.equals(r.name));
+	}
+
+	private RaceScoring.BetPick legalLivePick(RaceScoring.BetPick pick, UUID bettor) {
+		return RaceScoring.legalizeBettor(pick, ranked, hasPlayer(bettor), hasJolo(), hasTeiyo(),
+				humans().size() > 1);
+	}
+
+	private void clearFirstSlotIf(UUID player) {
+		if (player.equals(bettor)) {
+			bet = null;
+			stake = 0;
+			bettor = null;
+		}
+	}
 
 	/** Ranked heat, or a friendly against the field: one human. */
 	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, ServerPlayer player, ChocoboEntity bird) {
@@ -126,6 +199,7 @@ public class RaceSession {
 		this.layout = RaceCourseLayout.of(track);
 		forceChunks(true);
 		SquareBuilder.buildTrack(level, track);
+		SquareBuilder.scrubCourse(level, track);
 		for (int i = 0; i < players.size(); i++) {
 			RacePoint stall = track.stallPos(i, FIELD);
 			racers.add(new Racer(birds.get(i), players.get(i).getUUID(), players.get(i).getName().getString(),
@@ -142,16 +216,26 @@ public class RaceSession {
 				continue;
 			}
 			RacePoint stall = track.stallPos(racers.indexOf(r), FIELD);
-			moveRidden(e, stall.x(), stall.y(), stall.z());
+			moveRidden(e, stall.x(), stall.y(), stall.z(), false);
 			e.setYRot(track.facingYaw());
 			e.setYBodyRot(track.facingYaw());
 		}
-		ServerPlayer first = players.get(0);
 		if (ranked) {
-			RaceScoring.BetPick pending = RaceManager.takePendingBet(first);
-			if (pending != null) {
-				this.bet = RaceScoring.legalize(pending, ranked, track.getRaceClass().includesTeioh());
-				this.stake = RaceManager.takePendingStake(first);
+			for (ServerPlayer p : players) {
+				RaceScoring.BetPick pending = RaceManager.takePendingBet(p);
+				if (pending == null) {
+					continue;
+				}
+				int n = RaceManager.takePendingStake(p);
+				RaceScoring.BetPick legal = legalLivePick(pending, p.getUUID());
+				if (n > 0) {
+					bets.add(new BookieBet(p.getUUID(), legal, n));
+				}
+				if (this.bet == null) {
+					this.bet = legal;
+					this.stake = n;
+					this.bettor = p.getUUID();
+				}
 			}
 		}
 		for (ServerPlayer p : players) {
@@ -177,13 +261,24 @@ public class RaceSession {
 
 	private void spawnField(int humans, RaceClass raceClass) {
 		boolean teioh = ranked && raceClass.includesTeioh();
+		int namedSlots = FIELD - humans - (teioh ? 2 : 0);
+		List<FieldRoster.Entry> card = FieldRoster.draw(raceClass, Math.max(0, namedSlots),
+				new java.util.Random(level.random.nextLong()));
+		int cardIdx = 0;
+		List<String> announced = new ArrayList<>();
 		for (int i = humans; i < FIELD; i++) {
 			ChocoboEntity npc = ModEntities.CHOCOBO.get().create(level);
 			if (npc == null) {
 				continue;
 			}
-			boolean isTeioh = teioh && i == humans;
-			boolean isJolo = teioh && i == humans + 1;
+			boolean isTeioh = teioh && i == FIELD - 2 && i >= humans;
+			boolean isJolo = teioh && i == FIELD - 1 && i >= humans;
+			FieldRoster.Entry entry = null;
+			if (!isTeioh && !isJolo && cardIdx < card.size()) {
+				entry = card.get(cardIdx++);
+			}
+			String name = isTeioh ? NAME_TEIYO : isJolo ? NAME_JOLO : entry != null ? entry.name() : "Racer";
+			announced.add(name);
 			RacePoint stall = track.stallPos(i, FIELD);
 			npc.moveTo(stall.x(), stall.y(), stall.z(), track.facingYaw(), 0.0F);
 			face(npc, track.facingYaw());
@@ -192,24 +287,38 @@ public class RaceSession {
 			npc.setRaceNpc(true);
 			npc.setPersistenceRequired();
 			npc.setRacing(true);
-			npc.setColor(isTeioh ? ChocoboColor.BLACK : isJolo ? ChocoboColor.GOLD : npcColor(raceClass, i));
+			npc.setColor(isTeioh ? ChocoboColor.BLACK : isJolo ? ChocoboColor.GOLD
+					: entry != null ? entry.color() : npcColor(raceClass, i));
 			npc.setGrade(ChocoboGrade.byRank(Math.min(4, raceClass.getId() + 1)));
-			npc.setCustomName(Component.translatable(isTeioh ? "chocobosreborn.racer.teioh"
-					: isJolo ? "chocobosreborn.racer.jolo" : "chocobosreborn.racer.field", i));
+			npc.setRaceClass(raceClass);
+			int train = RaceScoring.fieldTraining(raceClass.getId(), isTeioh || isJolo);
+			if (!isTeioh && !isJolo) {
+				train = net.minecraft.util.Mth.clamp(train + level.random.nextInt(9) - 4, 0, 100);
+			}
+			npc.addTraining(train, train, train, train);
+			npc.fillStamina();
+			npc.setCustomName(Component.literal(name));
 			npc.setCustomNameVisible(false);   // the jockey carries the name
 			npc.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
 			level.addFreshEntity(npc);
-			mountJockey(npc, isTeioh ? TownRole.JOCKEY_TEIYO : isJolo ? TownRole.JOCKEY_JOLO : jockeyLook(i), stall);
-			Racer r = new Racer(npc, null, isTeioh ? NAME_TEIYO : isJolo ? NAME_JOLO : "field" + i,
-					RaceTrack.stallOffset(i, FIELD), track.progressAt(stall.x(), stall.z()));
+			mountJockey(npc, isTeioh ? TownRole.JOCKEY_TEIYO : isJolo ? TownRole.JOCKEY_JOLO : jockeyLook(i), stall, name);
+			Racer r = new Racer(npc, null, name, RaceTrack.stallOffset(i, FIELD), track.progressAt(stall.x(), stall.z()));
 			RacerProfile.Role role = isTeioh ? RacerProfile.Role.TEIYO : isJolo ? RacerProfile.Role.JOLO : RacerProfile.Role.FIELD;
-			r.goal = new RacerGoal(npc, track, r.lane);
-			r.goal.profile = RacerProfile.of(raceClass, role);
+			r.goal = new RacerGoal(npc, track, r.lane, RacerProfile.of(raceClass, role));
 			// every racer, rivals included, rolls its own form for this heat: +-5% (Ahmi: each race feels different)
 			r.goal.speed = 1.0D + RacerProfile.VARIANCE * (2.0D * level.random.nextDouble() - 1.0D);
 			r.goal.totalLaps = track.getLaps();
 			npc.installRacer(r.goal);
 			racers.add(r);
+		}
+		if (!announced.isEmpty()) {
+			String cardLine = String.join(", ", announced);
+			for (Racer h : humans()) {
+				ServerPlayer p = h.serverPlayer();
+				if (p != null) {
+					p.displayClientMessage(Component.translatable("chocobosreborn.race.card", cardLine), false);
+				}
+			}
 		}
 	}
 
@@ -219,19 +328,37 @@ public class RaceSession {
 	}
 
 	/** A Tribal Power kin in the saddle of an AI racer (visual only: the bird drives itself). */
-	private void mountJockey(ChocoboEntity npc, TownRole look, RacePoint stall) {
+	private void mountJockey(ChocoboEntity npc, TownRole look, RacePoint stall, String nametag) {
 		KinStewardEntity kin = ModEntities.KIN_STEWARD.get().create(level);
 		if (kin == null) {
 			return;
 		}
 		kin.moveTo(stall.x(), stall.y() + 1.0D, stall.z(), track.facingYaw(), 0.0F);
 		kin.setRole(look);
+		kin.setCustomName(Component.literal(nametag));
 		kin.setCustomNameVisible(true);
 		kin.setPersistenceRequired();
 		kin.installJockey();
 		level.addFreshEntity(kin);
-		kin.startRiding(npc, true);
 		jockeys.add(kin);
+	}
+
+	/** Mount after the client has the bird; same-tick startRiding logs "passengers for unknown entity". */
+	private void seatJockeys() {
+		int npc = 0;
+		for (Racer r : racers) {
+			if (r.human()) {
+				continue;
+			}
+			if (npc >= jockeys.size()) {
+				break;
+			}
+			KinStewardEntity kin = jockeys.get(npc++);
+			ChocoboEntity bird = r.entity();
+			if (bird != null && kin.getVehicle() == null && !kin.isRemoved()) {
+				kin.startRiding(bird, true);
+			}
+		}
 	}
 
 	/** Fans on the grandstand for this heat (one tribe look per seat, cycling). */
@@ -295,6 +422,11 @@ public class RaceSession {
 	}
 
 	public boolean hasPlayer(UUID id) {
+		return racers.stream().anyMatch(r -> id.equals(r.player) && !r.forfeited);
+	}
+
+	/** Still this heat's rider, including after a DNF, until teardown. */
+	public boolean belongsTo(UUID id) {
 		return racers.stream().anyMatch(r -> id.equals(r.player));
 	}
 
@@ -341,7 +473,7 @@ public class RaceSession {
 		}
 		tick++;
 		for (Racer me : humans()) {
-			if (me.forfeited) {
+			if (!RaceScoring.stillOnCourse(me.forfeited, me.finishIndex)) {
 				continue;
 			}
 			ServerPlayer player = me.serverPlayer();
@@ -370,6 +502,12 @@ public class RaceSession {
 			return;
 		}
 		if (state == State.HOLD) {
+			if (RaceScoring.seatJockeysOnHoldTick(tick)) {
+				seatJockeys();
+			}
+			if (RaceScoring.scrubCourseOnHoldTick(tick)) {
+				SquareBuilder.scrubCourse(level, track);
+			}
 			tickHold();
 			return;
 		}
@@ -378,8 +516,11 @@ public class RaceSession {
 
 	private void tickHold() {
 		for (int i = 0; i < racers.size(); i++) {
+			if (racers.get(i).forfeited) {
+				continue;
+			}
 			ChocoboEntity e = racers.get(i).entity();
-			if (e == null) {
+			if (e == null || e.level() != level) {
 				continue;
 			}
 			RacePoint stall = track.stallPos(i, FIELD);
@@ -395,8 +536,11 @@ public class RaceSession {
 		if (tick == 30) {
 			// the riders have just been transported: a big banner while their chunks stream in
 			for (Racer h : humans()) {
+				if (h.forfeited) {
+					continue;
+				}
 				ServerPlayer p = h.serverPlayer();
-				if (p != null) {
+				if (p != null && p.level() == level) {
 					Titles.show(p, Component.translatable("chocobosreborn.track." + track.id()),
 							Component.translatable("chocobosreborn.race.get_ready"), 10, 80, 20);
 				}
@@ -413,8 +557,11 @@ public class RaceSession {
 		}
 		if (left > 0 && left <= COUNTDOWN_TICKS && left % 20 == 0) {
 			for (Racer h : humans()) {
+				if (h.forfeited) {
+					continue;
+				}
 				ServerPlayer p = h.serverPlayer();
-				if (p != null) {
+				if (p != null && p.level() == level) {
 					Titles.count(p, left / 20);
 				}
 			}
@@ -424,13 +571,20 @@ public class RaceSession {
 		if (left <= 0) {
 			state = State.RUNNING;
 			for (Racer r : racers) {
+				ChocoboEntity e = r.anyEntity();
+				if (e != null && e.isAlive()) {
+					e.fillStamina();   // HOLD can drain a sprinting rider; everyone leaves the grid full
+				}
 				if (r.goal != null) {
 					r.goal.running = true;
 				}
 			}
 			for (Racer h : humans()) {
+				if (h.forfeited) {
+					continue;
+				}
 				ServerPlayer p = h.serverPlayer();
-				if (p != null) {
+				if (p != null && p.level() == level) {
 					Titles.show(p, Component.translatable("chocobosreborn.race.go").withStyle(net.minecraft.ChatFormatting.GREEN),
 							Component.empty(), 0, 20, 10);
 				}
@@ -450,12 +604,14 @@ public class RaceSession {
 	private void tickRunning() {
 		Racer lead = leadHuman();
 		for (Racer r : racers) {
-			if (r.forfeited || r.finishIndex >= 0) {
+			if (r.forfeited) {
 				continue;
 			}
 			ChocoboEntity e = r.entity();
 			if (e == null) {
-				r.forfeited = true;
+				if (r.finishIndex < 0) {
+					r.forfeited = true;
+				}
 				continue;
 			}
 			double progress = track.progressAt(e.getX(), e.getZ());
@@ -463,6 +619,9 @@ public class RaceSession {
 			if (RaceScoring.squareFallRescue(e.getY(), onCourse)) {
 				RacePoint back = track.pointAtLane(progress, r.lane);
 				moveRidden(e, back.x(), back.y(), back.z());
+			}
+			if (r.finishIndex >= 0) {
+				continue;
 			}
 			if (!r.human() && r.goal != null) {
 				r.goal.lapsDone = r.laps;
@@ -474,8 +633,11 @@ public class RaceSession {
 				ServerPlayer player = r.serverPlayer();
 				if (RaceScoring.finished(r.laps, track.getLaps())) {
 					r.finishIndex = finishCount++;
-					if (firstFinishTick < 0) {
-						firstFinishTick = tick;
+					if (r.human()) {
+						e.setRacing(false);   // unlock dismount; grace must not DNF a placed rider
+						if (firstFinishTick < 0) {
+							firstFinishTick = tick;
+						}
 					}
 					if (r.goal != null) {
 						r.goal.lapsDone = r.laps;
@@ -505,7 +667,8 @@ public class RaceSession {
 		boolean allDone = racers.stream().allMatch(r -> r.forfeited || r.finishIndex >= 0);
 		boolean humansDone = humans().stream().allMatch(r -> r.finishIndex >= 0 || r.forfeited);
 		boolean grace = firstFinishTick >= 0 && tick - firstFinishTick > FINISH_GRACE_TICKS;
-		if (allDone || grace || (humansDone && tick - firstFinishTick > 60)) {
+		boolean timedOut = tick > HOLD_TICKS + RUN_CAP_TICKS;
+		if (allDone || grace || timedOut || (humansDone && tick - firstFinishTick > 60)) {
 			finish();
 		}
 	}
@@ -551,13 +714,28 @@ public class RaceSession {
 
 	private void forfeit(Racer me, @Nullable ServerPlayer player) {
 		me.forfeited = true;
+		ChocoboEntity bird = me.anyEntity();
+		if (bird != null) {
+			bird.setRacing(false);
+			bird.setRaceTrack(-1);
+			if (!bird.isAlive()) {
+				bird.ejectPassengers();
+			} else if (bird.level() == level) {
+				moveRidden(bird, Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+			}
+		}
+		if (player != null && Square.isSquare(player.level())
+				&& (bird == null || player.getVehicle() != bird)) {
+			player.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+			player.fallDistance = 0.0F;
+		}
 		if (player != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.forfeit"), false);
-			if (racers.indexOf(me) == 0) {
+			if (RaceScoring.refundBookieOnForfeit(state == State.RUNNING)) {
 				refundStake(player);
 			}
 		}
-		if (humans().stream().allMatch(r -> r.forfeited)) {
+		if (!aborting && humans().stream().allMatch(r -> r.forfeited)) {
 			finish();
 		}
 	}
@@ -572,8 +750,7 @@ public class RaceSession {
 			}
 			me.settled = true;
 			ServerPlayer player = me.serverPlayer();
-			int place = me.forfeited ? racers.size() : (me.finishIndex >= 0 ? RaceScoring.placeOf(me.finishIndex, finishCount)
-					: Math.max(finishCount + 1, placeNow(me)));
+			int place = RaceScoring.resultPlace(me.finishIndex, me.forfeited, finishCount, racers.size(), placeNow(me));
 			boolean completed = me.finishIndex >= 0;
 			ChocoboEntity mine = me.entity();
 			// racing below your class: half the purse and no credit toward promotion
@@ -582,6 +759,16 @@ public class RaceSession {
 				mine.recordFirstPlace(true);
 			}
 			if (player == null) {
+				if (me.player != null) {
+					int gp = completed && duelStake <= 0 ? RacePrizes.gp(track.getRaceClass(), place, ranked) : 0;
+					if (below) {
+						gp /= 2;
+					}
+					if (gp > 0) {
+						RaceManager.oweGp(level.getServer(), me.player, gp);
+					}
+					settleBet(null, me.player, place == 1);
+				}
 				continue;
 			}
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.result", place, racers.size()), false);
@@ -603,28 +790,58 @@ public class RaceSession {
 						continue;   // every other item when racing below your class
 					}
 					ItemStack prize = prizes.get(k);
+					Component prizeName = prize.getHoverName();
 					give(player, prize);
-					player.displayClientMessage(Component.translatable("chocobosreborn.race.prize_item", prize.getHoverName()), false);
+					player.displayClientMessage(Component.translatable("chocobosreborn.race.prize_item", prizeName), false);
 				}
 			}
-			if (racers.indexOf(me) == 0) {
-				settleBet(player, place == 1);
-			}
+			settleBet(player, player.getUUID(), place == 1);
 			if (place == 1) {
-				level.playSound(null, player.blockPosition(), ModSounds.RACE_VICTORY.get(), SoundSource.MUSIC, 1.0F, 1.0F);
+				// Player-relative: teardown teleports home and a world sting at the line dies.
+				player.playNotifySound(ModSounds.RACE_VICTORY.get(), SoundSource.MUSIC, 1.0F, 1.0F);
 			}
 			if (mine != null && ranked && completed && place == 1 && !below) {
-				player.displayClientMessage(Component.translatable("chocobosreborn.race.class",
-						Component.translatable("chocobosreborn.class." + mine.raceClass().id()), mine.classWins(),
-						RaceClass.WINS_TO_PROMOTE), false);
+				if (RaceScoring.winsUntilPromote(mine.raceClass(), mine.classWins()) == 0) {
+					player.displayClientMessage(Component.translatable("chocobosreborn.almanac.d.racing_top",
+							Component.translatable("chocobosreborn.class." + mine.raceClass().id()), mine.classWins()), false);
+				} else {
+					player.displayClientMessage(Component.translatable("chocobosreborn.race.class",
+							Component.translatable("chocobosreborn.class." + mine.raceClass().id()), mine.classWins(),
+							RaceClass.WINS_TO_PROMOTE), false);
+				}
 				SquareAdvancements.award(player, SquareAdvancements.FIRST_PLACE);
 				if (mine.raceClass() == RaceClass.S) {
 					SquareAdvancements.award(player, SquareAdvancements.CLASS_S);
 				}
 			}
 		}
+		boolean anyPlaced = humans().stream().anyMatch(h -> h.finishIndex >= 0);
+		if (RaceScoring.scratchRefundsLeftoverBets(anyPlaced)) {
+			refundAllBets();
+		} else {
+			settleRemainingBets();
+		}
 		settleDuel();
 		teardown();
+	}
+
+	/** Spectator (and extra same-heat) Rook stakes: score against the actual first-place bird. */
+	private void settleRemainingBets() {
+		for (BookieBet b : List.copyOf(bets)) {
+			if (b.stake <= 0) {
+				continue;
+			}
+			boolean playerFirst = false;
+			for (Racer h : humans()) {
+				if (b.player.equals(h.player)) {
+					playerFirst = RaceScoring.resultPlace(h.finishIndex, h.forfeited, finishCount, racers.size(),
+							placeNow(h)) == 1;
+					break;
+				}
+			}
+			ServerPlayer p = level.getServer().getPlayerList().getPlayer(b.player);
+			settleBet(p, b.player, playerFirst);
+		}
 	}
 
 	/** Duel: the human who finished first (or the one still standing) takes both stakes; nobody finishes = refund. */
@@ -657,6 +874,8 @@ public class RaceSession {
 						give(p, new ItemStack(ModItems.GP.get(), n));
 					}
 					p.displayClientMessage(Component.translatable("chocobosreborn.duel.refund", duelStake), false);
+				} else if (h.player != null) {
+					RaceManager.oweGp(level.getServer(), h.player, duelStake);
 				}
 			}
 			return;
@@ -667,6 +886,8 @@ public class RaceSession {
 			for (int n : RaceCurrency.stacks(pot, 64)) {
 				give(w, new ItemStack(ModItems.GP.get(), n));
 			}
+		} else if (winner.player != null) {
+			RaceManager.oweGp(level.getServer(), winner.player, pot);
 		}
 		for (Racer h : hs) {
 			ServerPlayer p = h.serverPlayer();
@@ -676,8 +897,9 @@ public class RaceSession {
 		}
 	}
 
-	private void settleBet(ServerPlayer player, boolean playerFirst) {
-		if (bet == null || stake <= 0) {
+	private void settleBet(@Nullable ServerPlayer player, UUID id, boolean playerFirst) {
+		BookieBet b = betOf(id);
+		if (b == null) {
 			return;
 		}
 		boolean joeFirst = false;
@@ -685,7 +907,13 @@ public class RaceSession {
 		boolean fieldFirst = false;
 		boolean opponentFirst = false;
 		for (Racer r : racers) {
-			if (r.human() || r.finishIndex != 0) {
+			if (r.finishIndex != 0) {
+				continue;
+			}
+			if (r.human()) {
+				if (!ranked && !id.equals(r.player)) {
+					opponentFirst = true;
+				}
 				continue;
 			}
 			if (r.name.equals(NAME_TEIYO)) {
@@ -694,57 +922,91 @@ public class RaceSession {
 				joeFirst = true;
 			} else {
 				fieldFirst = true;
-				opponentFirst = !ranked;
 			}
 		}
-		boolean won = RaceScoring.pickWon(bet, ranked, playerFirst, joeFirst, teiohFirst, fieldFirst, opponentFirst);
-		int pay = RaceScoring.payout(stake, RaceScoring.odds(bet, track.getRaceClass().getId()), won);
+		boolean won = RaceScoring.pickWon(b.pick, ranked, playerFirst, joeFirst, teiohFirst, fieldFirst, opponentFirst);
+		int held = b.stake;
+		int pay = RaceScoring.payout(held, RaceScoring.odds(b.pick, track.getRaceClass().getId()), won);
+		b.stake = 0;
+		clearFirstSlotIf(id);
 		if (pay > 0) {
-			for (int n : RaceCurrency.stacks(pay, 64)) {
-				give(player, new ItemStack(ModItems.GP.get(), n));
+			if (player != null) {
+				for (int n : RaceCurrency.stacks(pay, 64)) {
+					give(player, new ItemStack(ModItems.GP.get(), n));
+				}
+				player.displayClientMessage(Component.translatable("chocobosreborn.bet.won", pay), false);
+			} else {
+				RaceManager.oweGp(level.getServer(), id, pay);
 			}
-			player.displayClientMessage(Component.translatable("chocobosreborn.bet.won", pay), false);
-		} else {
-			player.displayClientMessage(Component.translatable("chocobosreborn.bet.lost", stake), false);
+		} else if (player != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.lost", held), false);
 		}
-		bet = null;
-		stake = 0;
 	}
 
 	/** A heat that never settles hands the stake back. */
 	private void refundStake(ServerPlayer player) {
-		if (bet != null && stake > 0) {
-			for (int n : RaceCurrency.stacks(stake, 64)) {
-				give(player, new ItemStack(ModItems.GP.get(), n));
-			}
-			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", stake), false);
-			bet = null;
-			stake = 0;
+		BookieBet b = betOf(player.getUUID());
+		if (b == null) {
+			return;
 		}
+		int n = b.stake;
+		b.stake = 0;
+		clearFirstSlotIf(player.getUUID());
+		for (int stack : RaceCurrency.stacks(n, 64)) {
+			give(player, new ItemStack(ModItems.GP.get(), stack));
+		}
+		player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+	}
+
+	/** Abort / teardown: every remaining bookie stake goes back (or is owed if they logged off). */
+	private void refundAllBets() {
+		for (BookieBet b : bets) {
+			if (b.stake <= 0) {
+				continue;
+			}
+			ServerPlayer p = level.getServer().getPlayerList().getPlayer(b.player);
+			if (p != null) {
+				refundStake(p);
+			} else {
+				RaceManager.oweGp(level.getServer(), b.player, b.stake);
+				b.stake = 0;
+			}
+		}
+		bet = null;
+		stake = 0;
+		bettor = null;
 	}
 
 	private static void give(ServerPlayer player, ItemStack stack) {
 		if (!player.getInventory().add(stack)) {
-			player.drop(stack, false);
+			net.minecraft.world.entity.item.ItemEntity dropped = player.drop(stack, false);
+			if (dropped != null && Square.isSquare(player.level())) {
+				dropped.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y + 0.5D, Square.ARRIVAL.z);
+			}
 		}
 	}
 
 	private void teardown() {
 		state = State.DONE;
+		refundAllBets();
 		for (Racer r : racers) {
 			ServerPlayer player = r.serverPlayer();
-			if (player != null && racers.indexOf(r) == 0 && bet != null && stake > 0) {
-				refundStake(player);
-			}
 			ChocoboEntity e = r.anyEntity();
 			if (e == null) {
 				continue;
 			}
 			if (r.human()) {
 				e.setRacing(false);
+				e.setRaceTrack(-1);
+				if (r.forfeited) {
+					continue;   // already sent home; do not yank a later heat or a shop visit
+				}
 				if (!e.isAlive()) {
 					e.ejectPassengers();   // the dismount lock no longer applies; free the rider
 					continue;
+				}
+				if (e.level() != level) {
+					continue;   // already left Whiskerwind (forfeit + pocketwatch); do not yank overworld coords
 				}
 				double ox = (racers.indexOf(r) - 0.5D) * 2.0D;
 				moveRidden(e, Square.ARRIVAL.x + ox, Square.ARRIVAL.y, Square.ARRIVAL.z);
@@ -771,13 +1033,31 @@ public class RaceSession {
 	 * vanilla teleport packet is ignored for a locally controlled vehicle, so the
 	 * client would keep its own position and fight the server every tick.
 	 */
-	static void moveRidden(ChocoboEntity bird, double x, double y, double z) {
-		bird.teleportTo(x, y, z);
-		for (Entity p : bird.getPassengers()) {
-			if (p instanceof ServerPlayer sp) {
-				sp.connection.send(new net.minecraft.network.protocol.game.ClientboundMoveVehiclePacket(bird));
+	public static void moveRidden(ChocoboEntity bird, double x, double y, double z) {
+		moveRidden(bird, x, y, z, true);
+	}
+
+	/**
+	 * {@code remount} false at heat start: HOLD seats the rider next tick, after the
+	 * client has the bird at the stalls (same-tick startRiding warns "unknown entity").
+	 */
+	public static void moveRidden(ChocoboEntity bird, double x, double y, double z, boolean remount) {
+		ServerPlayer rider = bird.getControllingPassenger() instanceof ServerPlayer sp ? sp : null;
+		if (rider != null) {
+			RaceManager.RELEASING.add(bird.getUUID());
+			try {
+				rider.stopRiding();
+			} finally {
+				RaceManager.RELEASING.remove(bird.getUUID());
 			}
+			bird.teleportTo(x, y, z);
+			rider.teleportTo(x, y, z);
+			if (remount) {
+				rider.startRiding(bird, true);
+			}
+			return;
 		}
+		bird.teleportTo(x, y, z);
 	}
 
 	public boolean hasRacer(UUID bird) {
@@ -785,9 +1065,32 @@ public class RaceSession {
 	}
 
 	public void abort() {
+		aborting = true;
 		for (Racer h : humans()) {
-			h.forfeited = true;
+			if (RaceScoring.stillOnCourse(h.forfeited, h.finishIndex)) {
+				forfeit(h, h.serverPlayer());
+			}
 		}
-		finish();
+		aborting = false;
+		if (state != State.DONE) {
+			boolean anyPlaced = humans().stream().anyMatch(h -> h.finishIndex >= 0);
+			if (anyPlaced) {
+				finish();
+			} else {
+				settleDuel();
+				refundAllBets();
+				teardown();
+			}
+		}
+	}
+
+	/** One rider left (logout): the rest of the heat keeps running. */
+	void forfeitPlayer(ServerPlayer player) {
+		for (Racer me : humans()) {
+			if (player.getUUID().equals(me.player) && RaceScoring.stillOnCourse(me.forfeited, me.finishIndex)) {
+				forfeit(me, player);
+				return;
+			}
+		}
 	}
 }

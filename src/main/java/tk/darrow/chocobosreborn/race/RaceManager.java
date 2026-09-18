@@ -33,11 +33,34 @@ public final class RaceManager {
 
 	public static @Nullable RaceSession sessionOf(UUID player) {
 		for (RaceSession s : SESSIONS) {
-			if (s.live() && s.hasPlayer(player)) {
+			if (s.live() && s.belongsTo(player)) {
 				return s;
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Bookie: a racer's own heat, or the single HOLD heat in Whiskerwind so a
+	 * spectator can still put GP on the board. Several open heats stay pending.
+	 */
+	public static @Nullable RaceSession sessionForBet(UUID player) {
+		RaceSession mine = sessionOf(player);
+		if (mine != null) {
+			return mine;
+		}
+		RaceSession open = null;
+		int n = 0;
+		for (RaceSession s : SESSIONS) {
+			if (s.live() && s.ranked() && RaceScoring.booksOpen(true, s.running())) {
+				n++;
+				open = s;
+			}
+		}
+		if (!RaceScoring.attachSpectatorBet(false, HeatSchedule.entered(player), n)) {
+			return null;
+		}
+		return open;
 	}
 
 	/** A live heat already on this course. */
@@ -48,6 +71,21 @@ public final class RaceManager {
 	/** True while a live heat owns this bird (player or field NPC). */
 	public static boolean isActiveRacer(UUID bird) {
 		return SESSIONS.stream().anyMatch(s -> s.live() && s.hasRacer(bird));
+	}
+
+	/** True when a live heat's island covers this point (stray fans/jockeys on other islands can go). */
+	static boolean heatContains(double x, double z) {
+		for (RaceSession s : SESSIONS) {
+			if (!s.live()) {
+				continue;
+			}
+			RaceTrack t = s.track();
+			if (Math.abs(x - t.centerX()) <= t.getRadiusX() + 32.0D
+					&& Math.abs(z - t.centerZ()) <= t.getRadiusZ() + 32.0D) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static boolean anyRunning() {
@@ -62,6 +100,10 @@ public final class RaceManager {
 		ServerLevel square = Square.level(server);
 		if (square == null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.square.missing"), false);
+			return false;
+		}
+		if (Square.isSquare(player.level()) && sessionOf(player.getUUID()) != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
 			return false;
 		}
 		boolean owned = bird.isOwnedBy(player) || player.getAbilities().instabuild;
@@ -82,6 +124,7 @@ public final class RaceManager {
 		}
 		Square.teleportMounted(player, bird, square, Square.ARRIVAL, Square.ARRIVAL_YAW);
 		bringBirds(player, from, origin, square, Square.ARRIVAL, Square.ARRIVAL_YAW);
+		payOwedGp(player);
 		player.displayClientMessage(Component.translatable("chocobosreborn.square.welcome"), false);
 		SquareAdvancements.award(player, SquareAdvancements.SQUARE);
 		return true;
@@ -95,6 +138,10 @@ public final class RaceManager {
 			player.displayClientMessage(Component.translatable("chocobosreborn.square.missing"), false);
 			return false;
 		}
+		if (Square.isSquare(player.level()) && sessionOf(player.getUUID()) != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
+			return false;
+		}
 		SquareBuilder.buildPaddock(square);
 		SquareBuilder.spawnKeepers(square);
 		SquareBuilder.requestKeeperSync();
@@ -106,6 +153,7 @@ public final class RaceManager {
 		}
 		Square.teleport(player, square, Square.ARRIVAL, Square.ARRIVAL_YAW);
 		bringBirds(player, from, origin, square, Square.ARRIVAL, Square.ARRIVAL_YAW);
+		payOwedGp(player);
 		player.displayClientMessage(Component.translatable("chocobosreborn.square.welcome"), false);
 		SquareAdvancements.award(player, SquareAdvancements.SQUARE);
 		return true;
@@ -119,8 +167,9 @@ public final class RaceManager {
 		}
 		RaceSession s = sessionOf(player.getUUID());
 		if (s != null) {
-			s.abort();
+			s.forfeitPlayer(player);
 		}
+		HeatSchedule.drop(player);
 		SquareData.ReturnPoint rp = SquareData.get(square).takeReturn(player.getUUID());
 		ServerLevel target = rp == null ? player.server.overworld() : player.server.getLevel(rp.dimension());
 		if (target == null) {
@@ -130,6 +179,8 @@ public final class RaceManager {
 		float yaw = rp == null ? 0.0F : rp.yaw();
 		net.minecraft.world.phys.Vec3 origin = player.position();
 		DuelDesk.withdraw(player);
+		TradeDesk.withdraw(player);
+		refundPendingBet(player);
 		if (player.getVehicle() instanceof ChocoboEntity bird) {
 			Square.teleportMounted(player, bird, target, pos, yaw);
 		} else {
@@ -144,6 +195,7 @@ public final class RaceManager {
 			return false;
 		}
 		if (!Square.isSquare(level) && level != testLevel) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.gate.only_square"), true);
 			return false;
 		}
 		if (!(player.getVehicle() instanceof ChocoboEntity bird)) {
@@ -159,14 +211,24 @@ public final class RaceManager {
 			return false;
 		}
 		if (!Square.isSquare(level) && level != testLevel) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.gate.only_square"), true);
 			return false;
 		}
 		if (!(player.getVehicle() instanceof ChocoboEntity bird)) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
 			return false;
 		}
+		boolean owned = bird.isOwnedBy(player) || player.getAbilities().instabuild;
+		if (!RaceScoring.canEnterSquare(bird.isBaby(), bird.saddled(), owned)) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
+			return false;
+		}
 		if (sessionOf(player.getUUID()) != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
+			return false;
+		}
+		if (HeatSchedule.entered(player.getUUID())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.heat.wait"), true);
 			return false;
 		}
 		if (trackBusy(track)) {
@@ -177,10 +239,12 @@ public final class RaceManager {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return false;
 		}
-		if (ranked && track.getRaceClass().getId() > bird.raceClass().getId()) {
+		if (ranked && !RaceScoring.mayEnterCourse(bird.raceClass().getId(), track.getRaceClass().getId())) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
 			return false;
 		}
+		DuelDesk.withdraw(player);
+		TradeDesk.withdraw(player);
 		RaceSession session = new RaceSession(level, track, ranked, player, bird);
 		SESSIONS.add(session);
 		return true;
@@ -197,11 +261,29 @@ public final class RaceManager {
 			b.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return false;
 		}
-		if (sessionOf(a.getUUID()) != null || sessionOf(b.getUUID()) != null || trackBusy(track)) {
+		if (!birdA.saddled() || !birdB.saddled() || birdA.isBaby() || birdB.isBaby()
+				|| (!birdA.isOwnedBy(a) && !a.getAbilities().instabuild)
+				|| (!birdB.isOwnedBy(b) && !b.getAbilities().instabuild)) {
+			a.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
+			b.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
+			return false;
+		}
+		if (!RaceScoring.mayEnterCourse(birdA.raceClass().getId(), track.getRaceClass().getId())
+				|| !RaceScoring.mayEnterCourse(birdB.raceClass().getId(), track.getRaceClass().getId())) {
+			a.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
+			b.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
+			return false;
+		}
+		if (sessionOf(a.getUUID()) != null || sessionOf(b.getUUID()) != null || trackBusy(track)
+				|| HeatSchedule.entered(a.getUUID()) || HeatSchedule.entered(b.getUUID())) {
 			a.displayClientMessage(Component.translatable("chocobosreborn.race.occupied"), true);
 			b.displayClientMessage(Component.translatable("chocobosreborn.race.occupied"), true);
 			return false;
 		}
+		DuelDesk.consume(a.getUUID());
+		DuelDesk.withdraw(b);
+		TradeDesk.withdraw(a);
+		TradeDesk.withdraw(b);
 		RaceSession session = new RaceSession(level, track, false, java.util.List.of(a, b), java.util.List.of(birdA, birdB), stake);
 		SESSIONS.add(session);
 		return true;
@@ -218,7 +300,8 @@ public final class RaceManager {
 		if (!Square.isSquare(player.level())) {
 			return;
 		}
-		if (!(player.getVehicle() instanceof ChocoboEntity bird) || !bird.saddled() || bird.isBaby()) {
+		if (!(player.getVehicle() instanceof ChocoboEntity bird) || !bird.saddled() || bird.isBaby()
+				|| (!bird.isOwnedBy(player) && !player.getAbilities().instabuild)) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
 			return;
 		}
@@ -226,13 +309,13 @@ public final class RaceManager {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return;
 		}
+		if (!RaceScoring.mayEnterCourse(bird.raceClass().getId(), track.getRaceClass().getId())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
+			return;
+		}
 		if (mode == 1) {
-			DuelDesk.post(player, track, Math.max(0, Math.min(64, stake)));
+			DuelDesk.post(player, track, RaceScoring.clampDuelStake(stake));
 		} else {
-			if (track.getRaceClass().getId() > bird.raceClass().getId()) {
-				player.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
-				return;
-			}
 			if (sessionOf(player.getUUID()) != null) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
 				return;
@@ -264,16 +347,19 @@ public final class RaceManager {
 	 */
 	public static boolean placeBet(ServerPlayer player, RaceScoring.BetPick pick, int stake) {
 		int amount = RaceScoring.clampStake(stake);
-		RaceSession s = sessionOf(player.getUUID());
+		RaceSession s = sessionForBet(player.getUUID());
 		if (s != null) {
-			if (!RaceScoring.booksOpen(true, s.running()) || !RaceScoring.mayPlaceBet(true, s.bet != null, amount)) {
+			if (!RaceScoring.booksOpen(true, s.running())
+					|| !RaceScoring.mayPlaceBet(true, s.hasBookieBet(player.getUUID()), amount)) {
 				return false;
 			}
-			s.bet = RaceScoring.legalize(pick, s.ranked(), s.track().getRaceClass().includesTeioh());
-			s.stake = amount;
+			s.takeBookieBet(player.getUUID(), s.legalPick(pick, player.getUUID()), amount);
 			return true;
 		}
 		CompoundTag tag = player.getPersistentData();
+		if (SESSIONS.stream().anyMatch(RaceSession::live) && !HeatSchedule.entered(player.getUUID())) {
+			return false;
+		}
 		if (!RaceScoring.mayPlaceBet(true, tag.contains(PENDING_BET), amount)) {
 			return false;
 		}
@@ -287,6 +373,7 @@ public final class RaceManager {
 
 	private static final String PENDING_BET = "chocobosreborn_pending_bet";
 	private static final String PENDING_STAKE = "chocobosreborn_pending_stake";
+	private static final String SQUARE_DEATH = "chocobosreborn_square_death";
 
 	@org.jetbrains.annotations.Nullable
 	static RaceScoring.BetPick takePendingBet(ServerPlayer player) {
@@ -310,6 +397,40 @@ public final class RaceManager {
 	/** True if the player holds a bet waiting for the next heat. */
 	public static boolean hasPendingBet(ServerPlayer player) {
 		return player.getPersistentData().contains(PENDING_BET);
+	}
+
+	/**
+	 * Move a waiting stake onto the live HOLD without taking another stack of GP.
+	 * Returns the attached stake, or 0 if the pending was refunded / could not attach.
+	 */
+	public static int settlePendingOnto(ServerPlayer player, RaceSession s) {
+		if (!hasPendingBet(player)) {
+			return 0;
+		}
+		if (!RaceScoring.booksOpen(true, s.running()) || s.hasBookieBet(player.getUUID())) {
+			refundPendingBet(player);
+			return 0;
+		}
+		RaceScoring.BetPick pending = takePendingBet(player);
+		int n = takePendingStake(player);
+		if (pending == null || n <= 0) {
+			return 0;
+		}
+		s.takeBookieBet(player.getUUID(), s.legalPick(pending, player.getUUID()), n);
+		return n;
+	}
+
+	/** Scratch / miss: hand the waiting stake back. */
+	public static void refundPendingBet(ServerPlayer player) {
+		if (!hasPendingBet(player)) {
+			return;
+		}
+		takePendingBet(player);
+		int n = takePendingStake(player);
+		if (n > 0) {
+			DuelDesk.giveGp(player, n);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+		}
 	}
 
 	// ----------------------------------------------------------------- events
@@ -341,12 +462,14 @@ public final class RaceManager {
 		Entity rider = event.getEntityMounting();
 		if (vehicle instanceof ChocoboEntity bird && !bird.racing() && bird.isAlive() && rider.isAlive()
 				&& rider == bird.getControllingPassenger() && !RELEASING.contains(bird.getUUID())
-				&& !(rider instanceof ServerPlayer sp0 && sp0.isChangingDimension())
-				&& (!bird.onGround() || bird.isInWater()
-				|| bird.level().getFluidState(bird.blockPosition().below()).is(net.minecraft.tags.FluidTags.WATER))) {
-			// sneak is "down" while flying or on water; dismount on solid ground only
-			event.setCanceled(true);
-			return;
+				&& !(rider instanceof ServerPlayer sp0 && sp0.isChangingDimension())) {
+			boolean inOrOnWater = bird.isInWater()
+					|| bird.level().getFluidState(bird.blockPosition().below()).is(net.minecraft.tags.FluidTags.WATER);
+			if (RaceScoring.lockOffCourseDismount(bird.color().fly(), bird.onGround(), bird.color().waterWalk(),
+					inOrOnWater)) {
+				event.setCanceled(true);
+				return;
+			}
 		}
 		if (vehicle instanceof ChocoboEntity bird && bird.racing() && bird.isAlive() && !bird.isRemoved()
 				&& rider.isAlive() && !rider.isRemoved()
@@ -396,24 +519,123 @@ public final class RaceManager {
 
 	@SubscribeEvent
 	public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
-		DuelDesk.clear();
+		for (ServerPlayer p : event.getServer().getPlayerList().getPlayers()) {
+			refundPendingBet(p);
+		}
+		DuelDesk.refundAndClear(event.getServer());
 		TradeDesk.clear();
 		for (RaceSession s : new ArrayList<>(SESSIONS)) {
 			if (s.live()) {
 				s.abort();
 			}
 		}
+		for (ServerPlayer p : event.getServer().getPlayerList().getPlayers()) {
+			payOwedGp(p);
+		}
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
-		HeatSchedule.reset();
+		ServerLevel square = Square.level(event.getServer());
+		if (square != null) {
+			HeatSchedule.reset(square);
+		} else {
+			HeatSchedule.reset();
+		}
 		testLevel = null;
 	}
 
 	@SubscribeEvent
-	public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
-		RaceSession s = sessionOf(event.getEntity().getUUID());
+	public static void onDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer sp) || !Square.isSquare(sp.level())) {
+			return;
+		}
+		RaceSession s = sessionOf(sp.getUUID());
 		if (s != null) {
-			s.abort();
+			s.forfeitPlayer(sp);
+		}
+		DuelDesk.withdraw(sp);
+		TradeDesk.withdraw(sp);
+		sp.getPersistentData().putBoolean(SQUARE_DEATH, true);
+	}
+
+	@SubscribeEvent
+	public static void onClone(PlayerEvent.Clone event) {
+		CompoundTag old = event.getOriginal().getPersistentData();
+		CompoundTag now = event.getEntity().getPersistentData();
+		if (old.contains(PENDING_BET)) {
+			now.putInt(PENDING_BET, old.getInt(PENDING_BET));
+			now.putInt(PENDING_STAKE, old.getInt(PENDING_STAKE));
+		}
+		if (old.contains("chocobosreborn_pick")) {
+			now.putInt("chocobosreborn_pick", old.getInt("chocobosreborn_pick"));
+		}
+		if (event.isWasDeath() && old.getBoolean(SQUARE_DEATH)) {
+			now.putBoolean(SQUARE_DEATH, true);
+		}
+	}
+
+	@SubscribeEvent
+	public static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer sp) || !sp.getPersistentData().getBoolean(SQUARE_DEATH)) {
+			return;
+		}
+		sp.getPersistentData().remove(SQUARE_DEATH);
+		ServerLevel square = Square.level(sp.server);
+		if (square == null) {
+			return;
+		}
+		Square.teleport(sp, square, Square.ARRIVAL, Square.ARRIVAL_YAW);
+	}
+
+	private static final java.util.Map<java.util.UUID, Integer> OWED_GP = new java.util.HashMap<>();
+
+	/** GP that could not be handed over because the player had already left. */
+	static void oweGp(net.minecraft.server.MinecraftServer server, UUID id, int amount) {
+		if (amount <= 0) {
+			return;
+		}
+		ServerLevel square = Square.level(server);
+		if (square != null) {
+			SquareData.get(square).oweGp(id, amount);
+		} else {
+			OWED_GP.merge(id, amount, Integer::sum);
+		}
+	}
+
+	private static void payOwedGp(ServerPlayer player) {
+		int n = 0;
+		Integer mem = OWED_GP.remove(player.getUUID());
+		if (mem != null) {
+			n += mem;
+		}
+		ServerLevel square = Square.level(player.server);
+		if (square != null) {
+			n += SquareData.get(square).takeOwedGp(player.getUUID());
+		}
+		if (n > 0) {
+			DuelDesk.giveGp(player, n);
+			player.displayClientMessage(Component.translatable("chocobosreborn.gp.owed", n), false);
+		}
+	}
+
+	@SubscribeEvent
+	public static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
+		if (event.getEntity() instanceof ServerPlayer sp) {
+			payOwedGp(sp);
+		}
+	}
+
+	@SubscribeEvent
+	public static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+		if (!(event.getEntity() instanceof ServerPlayer sp)) {
+			return;
+		}
+		DuelDesk.withdraw(sp);
+		TradeDesk.withdraw(sp);
+		refundPendingBet(sp);
+		HeatSchedule.drop(sp);
+		RaceSession s = sessionOf(sp.getUUID());
+		if (s != null) {
+			s.forfeitPlayer(sp);
 		}
 	}
 }

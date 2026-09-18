@@ -2,11 +2,23 @@ package tk.darrow.chocobosreborn.race;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RaceScoringTest {
+	@Test
+	void persistHeatStartKeepsAFutureMarkAndBumpsADueOne() {
+		assertEquals(12000L, RaceScoring.persistHeatStart(12000L, 8000L, 6000, 200));
+		long now = 15000L;
+		long next = RaceScoring.persistHeatStart(12000L, now, 6000, 200);
+		assertTrue(next > now);
+		assertEquals(RaceScoring.nextHeatMark(now, 6000, 200), next);
+		assertEquals(RaceScoring.nextHeatMark(12000L, 6000, 200),
+				RaceScoring.persistHeatStart(12000L, 12000L, 6000, 200));
+	}
+
 	@Test
 	void finishGraceStartsAtFinishAndDoesNotExpireDuringTheRace() {
 		assertFalse(RaceScoring.finishGraceExpired(3000, -1));
@@ -37,6 +49,9 @@ class RaceScoringTest {
 		RaceScoring.Promotion stay = RaceScoring.afterFirstPlace(RaceClass.S, 3);
 		assertEquals(RaceClass.S, stay.raceClass());
 		assertFalse(stay.promoted());
+		assertEquals(0, RaceScoring.winsUntilPromote(RaceClass.S, stay.classWins()));
+		assertEquals(3, RaceScoring.winsUntilPromote(RaceClass.C, 0));
+		assertEquals(1, RaceScoring.winsUntilPromote(RaceClass.C, 2));
 	}
 
 	@Test
@@ -75,11 +90,59 @@ class RaceScoringTest {
 	}
 
 	@Test
+	void aFastDashSamplesTheBoostStripItWouldSkip() {
+		assertEquals(1, RaceScoring.boostPadSamples(0.0D, 0.0D));
+		assertEquals(1, RaceScoring.boostPadSamples(0.1D, 0.0D));
+		assertTrue(RaceScoring.boostPadSamples(1.3D, 0.0D) >= 3);
+		assertTrue(RaceScoring.boostPadSamples(1.3D, 0.0D) <= 8);
+	}
+
+	@Test
 	void wonderfulBirdsOutrunPoorOnes() {
 		assertTrue(RaceScoring.gradeSpeedMul(4) > RaceScoring.gradeSpeedMul(0));
 		assertEquals(1.00D, RaceScoring.gradeSpeedMul(2), 1.0E-9);
 		assertTrue(RaceScoring.dashMul() > 1.5D);
 		assertTrue(RaceScoring.emptyStaminaMul() < 0.7D);
+		assertEquals(1.0D, RaceScoring.speedTrainingMul(0), 1.0E-9);
+		assertEquals(1.35D, RaceScoring.speedTrainingMul(100), 1.0E-9);
+		assertEquals(1.0D, RaceScoring.speedTrainingMul(-8), 1.0E-9);
+	}
+
+	@Test
+	void intelligenceSkipsTheSameDashDrainForRiderAndAi() {
+		assertFalse(RaceScoring.intelSkipsDashDrain(0, 4, 0));
+		assertFalse(RaceScoring.intelSkipsDashDrain(100, 5, 0));
+		assertTrue(RaceScoring.intelSkipsDashDrain(100, 4, 0));
+		assertTrue(RaceScoring.intelSkipsDashDrain(50, 8, 49));
+		assertFalse(RaceScoring.intelSkipsDashDrain(50, 8, 50));
+		assertFalse(RaceScoring.dashEnds(1), "an intel skip that keeps the last point must not kill the dash");
+		assertTrue(RaceScoring.dashEnds(0));
+	}
+
+	@Test
+	void cooperationIsHandlingForRiderAndField() {
+		assertEquals(0.35F, RaceScoring.turnCatchup(0), 1.0E-5F);
+		assertEquals(1.0F, RaceScoring.turnCatchup(100), 1.0E-5F);
+		assertTrue(RaceScoring.turnCatchup(80) > RaceScoring.turnCatchup(20));
+		assertEquals(18.0F, RaceScoring.turnMaxDegrees(0), 1.0E-5F);
+		assertEquals(60.0F, RaceScoring.turnMaxDegrees(100), 1.0E-5F);
+		assertEquals(0.25F, RaceScoring.strafeMul(0), 1.0E-5F);
+		assertEquals(0.50F, RaceScoring.strafeMul(100), 1.0E-5F);
+		assertTrue(RaceScoring.handlingWobbleMul(0) > RaceScoring.handlingWobbleMul(100));
+		assertTrue(RaceScoring.handlingLineMul(100) > RaceScoring.handlingLineMul(0));
+		assertEquals(1.0D, RaceScoring.handlingLineMul(100), 1.0E-9);
+	}
+
+	@Test
+	void fieldNpcsGetClassTrainingAndRivalsMaxOut() {
+		assertEquals(22, RaceScoring.fieldTraining(0, false));
+		assertEquals(48, RaceScoring.fieldTraining(1, false));
+		assertEquals(72, RaceScoring.fieldTraining(2, false));
+		assertEquals(92, RaceScoring.fieldTraining(3, false));
+		assertEquals(100, RaceScoring.fieldTraining(0, true));
+		assertEquals(100, RaceScoring.fieldTraining(3, true));
+		assertTrue(RaceScoring.speedTrainingMul(RaceScoring.fieldTraining(3, false))
+				> RaceScoring.speedTrainingMul(RaceScoring.fieldTraining(0, false)));
 	}
 
 	@Test
@@ -109,12 +172,19 @@ class RaceScoringTest {
 		assertFalse(RaceScoring.canEnterSquare(true, true, true));
 		assertFalse(RaceScoring.canEnterSquare(false, false, true));
 		assertFalse(RaceScoring.canEnterSquare(false, true, false));
+		assertTrue(RaceScoring.mayEnterCourse(0, 0));
+		assertTrue(RaceScoring.mayEnterCourse(2, 0));
+		assertFalse(RaceScoring.mayEnterCourse(0, 2));
 	}
 
 	@Test
 	void countdownRemountsInsteadOfForfeit() {
 		assertFalse(RaceScoring.forfeitOnDismount(false));
 		assertTrue(RaceScoring.forfeitOnDismount(true));
+		assertTrue(RaceScoring.stillOnCourse(false, -1));
+		assertFalse(RaceScoring.stillOnCourse(true, -1));
+		assertFalse(RaceScoring.stillOnCourse(false, 0));
+		assertFalse(RaceScoring.stillOnCourse(true, 0));
 		assertFalse(RaceScoring.driftedFromStall(0.1D, 0.0D, 0.1D));
 		assertTrue(RaceScoring.driftedFromStall(1.0D, 0.0D, 0.0D));
 	}
@@ -159,6 +229,73 @@ class RaceScoringTest {
 		assertTrue(RaceScoring.sameCourseIndex(0, 0));
 		assertTrue(RaceScoring.sameCourseIndex(1, 1));
 		assertFalse(RaceScoring.sameCourseIndex(0, 1));
+		assertEquals(0, RaceScoring.funGateCourse(false));
+		assertEquals(3, RaceScoring.funGateCourse(true));
+	}
+
+	@Test
+	void startArrowMaskIsAThreeWideShaftAndAFortyFiveDegreeHead() {
+		int half = RaceScoring.startArrowHalf();
+		StringBuilder got = new StringBuilder();
+		for (int along = 0; along < RaceScoring.startArrowLength(); along++) {
+			for (int across = -half; across <= half; across++) {
+				if (RaceScoring.startArrowTip(along, across)) {
+					got.append('G');
+				} else if (RaceScoring.startArrowCell(along, across)) {
+					got.append('#');
+				} else {
+					got.append(' ');
+				}
+			}
+			if (along + 1 < RaceScoring.startArrowLength()) {
+				got.append('\n');
+			}
+		}
+		assertEquals(String.join("\n", RaceScoring.START_ARROW_MASK), got.toString());
+		int shaft = 0, barbs = 0, tipRow = 0;
+		for (int across = -half; across <= half; across++) {
+			if (RaceScoring.startArrowCell(0, across)) {
+				shaft++;
+			}
+			if (RaceScoring.startArrowCell(6, across)) {
+				barbs++;
+			}
+			if (RaceScoring.startArrowCell(RaceScoring.startArrowLength() - 1, across)) {
+				tipRow++;
+			}
+		}
+		assertEquals(3, shaft);
+		assertEquals(11, barbs);
+		assertEquals(1, tipRow);
+		assertTrue(RaceScoring.startArrowTip(RaceScoring.startArrowLength() - 1, 0));
+		assertFalse(RaceScoring.startArrowTip(RaceScoring.startArrowLength() - 2, 0));
+		assertArrayEquals(new int[]{1, 0}, RaceScoring.arrowForward(0.9D, 0.1D));
+		assertArrayEquals(new int[]{0, 1}, RaceScoring.arrowRight(1, 0));
+	}
+
+	@Test
+	void holdSeatsJockeysBeforeTheScrubSoTheyAreNotDiscarded() {
+		assertFalse(RaceScoring.seatJockeysOnHoldTick(1));
+		assertTrue(RaceScoring.seatJockeysOnHoldTick(2));
+		assertFalse(RaceScoring.seatJockeysOnHoldTick(40));
+		assertFalse(RaceScoring.scrubCourseOnHoldTick(1));
+		assertFalse(RaceScoring.scrubCourseOnHoldTick(2));
+		assertTrue(RaceScoring.scrubCourseOnHoldTick(40));
+	}
+
+	@Test
+	void aPlacedRiderKeepsTheirPlaceIfLaterMarkedDnf() {
+		assertEquals(1, RaceScoring.resultPlace(0, true, 1, 6, 6));
+		assertEquals(2, RaceScoring.resultPlace(1, false, 2, 6, 2));
+		assertEquals(6, RaceScoring.resultPlace(-1, true, 1, 6, 3));
+		assertEquals(3, RaceScoring.resultPlace(-1, false, 1, 6, 3));
+	}
+
+	@Test
+	void duelOpponentPaysTheOtherHumanNotAPaceBird() {
+		assertTrue(RaceScoring.pickWon(RaceScoring.BetPick.OPPONENT, false, false, false, false, true, true));
+		assertFalse(RaceScoring.pickWon(RaceScoring.BetPick.OPPONENT, false, true, false, false, true, false));
+		assertFalse(RaceScoring.pickWon(RaceScoring.BetPick.OPPONENT, true, false, false, false, true, true));
 	}
 
 	@Test
@@ -195,9 +332,45 @@ class RaceScoringTest {
 	}
 
 	@Test
+	void offCourseDismountLockIsOnlyForFliersAndWaterWalkers() {
+		assertTrue(RaceScoring.lockOffCourseDismount(true, false, false, false));
+		assertFalse(RaceScoring.lockOffCourseDismount(true, true, false, false));
+		assertTrue(RaceScoring.lockOffCourseDismount(false, false, true, true));
+		assertFalse(RaceScoring.lockOffCourseDismount(false, false, false, true));
+		assertFalse(RaceScoring.lockOffCourseDismount(false, true, false, false));
+	}
+
+	@Test
 	void gysahlClickOnABirdDoesNotStartEating() {
 		assertTrue(RaceScoring.clientConsumesGysahlOnBird(true));
 		assertFalse(RaceScoring.clientConsumesGysahlOnBird(false));
+	}
+
+	@Test
+	void squareBirdsAndLiveRacersAreProtected() {
+		assertTrue(RaceScoring.squareNpcProtected(true, false, false));
+		assertTrue(RaceScoring.squareNpcProtected(false, true, false));
+		assertTrue(RaceScoring.squareNpcProtected(false, false, true));
+		assertFalse(RaceScoring.squareNpcProtected(false, false, false));
+		assertTrue(RaceScoring.squareNpcProtected(false, false, false, true));
+		assertFalse(RaceScoring.squareNpcProtected(false, false, false, false));
+	}
+
+	@Test
+	void aFullHeatIsSkippedUnlessThisRiderIsAlreadyIn() {
+		assertTrue(RaceScoring.joinSkipsFullHeat(3, 6, false));
+		assertFalse(RaceScoring.joinSkipsFullHeat(6, 6, false));
+		assertTrue(RaceScoring.joinSkipsFullHeat(6, 6, true));
+	}
+
+	@Test
+	void spectatorBetsAttachToExactlyOneHoldHeat() {
+		assertTrue(RaceScoring.attachSpectatorBet(true, 0));
+		assertTrue(RaceScoring.attachSpectatorBet(false, 1));
+		assertFalse(RaceScoring.attachSpectatorBet(false, 0));
+		assertFalse(RaceScoring.attachSpectatorBet(false, 2));
+		assertFalse(RaceScoring.attachSpectatorBet(false, true, 1));
+		assertTrue(RaceScoring.attachSpectatorBet(true, true, 1));
 	}
 
 	@Test
@@ -229,6 +402,25 @@ class RaceScoringTest {
 		assertFalse(RaceScoring.squareFallRescue(10.0D, true));
 		assertFalse(RaceScoring.squareFallRescue(65.0D, false));
 		assertFalse(RaceScoring.squareFallRescue(50.0D, false));
+		assertTrue(RaceScoring.squarePetFallRescue(10.0D, false));
+		assertFalse(RaceScoring.squarePetFallRescue(10.0D, true));
+		assertFalse(RaceScoring.squarePetFallRescue(65.0D, false));
+		assertTrue(RaceScoring.forfeitDropsCourseAssign());
+	}
+
+	@Test
+	void aPostedDuelStakeIsConsumedNotRefundedWhenTheHeatStarts() {
+		assertEquals(0, RaceScoring.postedDuelReturnedAtStart(10));
+		assertEquals(0, RaceScoring.postedDuelReturnedAtStart(0));
+		assertEquals(20, RaceScoring.duelPotGp(10, 2));
+		assertEquals(0, RaceScoring.duelPotGp(0, 2));
+	}
+
+	@Test
+	void sneakReplacesAFedNutEvenWhileInLove() {
+		assertTrue(RaceScoring.sneakReplacesFedNut(true, true));
+		assertFalse(RaceScoring.sneakReplacesFedNut(true, false));
+		assertFalse(RaceScoring.sneakReplacesFedNut(false, true));
 	}
 
 	@Test
@@ -259,6 +451,11 @@ class RaceScoringTest {
 		assertFalse(RaceScoring.raceLoopShouldPlay(true, true, true));
 		assertFalse(RaceScoring.raceLoopShouldPlay(false, true, false));
 		assertFalse(RaceScoring.raceLoopShouldPlay(true, false, false));
+		assertTrue(RaceScoring.raceLoopShouldPlay(true, false, false, true));
+		assertFalse(RaceScoring.villageLoopShouldPlay(true, false, true));
+		assertTrue(RaceScoring.villageLoopShouldPlay(true, false, false));
+		assertTrue(RaceScoring.onCourseIsland(10.0D, 10.0D, 40.0D, 40.0D, 8.0D));
+		assertFalse(RaceScoring.onCourseIsland(80.0D, 0.0D, 40.0D, 40.0D, 8.0D));
 	}
 
 	@Test

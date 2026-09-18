@@ -60,6 +60,7 @@ public final class ChocobosReborn {
 	}
 
 	private void setup(FMLCommonSetupEvent event) {
+		event.enqueueWork(tk.darrow.chocobosreborn.item.ChocoboSpawnEggItem::registerDispensers);
 		LOGGER.info("Chocobos Reborn Village — chocobos ready.");
 	}
 }

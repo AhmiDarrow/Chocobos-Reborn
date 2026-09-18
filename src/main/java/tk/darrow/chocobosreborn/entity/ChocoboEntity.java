@@ -60,6 +60,7 @@ import tk.darrow.chocobosreborn.item.NutItem;
 import tk.darrow.chocobosreborn.item.SaddleItem;
 import tk.darrow.chocobosreborn.race.RaceClass;
 import tk.darrow.chocobosreborn.race.RaceScoring;
+import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.sound.ModSounds;
 
 public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumping, net.minecraft.world.entity.HasCustomInventoryScreen, net.minecraft.world.ContainerListener {
@@ -117,6 +118,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private boolean descending;
 	/** Server-side gate so a sprint dash stops the moment stamina hits zero. */
 	private boolean dashing;
+	/** Game-day greens satiety last recovered, so unloaded birds still catch up. */
+	private long lastGreensDay = Long.MIN_VALUE;
+	/** Game time of the last training green. 0 = never trained. */
+	private long lastGreensFeed;
 
 	public ChocoboEntity(EntityType<? extends ChocoboEntity> type, Level level) {
 		super(type, level);
@@ -161,14 +166,65 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected void registerGoals() {
-		this.goalSelector.addGoal(0, new FloatGoal(this));
+		this.goalSelector.addGoal(0, new ChocoFloatGoal());
 		this.goalSelector.addGoal(1, new SitWhenOrderedToGoal(this));
-		this.goalSelector.addGoal(2, new PanicGoal(this, 1.4D));
+		this.goalSelector.addGoal(2, new PanicGoal(this, 1.4D) {
+			@Override
+			public boolean canUse() {
+				return !Square.isSquare(level()) && super.canUse();
+			}
+
+			@Override
+			public boolean canContinueToUse() {
+				return !Square.isSquare(level()) && super.canContinueToUse();
+			}
+		});
 		this.goalSelector.addGoal(2, new net.minecraft.world.entity.ai.goal.BreedGoal(this, 1.0D));
-		this.goalSelector.addGoal(3, new FollowOwnerGoal(this, 1.2D, 8.0F, 3.0F));
+		this.goalSelector.addGoal(3, new FollowOwnerGoal(this, 1.2D, 8.0F, 3.0F) {
+			@Override
+			public boolean canUse() {
+				return !Square.isSquare(level()) && super.canUse();
+			}
+
+			@Override
+			public boolean canContinueToUse() {
+				return !Square.isSquare(level()) && super.canContinueToUse();
+			}
+		});
 		this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D,
-				Ingredient.of(ModItems.GYSAHL.get(), ModItems.CHOCOBO_LURE.get()), false));
-		this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 0.9D));
+				Ingredient.of(ModItems.GYSAHL.get(), ModItems.CHOCOBO_LURE.get()), false) {
+			@Override
+			public boolean canUse() {
+				return !Square.isSquare(level()) && super.canUse();
+			}
+
+			@Override
+			public boolean canContinueToUse() {
+				return !Square.isSquare(level()) && super.canContinueToUse();
+			}
+		});
+		this.goalSelector.addGoal(4, new WaterAvoidingRandomStrollGoal(this, 0.9D) {
+			@Override
+			public boolean canUse() {
+				return !color().waterWalk() && (townBird() || !Square.isSquare(level())) && super.canUse();
+			}
+
+			@Override
+			public boolean canContinueToUse() {
+				return !color().waterWalk() && (townBird() || !Square.isSquare(level())) && super.canContinueToUse();
+			}
+		});
+		this.goalSelector.addGoal(4, new net.minecraft.world.entity.ai.goal.RandomStrollGoal(this, 0.9D) {
+			@Override
+			public boolean canUse() {
+				return color().waterWalk() && (townBird() || !Square.isSquare(level())) && super.canUse();
+			}
+
+			@Override
+			public boolean canContinueToUse() {
+				return color().waterWalk() && (townBird() || !Square.isSquare(level())) && super.canContinueToUse();
+			}
+		});
 		this.goalSelector.addGoal(5, new LookAtPlayerGoal(this, Player.class, 8.0F));
 		this.goalSelector.addGoal(6, new RandomLookAroundGoal(this));
 	}
@@ -182,7 +238,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		applyColorStats(true);
 	}
 
-	/** Born grade plus one step per 60 training points (SPEC: greens lift the effective grade). */
+	/** Born grade plus one step per 120 training points (SPEC: greens lift the effective grade). */
 	public ChocoboGrade grade() {
 		int total = trainedSpeed() + trainedStamina() + trainedIntelligence() + trainedCooperation();
 		return ChocoboGrade.byRank(ChocoboGreen.gradeFromTraining(this.entityData.get(DATA_GRADE), total));
@@ -244,6 +300,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return this.entityData.get(DATA_RACING);
 	}
 
+	/** Almanac release: a nut in the bird must not finish a pairing after it goes wild. */
+	public void clearNut() {
+		this.entityData.set(DATA_NUT, 0);
+	}
+
 	public int raceTrack() {
 		return this.entityData.get(DATA_RACE_TRACK);
 	}
@@ -254,17 +315,40 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	public void setRacing(boolean racing) {
 		this.entityData.set(DATA_RACING, racing);
-		if (!racing) {
-			this.entityData.set(DATA_RACE_TRACK, -1);
+		if (racing) {
+			dropSquareLeash();
+		}
+		// keep raceTrack after the line so the course loop can finish before the sting
+	}
+
+	/** LeadItem runs before mobInteract; Square birds and live racers must not walk off on a lead. */
+	private void dropSquareLeash() {
+		if (isLeashed()) {
+			dropLeash(true, true);
 		}
 	}
 
-	/** Mounted speed factor: grade plus speed training (up to +12%). */
-	/** Speed training: +0.35% top speed per point, +35% at 100 (was 0.12%: "barely got any faster"). */
-	public static final double SPEED_PER_POINT = 0.0035D;
+	@Override
+	public boolean canBeLeashed() {
+		return !squareProtected() && super.canBeLeashed();
+	}
+
+	@Override
+	public boolean isPushable() {
+		return !squareProtected() && super.isPushable();
+	}
+
+	/** Town / NPC / live heat, including the finish-grace while the bird still carries a course. */
+	private boolean squareProtected() {
+		return RaceScoring.squareNpcProtected(townBird(), raceNpc(), racing(),
+				raceTrack() >= 0 && Square.isSquare(level()));
+	}
+
+	/** Speed training: +0.35% top speed per point, +35% at 100. */
+	public static final double SPEED_PER_POINT = RaceScoring.SPEED_PER_POINT;
 
 	public double speedMul() {
-		return RaceScoring.gradeSpeedMul(grade().getRank()) * (1.0D + SPEED_PER_POINT * trainedSpeed());
+		return RaceScoring.gradeSpeedMul(grade().getRank()) * RaceScoring.speedTrainingMul(trainedSpeed());
 	}
 
 	public boolean male() {
@@ -283,12 +367,27 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return RaceScoring.maxStamina(grade().getRank(), raceClass().getId(), false) + trainedStamina();
 	}
 
+	public void setStamina(int value) {
+		this.entityData.set(DATA_STAMINA, Mth.clamp(value, 0, maxStamina()));
+	}
+
+	public void fillStamina() {
+		setStamina(maxStamina());
+	}
+
+	public void setRaceClass(RaceClass raceClass) {
+		this.entityData.set(DATA_CLASS, raceClass.getId());
+	}
+
 	public boolean townBird() {
 		return this.entityData.get(DATA_TOWN_BIRD);
 	}
 
 	public void setTownBird(boolean town) {
 		this.entityData.set(DATA_TOWN_BIRD, town);
+		if (town) {
+			dropSquareLeash();
+		}
 	}
 
 	public boolean raceNpc() {
@@ -297,6 +396,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	public void setRaceNpc(boolean npc) {
 		this.entityData.set(DATA_RACE_NPC, npc);
+		if (npc) {
+			dropSquareLeash();
+		}
 	}
 
 	/**
@@ -316,6 +418,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	/** 0 chicobo (25% player), 1 (50% player), 2 (75% player), 3 adult. */
 	public int growthStage() {
 		return this.entityData.get(DATA_STAGE);
+	}
+
+	/** Spawn-egg chicks: age and hitbox before collision / addFreshEntity. */
+	public void markChick() {
+		setAge(-24000);
+		this.entityData.set(DATA_STAGE, 0);
+		refreshDimensions();
 	}
 
 	private int computeStage() {
@@ -454,10 +563,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public void addAdditionalSaveData(CompoundTag tag) {
+		// Pending almanac-release must land before vanilla writes OwnerUUID / Tame,
+		// or the chunk save keeps a tamed bird and clears the queue.
+		if (level() instanceof ServerLevel sl) {
+			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
+		}
 		super.addAdditionalSaveData(tag);
 		ledgerUpdate();
 		tag.putInt("Plumage", color().getId());
-		tag.putInt("Grade", grade().getRank());
+		tag.putInt("Grade", bornGrade().getRank());
 		tag.putInt("Nut", fedNut().ordinal());
 		tag.putInt("RaceWins", raceWins());
 		tag.putInt("RaceClass", raceClass().getId());
@@ -482,6 +596,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putIntArray("GreensFed", greensFed.clone());
 		tag.putBoolean("RaceNpc", raceNpc());
 		tag.putBoolean("TownBird", townBird());
+		if (lastGreensDay != Long.MIN_VALUE) {
+			tag.putLong("LastGreensDay", lastGreensDay);
+		}
+		if (lastGreensFeed > 0L) {
+			tag.putLong("LastGreensFeed", lastGreensFeed);
+		}
 	}
 
 	@Override
@@ -521,9 +641,27 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		this.entityData.set(DATA_RACE_NPC, tag.getBoolean("RaceNpc"));
 		this.entityData.set(DATA_TOWN_BIRD, tag.getBoolean("TownBird"));
+		if (tag.contains("LastGreensDay")) {
+			lastGreensDay = tag.getLong("LastGreensDay");
+		}
+		if (tag.contains("LastGreensFeed")) {
+			lastGreensFeed = tag.getLong("LastGreensFeed");
+		}
 		this.entityData.set(DATA_STAGE, computeStage());
 		// Attributes follow the plumage; health is whatever was saved.
 		applyColorStats(false);
+	}
+
+	@Override
+	public void onAddedToLevel() {
+		super.onAddedToLevel();
+		if (level() instanceof ServerLevel sl) {
+			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
+			ledgerUpdate();
+			if (townBird() && Square.isSquare(level())) {
+				restrictTo(new net.minecraft.core.BlockPos(0, tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, -72), 30);
+			}
+		}
 	}
 
 	// ------------------------------------------------------------ interaction
@@ -532,7 +670,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public InteractionResult mobInteract(Player player, InteractionHand hand) {
 		ItemStack stack = player.getItemInHand(hand);
 		if (raceNpc()) {
-			return InteractionResult.PASS;
+			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
 		if (townBird()) {
 			if (!level().isClientSide) {
@@ -540,10 +678,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			}
 			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
+		if (racing()) {
+			return InteractionResult.sidedSuccess(level().isClientSide);
+		}
 		if (stack.is(ModItems.GYSAHL.get())) {
 			if (!isTame()) {
 				if (!level().isClientSide && random.nextFloat() < 0.33F) {
 					tame(player);
+					heal(5.0F);
 					ledgerUpdate();
 					setOrderedToSit(true);
 					level().broadcastEntityEvent(this, (byte) 7);
@@ -555,6 +697,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				}
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
+			if (isOwnedBy(player)) {
+				return feedGreen(player, stack, ChocoboGreen.GYSAHL);
+			}
 			if (getHealth() < getMaxHealth()) {
 				if (!level().isClientSide) {
 					heal(5.0F);
@@ -564,30 +709,51 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				}
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
-			if (isOwnedBy(player)) {
-				return feedGreen(player, stack, ChocoboGreen.GYSAHL);
-			}
+			// unowned, full health: consume the click so the edible green is not eaten
+			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
 		if (isTame() && isOwnedBy(player)) {
 			if (stack.getItem() instanceof NutItem nutItem && !isBaby() && !racing()) {
 				// FF7: a nut is what mates two adults (Choco Billy's "mate").
+				// Vanilla canFallInLove is false while inLove, so sneak-replace must run first.
+				if (isInLove() || fedNut() != ChocoboNut.NONE) {
+					if (!player.isSecondaryUseActive()) {
+						return InteractionResult.sidedSuccess(level().isClientSide);
+					}
+					if (level().isClientSide) {
+						return InteractionResult.SUCCESS;
+					}
+					this.entityData.set(DATA_NUT, nutItem.nut().ordinal());
+					setInLove(player);
+					setOrderedToSit(false);
+					if (!player.getAbilities().instabuild) {
+						stack.shrink(1);
+					}
+					return InteractionResult.CONSUME;
+				}
+				if (!canFallInLove()) {
+					return InteractionResult.sidedSuccess(level().isClientSide);
+				}
 				if (!level().isClientSide) {
 					this.entityData.set(DATA_NUT, nutItem.nut().ordinal());
 					if (canFallInLove()) {
 						setInLove(player);
 					}
+					setOrderedToSit(false);
 					ChocoboNut fed = nutItem.nut();
 					if (fed == ChocoboNut.CAROB || fed == ChocoboNut.ZEIO) {
-						// mate unknown at feed time: report the minimum this bird can need
 						int need = minWinsEach(color(), color(), fed);
+						if (fed == ChocoboNut.CAROB && (color() == ChocoboColor.GREEN || color() == ChocoboColor.BLUE)) {
+							need = 2;
+						}
 						if (raceWins() < need) {
 							player.displayClientMessage(Component.translatable("chocobosreborn.nut.needs_wins",
 									Component.translatable("chocobosreborn.nut." + fed.id()), need, raceWins()), true);
 						}
 					}
-				}
-				if (!player.getAbilities().instabuild) {
-					stack.shrink(1);
+					if (!player.getAbilities().instabuild) {
+						stack.shrink(1);
+					}
 				}
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
@@ -597,7 +763,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			int equipSlot = stack.getItem() instanceof SaddleItem ? SLOT_SADDLE
 					: stack.getItem() instanceof tk.darrow.chocobosreborn.item.ChocoboArmorItem ? SLOT_ARMOR
 					: stack.getItem() instanceof tk.darrow.chocobosreborn.item.SaddlebagsItem ? SLOT_BAGS : -1;
-			if (equipSlot >= 0 && inventory.getItem(equipSlot).isEmpty() && !isBaby()) {
+			if (equipSlot >= 0 && !isBaby()) {
+				if (!inventory.getItem(equipSlot).isEmpty()) {
+					if (!level().isClientSide) {
+						player.displayClientMessage(Component.translatable("chocobosreborn.equip.occupied"), true);
+					}
+					return InteractionResult.sidedSuccess(level().isClientSide);
+				}
 				if (level().isClientSide) {
 					return InteractionResult.SUCCESS;
 				}
@@ -638,8 +810,18 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			}
 			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
+		boolean instabuild = player.getAbilities().instabuild;
+		if (!ChocoboGreen.trainReady(lastGreensFeed, level().getGameTime(), instabuild)) {
+			if (!level().isClientSide) {
+				int wait = ChocoboGreen.trainWaitTicks(lastGreensFeed, level().getGameTime());
+				player.displayClientMessage(Component.translatable("chocobosreborn.greens.wait",
+						ChocoboGreen.trainWaitClock(wait)), true);
+			}
+			return InteractionResult.sidedSuccess(level().isClientSide);
+		}
 		if (!level().isClientSide) {
 			greensFed[idx]++;
+			lastGreensFeed = level().getGameTime();
 			addTraining(green.speed(), green.stamina(), green.intelligence(), green.cooperation());
 			this.entityData.set(DATA_STAMINA, Math.min(maxStamina(), stamina() + 20));
 			if (getHealth() < getMaxHealth()) {
@@ -655,9 +837,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 					Component.translatable("item.chocobosreborn." + green.id() + "_green"),
 					trainedSpeed(), trainedStamina(), trainedIntelligence(), trainedCooperation(),
 					green.satiety() - greensFed[idx]), true);
-		}
-		if (!player.getAbilities().instabuild) {
-			stack.shrink(1);
+			if (!instabuild) {
+				stack.shrink(1);
+			}
 		}
 		return InteractionResult.sidedSuccess(level().isClientSide);
 	}
@@ -718,7 +900,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public void openCustomInventoryScreen(Player player) {
-		if (player instanceof net.minecraft.server.level.ServerPlayer sp && !isBaby()) {
+		if (player instanceof net.minecraft.server.level.ServerPlayer sp && !isBaby() && !racing()) {
 			sp.openMenu(new net.minecraft.world.SimpleMenuProvider(
 					(id, inv, p) -> new tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu(id, inv, this), getDisplayName()),
 					buf -> buf.writeVarInt(getId()));
@@ -746,7 +928,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (!(other instanceof ChocoboEntity mate) || mate == this) {
 			return false;
 		}
-		if (raceNpc() || mate.raceNpc()) {
+		if (raceNpc() || mate.raceNpc() || racing() || mate.racing()
+				|| squareProtected() || mate.squareProtected()) {
 			return false;
 		}
 		return isInLove() && mate.isInLove() && male() != mate.male()
@@ -755,7 +938,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public @Nullable AgeableMob getBreedOffspring(ServerLevel level, AgeableMob other) {
-		if (!(other instanceof ChocoboEntity mate)) {
+		// Vanilla spawn eggs call this with mate == this; that is not a farm pairing.
+		if (!(other instanceof ChocoboEntity mate) || mate == this) {
 			return null;
 		}
 		ChocoboEntity chick = ModEntities.CHOCOBO.get().create(level);
@@ -771,7 +955,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		ChocoboColor child = BreedRules.resolve(color(), mate.color(), grade(), mate.grade(), nut, wins, hit,
 				random.nextBoolean(), inherit);
 		chick.setColor(child);
-		int rank = (grade().getRank() + mate.grade().getRank()) / 2;
+		int rank = (bornGrade().getRank() + mate.bornGrade().getRank()) / 2;
 		if (nut == ChocoboNut.ZEIO) {
 			rank += 1;
 		}
@@ -825,6 +1009,24 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return super.isPickable() && !(LOCAL_RIDER != null && LOCAL_RIDER.test(this));
 	}
 
+	@Override
+	public boolean canBeHitByProjectile() {
+		// rider shots spawn inside this 3 m box; they must pass through
+		return super.canBeHitByProjectile() && !(getControllingPassenger() instanceof Player)
+				&& !squareProtected();
+	}
+
+	@Override
+	public boolean isInvulnerableTo(DamageSource source) {
+		if (source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY)) {
+			return super.isInvulnerableTo(source);
+		}
+		if (squareProtected()) {
+			return true;
+		}
+		return super.isInvulnerableTo(source);
+	}
+
 	/** Fighting from the saddle: a rider's own swings, arrows and sweeps never land on the bird. */
 	@Override
 	public boolean hurt(DamageSource source, float amount) {
@@ -840,9 +1042,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	private static final net.minecraft.resources.ResourceLocation BOOST_ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("chocobosreborn", "boost");
 	private static final net.minecraft.resources.ResourceLocation BOG_ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("chocobosreborn", "bog");
-	private static final int BOOST_TICKS = 45;
-	/** Speed added while boosting (x2) and taken while bogged (x0.45). */
-	private static final double BOOST_POWER = 1.0D, BOG_DRAG = -0.55D;
+	private static final int BOOST_TICKS = 50;
+	/** Speed added while boosting (+55%) and taken while bogged (-55%). */
+	private static final double BOOST_POWER = 0.55D, BOG_DRAG = -0.55D;
 	private int boostTicks;
 	/** Where the bird was at the end of the last tick: a ridden bird's server delta is ~0 and its
 	 *  xo is refreshed after the rider's move packet lands, so neither shows real movement. */
@@ -859,11 +1061,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 * are movement-speed modifiers, so they work for riders and race AI alike.
 	 */
 	private void tickCourseEffects() {
-		double mx = Double.isNaN(trackX) ? 0.0D : getX() - trackX, mz = Double.isNaN(trackX) ? 0.0D : getZ() - trackZ;
+		double prevX = trackX, prevZ = trackZ;
+		double mx = Double.isNaN(prevX) ? 0.0D : getX() - prevX, mz = Double.isNaN(prevX) ? 0.0D : getZ() - prevZ;
 		trackX = getX();
 		trackZ = getZ();
 		boolean moving = mx * mx + mz * mz > 0.001D;
-		if (moving && level().getBlockState(blockPosition()).is(tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get())) {
+		if (moving && crossedBoostPad(prevX, prevZ)) {
 			if (boostTicks <= 0) {
 				level().playSound(null, this, net.minecraft.sounds.SoundEvents.FIREWORK_ROCKET_LAUNCH,
 						net.minecraft.sounds.SoundSource.NEUTRAL, 0.7F, 1.5F);
@@ -884,7 +1087,29 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		// AI birds take the boost as an attribute; a rider's client applies it to its input (getRiddenInput)
 		boolean ridden = getControllingPassenger() instanceof Player;
 		speedMod(BOOST_ID, boostTicks > 0 && !ridden, BOOST_POWER);
-		speedMod(BOG_ID, bog, BOG_DRAG);
+		speedMod(BOG_ID, bog && !ridden, BOG_DRAG);
+	}
+
+	/** Current block plus the path since last tick, so a dash cannot skip a 1-block strip. */
+	private boolean crossedBoostPad(double prevX, double prevZ) {
+		if (isBoostPad(blockPosition())) {
+			return true;
+		}
+		if (Double.isNaN(prevX)) {
+			return false;
+		}
+		int n = RaceScoring.boostPadSamples(getX() - prevX, getZ() - prevZ);
+		for (int i = 0; i <= n; i++) {
+			double f = i / (double) n;
+			if (isBoostPad(BlockPos.containing(prevX + (getX() - prevX) * f, getY(), prevZ + (getZ() - prevZ) * f))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean isBoostPad(BlockPos pos) {
+		return level().getBlockState(pos).is(tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get());
 	}
 
 	private void speedMod(net.minecraft.resources.ResourceLocation id, boolean on, double amount) {
@@ -926,8 +1151,23 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.moveControl = new tk.darrow.chocobosreborn.race.RacerMoveControl(this);
 		this.goalSelector.removeAllGoals(g -> true);
 		this.targetSelector.removeAllGoals(g -> true);
-		this.goalSelector.addGoal(0, new FloatGoal(this));
+		this.goalSelector.addGoal(0, new ChocoFloatGoal());
 		this.goalSelector.addGoal(1, racer);
+	}
+
+	/** Vanilla float jumps every tick in liquid; that fights sneak-dive on river and lava birds. */
+	private final class ChocoFloatGoal extends FloatGoal {
+		ChocoFloatGoal() {
+			super(ChocoboEntity.this);
+		}
+
+		@Override
+		public boolean canUse() {
+			if (getControllingPassenger() instanceof Player p && (descending || p.isShiftKeyDown())) {
+				return false;
+			}
+			return super.canUse();
+		}
 	}
 
 	// ---------------------------------------------------------------- riding
@@ -956,7 +1196,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected void tickRidden(Player player, Vec3 travel) {
-		this.setRot(player.getYRot(), player.getXRot() * 0.5F);
+		float catchup = RaceScoring.turnCatchup(trainedCooperation());
+		this.setYRot(Mth.rotLerp(catchup, this.getYRot(), player.getYRot()));
+		this.setXRot(Mth.rotLerp(catchup, this.getXRot(), player.getXRot() * 0.5F));
 		this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
 		if (!level().isClientSide) {
 			int st = stamina();
@@ -965,18 +1207,17 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			boolean wantsDash = player.isSprinting() && player.zza > 0.0F && !(color().fly() && !onGround());
 			if (wantsDash && st > 0) {
 				dashing = true;
-				// Intelligence: a smart bird paces itself (skips every 4th drain at 100).
-				boolean skip = trainedIntelligence() > 0 && tickCount % 4 == 0 && random.nextInt(100) < trainedIntelligence();
-				this.entityData.set(DATA_STAMINA, skip ? st : st - 1);
+				boolean skip = RaceScoring.intelSkipsDashDrain(trainedIntelligence(), tickCount, random.nextInt(100));
+				setStamina(skip ? st : st - 1);
 			} else {
 				dashing = false;
 				// Recover: quick when standing, slow while cruising.
 				int gain = player.zza == 0.0F && player.xxa == 0.0F ? 2 : (tickCount % 3 == 0 ? 1 : 0);
 				if (st < max && gain > 0) {
-					this.entityData.set(DATA_STAMINA, Math.min(max, st + gain));
+					setStamina(st + gain);
 				}
 			}
-			if (dashing && st - 1 <= 0) {
+			if (dashing && RaceScoring.dashEnds(stamina())) {
 				dashing = false;
 				player.setSprinting(false);
 			}
@@ -986,26 +1227,31 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected Vec3 getRiddenInput(Player player, Vec3 travel) {
-		float strafe = player.xxa * 0.5F;
+		float strafe = player.xxa * RaceScoring.strafeMul(trainedCooperation());
 		float forward = player.zza;
 		if (forward <= 0.0F) {
 			forward *= 0.25F;
 		}
 		double mul = speedMul();
-		if (player.isSprinting() && stamina() > 0) {
+		// Airborne sprint is "dive" on a flier, not a stamina dash (tickRidden matches).
+		boolean airDive = color().fly() && !onGround();
+		if (player.isSprinting() && stamina() > 0 && !airDive) {
 			mul *= RaceScoring.dashMul();
 		} else if (stamina() <= 0) {
 			mul *= RaceScoring.emptyStaminaMul();
 		}
 		if (boosting()) {
-			mul *= 1.0D + BOOST_POWER;   // boost pad: same x2 the AI gets
+			mul *= 1.0D + BOOST_POWER;   // boost pad: +55%, same as the AI attribute
+		}
+		if (onGround() && getBlockStateOn().is(Blocks.MUD)) {
+			mul *= 1.0D + BOG_DRAG;   // mud: same x0.45 the AI gets
 		}
 		ChocoboColor c = color();
 		boolean water = isInWater() || (c.waterWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.WATER))
 				|| (c.lavaWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.LAVA));
-		// mountedCruise already carries the grade factor; speedMul() adds only training here.
+		// mountedCruise carries grade; divide speedMul back out so training is not applied twice.
 		double cruise = RaceScoring.mountedCruise(c.landSpeed(), c.waterSpeed(), water, racing(), grade().getRank());
-		double training = 1.0D + SPEED_PER_POINT * trainedSpeed();
+		double training = RaceScoring.speedTrainingMul(trainedSpeed());
 		return new Vec3(strafe, 0.0D, forward).scale(mul / speedMul() * training * cruise / Math.max(0.05D, c.landSpeed()));
 	}
 
@@ -1140,33 +1386,41 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return saddled() && !isBaby() && super.canAddPassenger(passenger);
 	}
 
-	@Override
-	protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean recentlyHit) {
-		super.dropCustomDeathLoot(level, source, recentlyHit);
-		if (saddled()) {
-			spawnAtLocation(new ItemStack(ModItems.SADDLE.get()));
-		}
-	}
-
 	// ------------------------------------------------------------------ tick
 
 	@Override
 	public void aiStep() {
 		super.aiStep();
 		if (!level().isClientSide) {
+			if (isInLove() && isOrderedToSit()) {
+				setOrderedToSit(false);
+			}
+			// A nut stays until they hatch; keep the love window open so a missed path
+			// does not lock Carob/Zeio forever.
+			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove()) {
+				setInLove(null);
+			}
 			int stage = computeStage();
 			if (stage != growthStage()) {
 				this.entityData.set(DATA_STAGE, stage);
 				refreshDimensions();
 			}
 			if (!isVehicle() && stamina() < maxStamina() && tickCount % 4 == 0) {
-				this.entityData.set(DATA_STAMINA, stamina() + 1);
+				setStamina(stamina() + 1);
 			}
-			// A sated bird gets its appetite back slowly: one feed of each green per day.
-			if (level().getGameTime() % 24000 == 0) {
-				for (int i = 0; i < greensFed.length; i++) {
-					if (greensFed[i] > 0) {
-						greensFed[i]--;
+			// A sated bird gets its appetite back slowly: one feed of each green per day,
+			// including days spent unloaded.
+			long day = level().getGameTime() / 24000L;
+			if (lastGreensDay == Long.MIN_VALUE) {
+				lastGreensDay = day;
+			} else if (day > lastGreensDay) {
+				int days = (int) Math.min(40L, day - lastGreensDay);
+				lastGreensDay = day;
+				for (int n = 0; n < days; n++) {
+					for (int i = 0; i < greensFed.length; i++) {
+						if (greensFed[i] > 0) {
+							greensFed[i]--;
+						}
 					}
 				}
 			}
@@ -1193,7 +1447,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				}
 			}
 			// Chocobo Lure: wild birds show themselves to a player carrying one.
-			if (!isTame() && tickCount % 20 == 0) {
+			if (!isTame() && !squareProtected() && tickCount % 20 == 0) {
 				Player lurer = level().getNearestPlayer(this, 32.0D);
 				if (lurer != null && (lurer.getMainHandItem().is(ModItems.CHOCOBO_LURE.get())
 						|| lurer.getOffhandItem().is(ModItems.CHOCOBO_LURE.get()))) {
@@ -1210,6 +1464,17 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (c.fireImmune() && isOnFire()) {
 			clearFire();
 		}
+		if (!level().isClientSide && Square.isSquare(level()) && !racing() && !raceNpc() && raceTrack() < 0
+				&& RaceScoring.squarePetFallRescue(getY(),
+				getControllingPassenger() instanceof Player && color().fly() && !onGround() && getY() >= 20.0D)) {
+			if (getControllingPassenger() instanceof net.minecraft.server.level.ServerPlayer) {
+				tk.darrow.chocobosreborn.race.RaceSession.moveRidden(this, Square.ARRIVAL.x, Square.ARRIVAL.y,
+						Square.ARRIVAL.z);
+			} else {
+				teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+			}
+			fallDistance = 0.0F;
+		}
 		if (!level().isClientSide && getControllingPassenger() instanceof LivingEntity rider && tickCount % 20 == 0) {
 			if (c.waterBreathing()) {
 				rider.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 60, 0, true, false));
@@ -1222,6 +1487,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			}
 			if (c.riderSlowFalling()) {
 				rider.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 60, 0, true, false));
+				addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 60, 0, true, false));
 			}
 		}
 	}
@@ -1249,7 +1515,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public boolean causeFallDamage(float distance, float multiplier, DamageSource source) {
-		return color().fly() ? false : super.causeFallDamage(distance, multiplier, source);
+		return (color().fly() || color().riderSlowFalling()) ? false : super.causeFallDamage(distance, multiplier, source);
 	}
 
 	@Override
@@ -1258,8 +1524,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	@Override
+	protected int decreaseAirSupply(int current) {
+		// canBreatheUnderwater() is final in this mapping; sneak-dive is "down" for river birds.
+		return color().waterWalk() ? current : super.decreaseAirSupply(current);
+	}
+
+	@Override
 	public boolean removeWhenFarAway(double distance) {
-		return !isTame() && !raceNpc() && super.removeWhenFarAway(distance);
+		return !isTame() && !raceNpc() && !townBird() && super.removeWhenFarAway(distance);
 	}
 
 }

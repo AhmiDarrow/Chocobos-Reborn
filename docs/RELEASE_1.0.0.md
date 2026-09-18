@@ -4,7 +4,7 @@ First public release. Minecraft 1.21.1, NeoForge 21.1.249, Java 21, client and s
 
 - **Birds**: eight plumages, three growth stages, original voxel bird with saddled and armored meshes; the End bird wears end stone in its feathers, the Nether bird lava.
 - **Taming and training**: Gysahl tames, eight greens train speed, stamina, intelligence and cooperation; speed training now shows on the road.
-- **Breeding**: eight nuts, the FF7 farm line to Green, Blue, Black and Gold, race wins required for colour rolls; End and Nether birds breed as Yellows.
+- **Breeding**: eight nuts, the FF7 farm line to Green, Blue, Black and Gold, race wins required for colour rolls; End and Nether birds breed true.
 - **Riding**: dash on stamina, breed abilities (climb, rivers, night sight, lava, Gold flight), fight from the saddle, equipment screen with armor and saddlebags.
 - **Chocobo Almanac**: illustrated guide and a live ledger of your birds with rename, release and remove.
 - **Whiskerwind**: a race town on a void island with its own sky and music, protected from digging and spawns, with town birds, stalls, duel master, broker, bookie and the Race Hall.

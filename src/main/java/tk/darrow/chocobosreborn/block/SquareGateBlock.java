@@ -14,12 +14,13 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.race.RaceManager;
+import tk.darrow.chocobosreborn.race.RaceScoring;
 import tk.darrow.chocobosreborn.race.Square;
 
 /**
  * Chocobo Square gates. ENTRY (placed anywhere): ride a saddled bird into
- * the Square. SHORT / LONG (in the Square): a fun one-on-one heat on course
- * 0 / 1. RETURN: home.
+ * the Square. SHORT / LONG (in the Square): a fun heat on the class's sprint
+ * (course 0) or first grand prix (course 3). RETURN: home.
  */
 public class SquareGateBlock extends Block {
 	public enum Kind implements StringRepresentable {
@@ -70,14 +71,14 @@ public class SquareGateBlock extends Block {
 				} else if (sp.getVehicle() instanceof ChocoboEntity bird) {
 					RaceManager.enterSquare(sp, bird);
 				} else {
-					sp.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
+					RaceManager.enterSquareOnFoot(sp);
 				}
 			}
 			case SHORT_COURSE, LONG_COURSE -> {
 				if (!inSquare) {
 					sp.displayClientMessage(Component.translatable("chocobosreborn.gate.only_square"), true);
 				} else {
-					RaceManager.startRace(sp, kind == Kind.SHORT_COURSE ? 0 : 1, false);
+					RaceManager.startRace(sp, RaceScoring.funGateCourse(kind == Kind.LONG_COURSE), false);
 				}
 			}
 			case RETURN_GATE -> RaceManager.leaveSquare(sp);

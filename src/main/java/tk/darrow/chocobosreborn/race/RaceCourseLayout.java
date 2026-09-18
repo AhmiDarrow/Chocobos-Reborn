@@ -21,8 +21,10 @@ import java.util.Set;
  * {@link RaceTrack#ridgeHeight()} blocks or a bog of mud, with a detour road laid
  * outside (DETOUR_INNER..DETOUR_OUTER) and connectors at both ends; boost strips
  * lay {@code chocobosreborn:boost_pad} across the band;</li>
- * <li>a start / finish gantry, lamps, and the grandstand in the infield beside the
- * start straight with {@link #fanPosts()} for the crowd.</li>
+ * <li>a chequered start / finish line, a painted six-stall grid, a yellow arrow
+ * just past it, a start / finish gantry with lights clear of a mounted bird,
+ * lamps on both verges, warning posts before terrain, and the grandstand in the
+ * infield beside the start straight with {@link #fanPosts()} for the crowd.</li>
  * </ul>
  */
 public final class RaceCourseLayout {
@@ -36,9 +38,13 @@ public final class RaceCourseLayout {
 	public record FanPost(double x, double y, double z, float yaw) {
 	}
 
+	/** Course-name wall sign on the marshal's tower, facing the grid. */
+	public record BoardPost(int x, int y, int z, String facing) {
+	}
+
 	private static final Map<RaceTrack, RaceCourseLayout> CACHE = new EnumMap<>(RaceTrack.class);
 	private static final double CONNECT = 0.012D;      // t-length of a detour connector
-	private static final double MARGIN = 8.0D;         // ground either side of the kerbs
+	private static final double MARGIN = 10.0D;        // ground either side of the kerbs
 	private static final String BOOST = "chocobosreborn:boost_pad";
 	private static final String[] RAINBOW = {"red", "orange", "yellow", "lime", "light_blue", "blue", "purple"};
 
@@ -48,6 +54,7 @@ public final class RaceCourseLayout {
 	private final Set<Tile> road = new HashSet<>();
 	private final Set<Long> chunks = new HashSet<>();
 	private final List<FanPost> fans = new ArrayList<>();
+	private BoardPost board;
 	private int decoSeed;
 
 	public static synchronized RaceCourseLayout of(RaceTrack track) {
@@ -88,7 +95,8 @@ public final class RaceCourseLayout {
 					put(x, surf - d, z, theme.base);
 				}
 				if (!underRoad) {
-					put(x, surf, z, sky ? theme.base : theme.ground);
+					boolean rim = o < -outer + 0.75D || o > inner - 0.75D;
+					put(x, surf, z, rim ? theme.wall : (sky ? theme.base : theme.ground));
 				}
 			}
 			// the band
@@ -98,8 +106,9 @@ public final class RaceCourseLayout {
 				road.add(new Tile(x, z));
 				if (ft == null) {
 					String surface = sky ? RAINBOW[(i / 8) % RAINBOW.length] + "_concrete" : theme.road;
-					if (t < 0.004D || t > 0.996D) {
-						surface = ((x + z) & 1) == 0 ? "white_concrete" : "black_concrete";   // start / finish line
+					RaceTrack.Feature soon = approachingBoost(t, lap);
+					if (soon != null && boostLane(soon, o) && (i / 2) % 2 == 0) {
+						surface = "yellow_concrete";
 					}
 					put(x, surf, z, surface);
 					if (any != null && any.type() == RaceTrack.Feature.Type.BOOST && boostLane(any, o)) {
@@ -140,9 +149,13 @@ public final class RaceCourseLayout {
 				int x = floor(q.x()), z = floor(q.z());
 				String kerb = corner ? ((i / 6) % 2 == 0 ? theme.kerbA : theme.kerbB) : theme.wall;
 				put(x, surf, z, kerb);
+				if (corner) {
+					RacePoint wide = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.0D));
+					put(floor(wide.x()), surf, floor(wide.z()), kerb);
+				}
 				if (liquid) {
 					put(x, surf + 1, z, theme.wall);
-				} else if (!theme.rail.equals("air") && !(t < 0.03D && t > 0.0D) && (side < 0 || corner)) {
+				} else if (!theme.rail.equals("air") && t >= 0.03D && (side < 0 || corner)) {
 					put(x, surf + 1, z, theme.rail);
 				}
 			}
@@ -156,7 +169,7 @@ public final class RaceCourseLayout {
 					put(x, surf, z, theme.road);
 				}
 				RacePoint edge = track.pointAtLane(t, -RaceTrack.DETOUR_OUTER - 1.0D);
-				put(floor(edge.x()), surf, floor(edge.z()), theme.wall);
+				put(floor(edge.x()), surf, floor(edge.z()), ft == null ? "yellow_concrete" : theme.wall);
 				if (!theme.rail.equals("air")) {
 					put(floor(edge.x()), surf + 1, floor(edge.z()), theme.rail);
 				}
@@ -191,7 +204,10 @@ public final class RaceCourseLayout {
 		}
 		lamps(lap);
 		gantry();
+		startLine(lap);
+		startGrid(lap);
 		startArrow(lap);
+		warnings(lap);
 		grandstand(lap, standFrom, standTo);
 		landmark();
 		for (Cell c : blocks.keySet()) {
@@ -202,61 +218,148 @@ public final class RaceCourseLayout {
 	// ------------------------------------------------------------ dressing
 
 	private void lamps(double lap) {
+		double standFrom = 6.0D / lap, standTo = Math.min(50.0D, lap * 0.06D) / lap;
 		int lamps = (int) (lap / 40.0D);
 		for (int i = 0; i < lamps; i++) {
 			double t = i / (double) lamps;
 			if (track.terrainAt(t) != null || t < 0.05D) {
 				continue;
 			}
-			RacePoint q = track.pointAtLane(t, -(RaceTrack.ROAD_HALF + 2.5D));
-			int x = floor(q.x()), z = floor(q.z());
+			boolean stand = t >= standFrom && t <= standTo;
 			int y = (int) track.groundY(t) - 1;
-			put(x, y, z, theme.wall);
-			put(x, y + 1, z, theme.post);
-			put(x, y + 2, z, theme.post);
-			put(x, y + 3, z, theme.post);
-			put(x, y + 4, z, theme.lamp);
+			for (int side : new int[]{-1, 1}) {
+				if (side > 0 && stand) {
+					continue;
+				}
+				RacePoint q = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.5D));
+				int x = floor(q.x()), z = floor(q.z());
+				put(x, y, z, theme.wall);
+				put(x, y + 1, z, theme.post);
+				put(x, y + 2, z, theme.post);
+				put(x, y + 3, z, theme.post);
+				put(x, y + 4, z, theme.lamp);
+			}
 		}
+	}
+
+	/** Chequered band across the road at t = 0, five rows so it reads at speed. */
+	private void startLine(double lap) {
+		for (int row = -2; row <= 2; row++) {
+			double t = row / lap;
+			if (t < 0.0D) {
+				t += 1.0D;
+			}
+			int surf = (int) track.groundY(t) - 1;
+			for (double o = -RaceTrack.ROAD_HALF; o <= RaceTrack.ROAD_HALF; o += 0.5D) {
+				RacePoint q = track.pointAtLane(t, o);
+				boolean white = ((floor(o + RaceTrack.ROAD_HALF) + row) & 1) == 0;
+				put(floor(q.x()), surf, floor(q.z()), white ? "white_concrete" : "black_concrete");
+			}
+		}
+	}
+
+	/** Six stall boxes on the grid at t = 0.02, outlined in white. */
+	private void startGrid(double lap) {
+		int surf = (int) track.groundY(0.02D) - 1;
+		for (int stall = 0; stall < 6; stall++) {
+			double centre = RaceTrack.stallOffset(stall, 6);
+			for (int row = 0; row < 4; row++) {
+				double t = 0.02D + (row - 3) / lap;
+				for (double o = centre - 0.8D; o <= centre + 0.8D; o += 0.5D) {
+					boolean edge = row == 0 || row == 3 || o <= centre - 0.55D || o >= centre + 0.55D;
+					if (!edge) {
+						continue;
+					}
+					RacePoint q = track.pointAtLane(t, o);
+					put(floor(q.x()), surf, floor(q.z()), "white_concrete");
+				}
+			}
+		}
+	}
+
+	/** A yellow arrow on the road just past the grid, pointing the way round. */
+	private void startArrow(double lap) {
+		double t0 = 0.02D + 4.0D / lap;
+		RacePoint origin = track.pointAtLane(t0, 0.0D);
+		double[] tg = track.tangent(t0);
+		int[] f = RaceScoring.arrowForward(tg[0], tg[1]);
+		int[] r = RaceScoring.arrowRight(f[0], f[1]);
+		int ox = floor(origin.x()), oz = floor(origin.z());
+		int surf = (int) track.groundY(t0) - 1;
+		int half = RaceScoring.startArrowHalf();
+		for (int along = 0; along < RaceScoring.startArrowLength(); along++) {
+			for (int across = -half; across <= half; across++) {
+				if (!RaceScoring.startArrowCell(along, across)) {
+					continue;
+				}
+				int x = ox + f[0] * along + r[0] * across;
+				int z = oz + f[1] * along + r[1] * across;
+				put(x, surf, z, RaceScoring.startArrowTip(along, across) ? "gold_block" : "yellow_concrete");
+			}
+		}
+	}
+
+	/** Coloured posts a few blocks before each terrain feature. */
+	private void warnings(double lap) {
+		for (RaceTrack.Feature f : track.terrainFeatures()) {
+			double t = f.start() - 8.0D / lap;
+			if (t < 0.06D) {
+				t = 0.06D;
+			}
+			int surf = (int) track.groundY(t) - 1;
+			String colour = switch (f.type()) {
+				case WATER -> "light_blue";
+				case LAVA -> "orange";
+				case RIDGE -> "gray";
+				case MUD -> "brown";
+				default -> "yellow";
+			};
+			for (int side : new int[]{-1, 1}) {
+				RacePoint q = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.0D));
+				int x = floor(q.x()), z = floor(q.z());
+				put(x, surf + 1, z, theme.post);
+				put(x, surf + 2, z, theme.post);
+				put(x, surf + 3, z, colour + "_banner[rotation=8]");
+			}
+		}
+	}
+
+	private RaceTrack.Feature approachingBoost(double t, double lap) {
+		double window = 6.0D / lap;
+		for (RaceTrack.Feature f : track.features()) {
+			if (f.type() != RaceTrack.Feature.Type.BOOST) {
+				continue;
+			}
+			if (t < f.start() && f.start() - t <= window) {
+				return f;
+			}
+		}
+		return null;
 	}
 
 	/** Start / finish gantry across the band at t = 0. */
-	/** A big yellow arrow painted on the road just past the grid, pointing the way round. */
-	private void startArrow(double lap) {
-		// a proper arrow: a 3-wide shaft of six rows, then a triangular head nine wide at its
-		// base tapering to a one-block gold tip over seven rows
-		double from = 14.0D / lap;
-		for (int row = 0; row < 13; row++) {
-			double t = from + row / lap;
-			int surf = (int) track.groundY(t) - 1;
-			double half = row < 6 ? 1.0D : 4.5D - (row - 6) * 0.75D;
-			for (double o = -half; o <= half; o += 0.5D) {
-				RacePoint q = track.pointAtLane(t, o);
-				put(floor(q.x()), surf, floor(q.z()), row == 12 ? "gold_block" : "yellow_concrete");
-			}
-		}
-	}
-
 	private void gantry() {
 		int y = (int) track.groundY(0.0D) - 1;
+		int beam = 11;
 		for (double o : new double[]{-RaceTrack.ROAD_HALF - 1.5D, RaceTrack.ROAD_HALF + 1.5D}) {
 			RacePoint q = track.pointAtLane(0.0D, o);
 			int x = floor(q.x()), z = floor(q.z());
-			for (int h = 0; h <= 9; h++) {
-				put(x, y + h, z, h == 6 ? theme.lamp : theme.post);
+			for (int h = 0; h <= beam; h++) {
+				put(x, y + h, z, h == 8 ? theme.lamp : theme.post);
 			}
-			put(x, y + 10, z, theme.kerbA);
+			put(x, y + beam + 1, z, theme.kerbA);
 		}
 		for (double o = -RaceTrack.ROAD_HALF - 1.5D; o <= RaceTrack.ROAD_HALF + 1.5D; o += 0.5D) {
 			RacePoint q = track.pointAtLane(0.0D, o);
 			int x = floor(q.x()), z = floor(q.z());
-			put(x, y + 9, z, (floor(o) & 1) == 0 ? "black_concrete" : "white_concrete");
-			// the starting light tree hangs under the beam (red, amber, green), clear of a 3.25 m bird
+			put(x, y + beam, z, (floor(o) & 1) == 0 ? "black_concrete" : "white_concrete");
+			// lights hang under the beam (red, amber, green), clear of a mounted bird
 			int lane = floor(o + RaceTrack.ROAD_HALF + 1.5D);
 			if (lane % 4 == 1) {
-				put(x, y + 8, z, "red_concrete");
-				put(x, y + 7, z, "yellow_concrete");
-				put(x, y + 6, z, "lime_concrete");
-				put(x, y + 5, z, "sea_lantern");
+				put(x, y + beam - 1, z, "red_concrete");
+				put(x, y + beam - 2, z, "yellow_concrete");
+				put(x, y + beam - 3, z, "lime_concrete");
+				put(x, y + beam - 4, z, "sea_lantern");
 			}
 		}
 		// a marshal's tower beside the gantry
@@ -276,6 +379,10 @@ public final class RaceCourseLayout {
 		}
 		put(tx, y + 11, tz, theme.lamp);
 		put(tx + 1, y + 11, tz + 1, "yellow_banner[rotation=8]");
+		RacePoint road = track.pointAt(0.0D);
+		String facing = cardinal(new double[]{road.x() - tx, road.z() - tz});
+		RacePoint face = track.pointAtLane(0.0D, -RaceTrack.ROAD_HALF - 3.0D);
+		board = new BoardPost(floor(face.x()), y + 6, floor(face.z()), facing);
 	}
 
 	/**
@@ -322,6 +429,9 @@ public final class RaceCourseLayout {
 				for (int h = 0; h <= 7; h++) {
 					put(floor(front.x()), y + h, floor(front.z()), h == 3 ? theme.lamp : theme.post);
 				}
+			}
+			if (s % 8 == 4) {
+				put(bx, y + 6, bz, FLAG_COLOURS[Math.floorMod(s / 8, FLAG_COLOURS.length)] + "_banner[rotation=8]");
 			}
 		}
 		// fan posts: two per row, spread along the stand, standing on the seats
@@ -406,7 +516,11 @@ public final class RaceCourseLayout {
 			t += 0.03D;
 		}
 		int surf = (int) track.groundY(t) - 1;
-		RacePoint q = track.pointAtLane(t, -(RaceTrack.ROAD_HALF + 9.0D));
+		if (theme == RaceTrack.Theme.SKYWAY) {
+			archOver(t, surf, "magenta_stained_glass", "end_rod");
+			return;
+		}
+		RacePoint q = track.pointAtLane(t, -(RaceTrack.ROAD_HALF + 6.0D));
 		int x = floor(q.x()), z = floor(q.z());
 		int y = surf + 1;
 		for (int dx = -3; dx <= 3; dx++) {
@@ -508,7 +622,6 @@ public final class RaceCourseLayout {
 				}
 				put(x, y + 12, z, "glowstone");
 			}
-			case SKYWAY -> archOver(t, surf, "magenta_stained_glass", "end_rod");
 			case KEEP -> archOver(t, surf, "polished_blackstone_bricks", "soul_lantern[hanging=true]");
 			case END -> {
 				for (int h = 0; h < 14; h++) {
@@ -521,6 +634,8 @@ public final class RaceCourseLayout {
 				put(x + 1, y + 14, z + 1, "end_rod");
 				put(x + 1, y + 14, z, "end_rod");
 				put(x, y + 14, z + 1, "end_rod");
+			}
+			default -> {
 			}
 		}
 	}
@@ -812,6 +927,11 @@ public final class RaceCourseLayout {
 	/** Where the crowd stands in the infield grandstand. */
 	public List<FanPost> fanPosts() {
 		return Collections.unmodifiableList(fans);
+	}
+
+	/** Marshal-tower sign that names the course, facing the grid. */
+	public BoardPost courseBoard() {
+		return board;
 	}
 
 	public boolean onCourse(double x, double z) {

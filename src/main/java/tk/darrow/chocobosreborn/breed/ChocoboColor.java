@@ -142,8 +142,7 @@ public enum ChocoboColor {
 			case WHITE -> Ff7Line.Color.WHITE;
 			case BLACK -> Ff7Line.Color.BLACK;
 			case GOLD -> Ff7Line.Color.GOLD;
-			// the End and Nether birds breed as plain Yellows (their colour never passes on)
-			case PURPLE, FLAME -> Ff7Line.Color.YELLOW;
+			case PURPLE, FLAME -> Ff7Line.Color.OTHER;
 		};
 	}
 

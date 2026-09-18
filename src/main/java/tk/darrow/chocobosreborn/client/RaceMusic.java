@@ -17,11 +17,15 @@ public final class RaceMusic {
 	@Nullable
 	private static Loop current;
 	private static boolean currentIsVillage;
+	/** Ticks to keep MUSIC clear after the first-place sting so the village loop does not cover it. */
+	private static int stingHold;
 	/** The village playlist: one track plays through, a short gap, then the next. Never two at once. */
 	private static final java.util.function.Supplier<SoundEvent>[] VILLAGE = new java.util.function.Supplier[]{
 			() -> ModSounds.VILLAGE_THEME.get(), () -> ModSounds.VILLAGE_NIGHT.get()};
 	private static int villageIndex;
 	private static int villageGap;
+	/** Last course loop so a dismounted finisher does not snap to Meadow after the sting. */
+	private static String lastTrackId = "c_meadow";
 
 	private RaceMusic() {
 	}
@@ -30,11 +34,17 @@ public final class RaceMusic {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player == null || mc.level == null) {
 			stop();
+			stingHold = 0;
+			return;
+		}
+		if (stingHold > 0) {
+			stingHold--;
 			return;
 		}
 		boolean inSquare = Square.isSquare(mc.level);
 		boolean racing = mc.player.getVehicle() instanceof ChocoboEntity bird && bird.racing();
-		if (RaceScoring.villageLoopShouldPlay(inSquare, racing)) {
+		boolean onCourse = inSquare && onCourseIsland(mc.player);
+		if (RaceScoring.villageLoopShouldPlay(inSquare, racing, onCourse)) {
 			if (current != null && currentIsVillage && !current.isStopped() && mc.getSoundManager().isActive(current)) {
 				return;   // still playing
 			}
@@ -55,7 +65,7 @@ public final class RaceMusic {
 			mc.getSoundManager().play(current);
 			return;
 		}
-		if (!RaceScoring.raceLoopShouldPlay(inSquare, racing, false)) {
+		if (!RaceScoring.raceLoopShouldPlay(inSquare, racing, false, onCourse)) {
 			stop();
 			return;
 		}
@@ -63,15 +73,40 @@ public final class RaceMusic {
 			stop();
 			mc.getMusicManager().stopPlaying();   // no overworld track under the race loop
 			// The bird carries the course it is racing (synced), so every course plays its own loop.
-			String trackId = "c_meadow";
-			if (mc.player.getVehicle() instanceof ChocoboEntity b) {
-				trackId = (b.raceTrack() >= 0 ? tk.darrow.chocobosreborn.race.RaceTrack.byId(b.raceTrack())
-						: tk.darrow.chocobosreborn.race.RaceTrack.forClass(b.raceClass(), 0)).id();
-			}
-			current = new Loop(ModSounds.raceLoop(trackId), true);
+			current = new Loop(ModSounds.raceLoop(courseLoopId(mc)), true);
 			currentIsVillage = false;
 			mc.getSoundManager().play(current);
 		}
+	}
+
+	private static String courseLoopId(Minecraft mc) {
+		if (mc.player != null && mc.player.getVehicle() instanceof ChocoboEntity b && b.raceTrack() >= 0) {
+			lastTrackId = tk.darrow.chocobosreborn.race.RaceTrack.byId(b.raceTrack()).id();
+			return lastTrackId;
+		}
+		tk.darrow.chocobosreborn.race.RaceTrack here = trackAt(mc.player);
+		if (here != null) {
+			lastTrackId = here.id();
+			return lastTrackId;
+		}
+		return lastTrackId;
+	}
+
+	private static boolean onCourseIsland(net.minecraft.world.entity.player.Player player) {
+		return trackAt(player) != null;
+	}
+
+	private static tk.darrow.chocobosreborn.race.RaceTrack trackAt(net.minecraft.world.entity.player.Player player) {
+		if (player == null) {
+			return null;
+		}
+		for (tk.darrow.chocobosreborn.race.RaceTrack t : tk.darrow.chocobosreborn.race.RaceTrack.values()) {
+			if (RaceScoring.onCourseIsland(player.getX() - t.centerX(), player.getZ() - t.centerZ(),
+					t.getRadiusX(), t.getRadiusZ(), 8.0D)) {
+				return t;
+			}
+		}
+		return null;
 	}
 
 	private static void stop() {
@@ -85,6 +120,14 @@ public final class RaceMusic {
 	public static void onPlaySound(net.neoforged.neoforge.client.event.sound.PlaySoundEvent event) {
 		SoundInstance sound = event.getSound();
 		if (sound == null || sound instanceof Loop || sound.getSource() != SoundSource.MUSIC) {
+			return;
+		}
+		if (sound.getLocation().equals(ModSounds.RACE_VICTORY.get().getLocation())) {
+			stop();   // cut the course loop so the first-place sting is heard
+			stingHold = 160;   // ~8s, covers the streamed stinger
+			if (!(sound instanceof Loop)) {
+				event.setSound(new Loop(ModSounds.RACE_VICTORY.get(), false));
+			}
 			return;
 		}
 		Minecraft mc = Minecraft.getInstance();

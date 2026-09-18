@@ -73,6 +73,12 @@ class CourseMapDumpTest {
 		if (b.equals("mud")) {
 			return 0x6B4A2B;
 		}
+		if (b.equals("gold_block")) {
+			return 0xFFC000;
+		}
+		if (b.equals("yellow_concrete")) {
+			return 0xFFE040;
+		}
 		if (b.equals("white_concrete") || b.equals("black_concrete")) {
 			return 0xE0E0E0;
 		}

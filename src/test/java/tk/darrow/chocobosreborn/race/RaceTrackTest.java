@@ -283,4 +283,70 @@ class RaceTrackTest {
 			assertTrue(n < 750_000, track.name() + " has " + n + " blocks");
 		}
 	}
+
+	@Test
+	void courseVersionFiveRelaysTheIslands() {
+		assertEquals(5, SquareBuilder.COURSE_VERSION);
+	}
+
+	@Test
+	void startPaintSitsPastTheGridOnSprintAndGrandPrix() {
+		for (RaceTrack track : List.of(RaceTrack.C_MEADOW, RaceTrack.S_MAELSTROM)) {
+			RaceCourseLayout lay = RaceCourseLayout.of(track);
+			var line = track.pointAtLane(0.0D, 0.0D);
+			String chequer = lay.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(line.x()),
+					(int) line.y() - 1, (int) Math.floor(line.z())));
+			assertTrue("white_concrete".equals(chequer) || "black_concrete".equals(chequer),
+					track.name() + " start line " + chequer);
+			assertNotNull(lay.courseBoard(), track.name() + " marshal board");
+		}
+	}
+
+	@Test
+	void startArrowIsABlockArrowOnEveryCourse() {
+		for (RaceTrack track : RaceTrack.values()) {
+			RaceCourseLayout lay = RaceCourseLayout.of(track);
+			double t0 = 0.02D + 4.0D / track.lapLength();
+			var origin = track.pointAtLane(t0, 0.0D);
+			double[] tg = track.tangent(t0);
+			int[] f = RaceScoring.arrowForward(tg[0], tg[1]);
+			int[] r = RaceScoring.arrowRight(f[0], f[1]);
+			int ox = (int) Math.floor(origin.x()), oz = (int) Math.floor(origin.z());
+			int y = (int) origin.y() - 1;
+			int painted = 0;
+			int half = RaceScoring.startArrowHalf();
+			for (int along = 0; along < RaceScoring.startArrowLength(); along++) {
+				for (int across = -half; across <= half; across++) {
+					if (!RaceScoring.startArrowCell(along, across)) {
+						continue;
+					}
+					painted++;
+					String b = lay.blocks().get(new RaceCourseLayout.Cell(
+							ox + f[0] * along + r[0] * across, y, oz + f[1] * along + r[1] * across));
+					if (RaceScoring.startArrowTip(along, across)) {
+						assertEquals("gold_block", b, track.name() + " tip");
+					} else {
+						assertEquals("yellow_concrete", b, track.name() + " " + along + "," + across);
+					}
+				}
+			}
+			assertTrue(painted > 20, track.name() + " arrow cells");
+			String besideShaft = lay.blocks().get(new RaceCourseLayout.Cell(
+					ox + r[0] * 2, y, oz + r[1] * 2));
+			assertFalse("yellow_concrete".equals(besideShaft), track.name() + " shaft is 3 wide");
+		}
+	}
+
+	@Test
+	void warningPostsStandBeforeTerrain() {
+		RaceTrack t = RaceTrack.B_FORD;
+		RaceCourseLayout lay = RaceCourseLayout.of(t);
+		double warn = t.terrainFeatures().get(0).start() - 8.0D / t.lapLength();
+		var q = t.pointAtLane(warn, RaceTrack.ROAD_HALF + 2.0D);
+		int surf = (int) t.groundY(warn) - 1;
+		String banner = lay.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(q.x()), surf + 3,
+				(int) Math.floor(q.z())));
+		assertNotNull(banner, "warning banner");
+		assertTrue(banner.contains("_banner"), banner);
+	}
 }

@@ -46,6 +46,7 @@ def block_loot(block, entries, block_type="minecraft:block"):
 def main():
     # ------------------------------------------------------------ loot tables
     w(f"{NS}/loot_table/blocks/square_gate.json", block_loot("square_gate", [item_entry(f"{NS}:square_gate")]))
+    w(f"{NS}/loot_table/blocks/boost_pad.json", block_loot("boost_pad", [item_entry(f"{NS}:boost_pad")]))
     # crop: seeds always; greens only when grown (age 4). Fortune adds seeds.
     grown = [{"condition": "minecraft:block_state_property", "block": f"{NS}:gysahl_green",
               "properties": {"age": "4"}}]
@@ -158,15 +159,16 @@ def main():
         "type": f"{NS}:add_item",
         "conditions": [{"condition": "minecraft:any_of", "terms": [
             {"condition": "minecraft:match_tool", "predicate": {"items": "#minecraft:hoes"}},
-            {"condition": "minecraft:random_chance", "chance": 0.08},
+            {"condition": "minecraft:random_chance", "chance": 0.12},
         ]}, {"condition": "minecraft:any_of", "terms": [
             {"condition": "minecraft:block_state_property", "block": "minecraft:short_grass"},
             {"condition": "minecraft:block_state_property", "block": "minecraft:tall_grass"},
             {"condition": "minecraft:block_state_property", "block": "minecraft:fern"},
+            {"condition": "minecraft:block_state_property", "block": "minecraft:large_fern"},
         ]}],
         "item": f"{NS}:gysahl_green_seeds",
         "count": 1,
-        "chance": 0.35,
+        "chance": 1.0,
     })
 
     # ------------------------------------------------- Chocobo Square dimension

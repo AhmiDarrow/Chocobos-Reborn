@@ -257,6 +257,7 @@ if __name__ == "__main__":
     if mode == "test":
         run(["gysahl_green"])
     elif mode == "all":
-        run(list(ICONS) + list(CROP_STAGES) + list(TILES))
+        # square_gate* tiles are hand-painted in tools/paint_item_art.py
+        run(list(ICONS) + list(CROP_STAGES))
     elif mode == "only":
         run(sys.argv[2:])

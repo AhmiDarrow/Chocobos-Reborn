@@ -7,12 +7,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 
 /**
- * Square AI racer. Drives a {@link RacerProfile}: hesitates at the start,
- * converges onto the inside racing line, dashes on the straights within an
- * energy budget (saving some for the last lap at higher classes), swings out to
- * pass a slower bird, wobbles and occasionally stumbles at low classes, and
- * rubber-bands gently toward the player at C and B. The session sets
- * {@link #speed} (base multiplier on the bird's movement speed), {@link #profile},
+ * Square AI racer. Drives a {@link RacerProfile} on top of the bird's own
+ * training: speed, stamina, intelligence and cooperation (handling) use the
+ * same formulas as a rider. The profile is discipline (when to dash, wobble,
+ * rubber-band). The session sets {@link #speed}, {@link #profile},
  * {@link #playerGap} and {@link #lapsDone} each tick, and toggles {@link #running}.
  */
 public class RacerGoal extends Goal {
@@ -44,14 +42,15 @@ public class RacerGoal extends Goal {
 	private boolean dashing;
 	private List<ChocoboEntity> nearby = List.of();
 
-	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane) {
+	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane, RacerProfile profile) {
 		this.bird = bird;
 		this.track = track;
 		this.startLane = lane;
 		this.layout = RaceCourseLayout.of(track);
+		this.profile = profile;
 		this.noiseSeed = bird.getRandom().nextDouble() * Math.PI * 2.0D;
 		this.lineSpread = (bird.getRandom().nextDouble() - 0.5D) * 1.2D;
-		this.bogSavvy = bird.getRandom().nextDouble() < 0.45D + 0.55D * profile.lineHold();
+		this.bogSavvy = bird.getRandom().nextDouble() < RacerProfile.bogSavvyChance(profile.lineHold());
 		setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
 	}
 
@@ -95,17 +94,27 @@ public class RacerGoal extends Goal {
 		boolean lastLap = lapsDone >= totalLaps - 1;
 		boolean straight = track.isStraight(t);
 
-		// --- energy and dashing
+		// --- stamina and dashing (same pool and intel skip as a rider)
+		int maxSt = Math.max(1, bird.maxStamina());
+		int st = bird.stamina();
+		energy = st / (double) maxSt;
+		dashing = profile.wantsDash(energy, straight, lastLap, playerGap) && st > 0;
 		if (dashing) {
-			energy = Math.max(0.0D, energy - profile.energyDrain());
-		} else {
-			energy = Math.min(1.0D, energy + profile.energyRecover());
+			boolean skip = RaceScoring.intelSkipsDashDrain(bird.trainedIntelligence(), bird.tickCount,
+					bird.getRandom().nextInt(100));
+			if (!skip) {
+				bird.setStamina(st - 1);
+			}
+		} else if (st < maxSt && bird.tickCount % 3 == 0) {
+			bird.setStamina(st + 1);
 		}
-		dashing = profile.wantsDash(energy, straight, lastLap, playerGap);
+		energy = bird.stamina() / (double) maxSt;
 
 		// --- racing line: start lane blends into the inside line over the first stretch
-		double blend = Math.min(1.0D, ticks / 140.0D) * profile.lineHold();
-		double wobble = profile.wobble() * Math.sin(bird.tickCount * 0.05D + noiseSeed);
+		int coop = bird.trainedCooperation();
+		double blend = Math.min(1.0D, ticks / 140.0D) * profile.lineHold() * RaceScoring.handlingLineMul(coop);
+		double wobble = profile.wobble() * RaceScoring.handlingWobbleMul(coop)
+				* Math.sin(bird.tickCount * 0.05D + noiseSeed);
 		double lane = startLane + (INSIDE_LINE + lineSpread - startLane) * blend + wobble;
 		// --- features: birds that excel take the direct line, the rest swing out onto the detour early
 		RaceTrack.Feature feature = track.terrainAt(t + 0.03D);
@@ -151,9 +160,12 @@ public class RacerGoal extends Goal {
 		double ahead = 0.012D + 0.006D * Math.max(0.0D, speed - 1.0D);
 		RacePoint target = track.pointAtLane((t + ahead) % 1.0D, lane);
 		// terrain is physical now (water slows swimmers, ridges block non-climbers); no attribute fudge
-		double mul = speed * profile.cruise() * profile.bandFactor(playerGap);
+		double mul = speed * profile.cruise() * profile.bandFactor(playerGap)
+				* RaceScoring.speedTrainingMul(bird.trainedSpeed());
 		if (dashing) {
 			mul *= profile.dash();
+		} else if (bird.stamina() <= 0) {
+			mul *= RaceScoring.emptyStaminaMul();
 		}
 		if (stumble > 0) {
 			mul *= 0.55D;

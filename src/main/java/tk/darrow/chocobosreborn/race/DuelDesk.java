@@ -33,6 +33,21 @@ public final class DuelDesk {
 		OPEN.clear();
 	}
 
+	/** Server stop: give back stakes still sitting in the book. */
+	public static void refundAndClear(net.minecraft.server.MinecraftServer server) {
+		for (Challenge c : new ArrayList<>(OPEN.values())) {
+			if (c.stake() > 0) {
+				ServerPlayer p = server.getPlayerList().getPlayer(c.challenger());
+				if (p != null) {
+					giveGp(p, c.stake());
+				} else {
+					RaceManager.oweGp(server, c.challenger(), c.stake());
+				}
+			}
+		}
+		OPEN.clear();
+	}
+
 	@Nullable
 	public static Challenge mine(UUID player) {
 		return OPEN.get(player);
@@ -51,12 +66,27 @@ public final class DuelDesk {
 
 	/** Post a challenge; takes the stake from the challenger's GP. */
 	public static boolean post(ServerPlayer player, RaceTrack track, int stake) {
-		if (OPEN.containsKey(player.getUUID())) {
-			withdraw(player);
+		if (HeatSchedule.entered(player.getUUID()) || RaceManager.sessionOf(player.getUUID()) != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.heat.wait"), true);
+			return false;
 		}
-		if (stake > 0 && !takeGp(player, stake)) {
+		int posted = 0;
+		Challenge prev = OPEN.get(player.getUUID());
+		if (prev != null) {
+			posted = prev.stake();
+		}
+		if (stake > 0 && countGp(player) + posted < stake) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.duel.no_gp", stake), true);
 			return false;
+		}
+		if (prev != null) {
+			OPEN.remove(player.getUUID());
+		}
+		int extra = stake - posted;
+		if (extra > 0) {
+			takeGp(player, extra);
+		} else if (extra < 0) {
+			giveGp(player, -extra);
 		}
 		OPEN.put(player.getUUID(), new Challenge(player.getUUID(), player.getName().getString(), track, stake,
 				player.level().getGameTime()));
@@ -73,6 +103,11 @@ public final class DuelDesk {
 		}
 	}
 
+	/** Take a posted challenge off the book without returning the GP: it is now the duel pot. */
+	public static void consume(UUID player) {
+		OPEN.remove(player);
+	}
+
 	/** Drop challenges whose poster left or that sat too long. */
 	public static void tick(ServerLevel level) {
 		if (OPEN.isEmpty() || level.getGameTime() % 100 != 0) {
@@ -83,55 +118,87 @@ public final class DuelDesk {
 			boolean gone = poster == null || !Square.isSquare(poster.level());
 			if (gone || level.getGameTime() - c.postedTick() > EXPIRY_TICKS) {
 				OPEN.remove(c.challenger());
-				if (poster != null && c.stake() > 0) {
-					giveGp(poster, c.stake());
-					poster.displayClientMessage(Component.translatable("chocobosreborn.duel.withdrawn", c.stake()), true);
+				if (c.stake() > 0) {
+					if (poster != null) {
+						giveGp(poster, c.stake());
+						poster.displayClientMessage(Component.translatable("chocobosreborn.duel.withdrawn", c.stake()), true);
+					} else {
+						RaceManager.oweGp(level.getServer(), c.challenger(), c.stake());
+					}
 				}
 			}
 		}
 	}
 
-	/** A second rider accepts the oldest open challenge: takes their stake and starts the heat. */
+	/** A second rider accepts the oldest challenge their bird may enter. */
 	public static boolean accept(ServerPlayer acceptor, ChocoboEntity bird) {
-		List<Challenge> open = others(acceptor.getUUID());
-		if (open.isEmpty()) {
-			return false;
-		}
-		Challenge c = open.get(0);
-		ServerPlayer challenger = acceptor.server.getPlayerList().getPlayer(c.challenger());
-		if (challenger == null || !(challenger.getVehicle() instanceof ChocoboEntity theirs)
-				|| !Square.isSquare(challenger.level())) {
-			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.challenger_away", c.name()), true);
-			return false;
-		}
-		if (c.stake() > 0 && !takeGp(acceptor, c.stake())) {
-			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.no_gp", c.stake()), true);
-			return false;
-		}
-		OPEN.remove(c.challenger());
-		if (!RaceManager.startDuel(challenger, theirs, acceptor, bird, c.track(), c.stake())) {
-			// could not start: everyone gets their GP back
-			if (c.stake() > 0) {
-				giveGp(challenger, c.stake());
-				giveGp(acceptor, c.stake());
+		int needGp = 0;
+		for (Challenge c : others(acceptor.getUUID())) {
+			ServerPlayer challenger = acceptor.server.getPlayerList().getPlayer(c.challenger());
+			if (challenger == null || !(challenger.getVehicle() instanceof ChocoboEntity theirs)
+					|| !Square.isSquare(challenger.level())) {
+				continue;
 			}
-			return false;
+			if (RaceManager.sessionOf(challenger.getUUID()) != null
+					|| RaceManager.sessionOf(acceptor.getUUID()) != null
+					|| HeatSchedule.entered(challenger.getUUID()) || HeatSchedule.entered(acceptor.getUUID())
+					|| RaceManager.trackBusy(c.track())) {
+				continue;
+			}
+			if (!RaceScoring.mayEnterCourse(bird.raceClass().getId(), c.track().getRaceClass().getId())
+					|| !RaceScoring.mayEnterCourse(theirs.raceClass().getId(), c.track().getRaceClass().getId())) {
+				continue;
+			}
+			if (c.stake() > 0 && !takeGp(acceptor, c.stake())) {
+				needGp = Math.max(needGp, c.stake());
+				continue;
+			}
+			if (!RaceManager.startDuel(challenger, theirs, acceptor, bird, c.track(), c.stake())) {
+				if (c.stake() > 0) {
+					giveGp(acceptor, c.stake());
+				}
+				continue;
+			}
+			OPEN.remove(c.challenger());
+			withdraw(acceptor);
+			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.accepting", c.name(),
+					Component.translatable("chocobosreborn.track." + c.track().id()), c.stake()), false);
+			return true;
 		}
-		return true;
+		if (needGp > 0) {
+			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.no_gp", needGp), true);
+		}
+		return false;
 	}
 
-	static boolean takeGp(ServerPlayer player, int amount) {
+	static int countGp(ServerPlayer player) {
 		int have = 0;
 		for (ItemStack s : player.getInventory().items) {
 			if (s.is(ModItems.GP.get())) {
 				have += s.getCount();
 			}
 		}
-		if (have < amount) {
+		for (ItemStack s : player.getInventory().offhand) {
+			if (s.is(ModItems.GP.get())) {
+				have += s.getCount();
+			}
+		}
+		return have;
+	}
+
+	static boolean takeGp(ServerPlayer player, int amount) {
+		if (countGp(player) < amount) {
 			return false;
 		}
 		int left = amount;
 		for (ItemStack s : player.getInventory().items) {
+			if (left > 0 && s.is(ModItems.GP.get())) {
+				int take = Math.min(left, s.getCount());
+				s.shrink(take);
+				left -= take;
+			}
+		}
+		for (ItemStack s : player.getInventory().offhand) {
 			if (left > 0 && s.is(ModItems.GP.get())) {
 				int take = Math.min(left, s.getCount());
 				s.shrink(take);
@@ -145,7 +212,10 @@ public final class DuelDesk {
 		for (int n : RaceCurrency.stacks(amount, 64)) {
 			ItemStack st = new ItemStack(ModItems.GP.get(), n);
 			if (!player.getInventory().add(st)) {
-				player.drop(st, false);
+				net.minecraft.world.entity.item.ItemEntity dropped = player.drop(st, false);
+				if (dropped != null && Square.isSquare(player.level())) {
+					dropped.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y + 0.5D, Square.ARRIVAL.z);
+				}
 			}
 		}
 	}

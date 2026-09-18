@@ -7,6 +7,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
+import tk.darrow.chocobosreborn.entity.ModEntities;
 
 public final class ModMenus {
 	public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, ChocobosReborn.MOD_ID);
@@ -16,7 +17,8 @@ public final class ModMenus {
 				int id = buf.readVarInt();
 				ChocoboEntity bird = inv.player.level().getEntity(id) instanceof ChocoboEntity c ? c : null;
 				if (bird == null) {
-					throw new IllegalStateException("no chocobo " + id);
+					bird = new ChocoboEntity(ModEntities.CHOCOBO.get(), inv.player.level());
+					bird.discard();
 				}
 				return new ChocoboInventoryMenu(windowId, inv, bird);
 			}));

@@ -21,6 +21,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.breed.ChocoboGrade;
 import tk.darrow.chocobosreborn.breed.ChocoboNut;
@@ -29,6 +30,7 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
 import tk.darrow.chocobosreborn.ledger.BirdRecord;
 import tk.darrow.chocobosreborn.net.RacePayloads;
 import tk.darrow.chocobosreborn.race.RaceClass;
+import tk.darrow.chocobosreborn.race.RaceScoring;
 
 /**
  * The Chocobo Almanac. Chapters on the left, an illustrated, scrolling page on
@@ -49,6 +51,8 @@ public class AlmanacScreen extends Screen {
 	private static final int LEFT_W = 112;
 	private static final int PAD = 8;
 	private static final int LINE = 10;
+	private static final ResourceLocation PAGE = ResourceLocation.fromNamespaceAndPath(
+			ChocobosReborn.MOD_ID, "textures/gui/almanac.png");
 
 	/** One rendered element of a page. */
 	private interface Block {
@@ -66,6 +70,8 @@ public class AlmanacScreen extends Screen {
 	private double scroll;
 	private final List<Block> blocks = new ArrayList<>();
 	private final List<net.minecraft.client.gui.components.AbstractWidget> pageWidgets = new ArrayList<>();
+	/** Back and Release: stay put when the page scrolls. */
+	private final List<net.minecraft.client.gui.components.AbstractWidget> chromeWidgets = new ArrayList<>();
 	private int pageTop;
 	@Nullable private EditBox nameBox;
 	private final List<ChocoboEntity> previews = new ArrayList<>();
@@ -77,6 +83,25 @@ public class AlmanacScreen extends Screen {
 			birds.add(BirdRecord.load((CompoundTag) t));
 		}
 		this.player = data.hasUUID("Player") ? data.getUUID("Player") : new UUID(0L, 0L);
+	}
+
+	/** Server pushed a fresh ledger while this book is already open (release, rename). */
+	public void reload(CompoundTag data) {
+		birds.clear();
+		for (Tag t : data.getList("Birds", Tag.TAG_COMPOUND)) {
+			birds.add(BirdRecord.load((CompoundTag) t));
+		}
+		UUID keep = shown == null ? null : shown.id();
+		shown = null;
+		if (keep != null) {
+			for (BirdRecord r : birds) {
+				if (r.id().equals(keep)) {
+					shown = r;
+					break;
+				}
+			}
+		}
+		rebuild();
 	}
 
 	// ----------------------------------------------------------------- layout
@@ -93,7 +118,19 @@ public class AlmanacScreen extends Screen {
 		addRenderableWidget(Button.builder(Component.translatable("chocobosreborn.almanac.stable.title"),
 				b -> select(CHAPTERS.length)).bounds(PAD, y, LEFT_W, 18).build());
 		pageTop = PAD + 14;
-		select(chapter);
+		UUID keep = shown == null ? null : shown.id();
+		if (keep == null || chapter != CHAPTERS.length) {
+			rebuild();
+			return;
+		}
+		shown = null;
+		for (BirdRecord r : birds) {
+			if (r.id().equals(keep)) {
+				shown = r;
+				break;
+			}
+		}
+		rebuild();
 	}
 
 	private void select(int idx) {
@@ -103,12 +140,28 @@ public class AlmanacScreen extends Screen {
 		rebuild();
 	}
 
+	private static boolean birdIsRacing(UUID id) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level == null || mc.player == null) {
+			return false;
+		}
+		if (mc.player.getVehicle() instanceof ChocoboEntity v && v.getUUID().equals(id) && v.racing()) {
+			return true;
+		}
+		for (net.minecraft.world.entity.Entity e : mc.level.entitiesForRendering()) {
+			if (e instanceof ChocoboEntity c && c.getUUID().equals(id) && c.racing()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private int pageX() {
 		return PAD + LEFT_W + PAD;
 	}
 
 	private int pageW() {
-		return width - pageX() - PAD;
+		return Math.max(80, width - pageX() - PAD - 68);
 	}
 
 	private void clearPage() {
@@ -116,12 +169,14 @@ public class AlmanacScreen extends Screen {
 			removeWidget(w);
 		}
 		pageWidgets.clear();
+		chromeWidgets.clear();
 		blocks.clear();
 		nameBox = null;
 		stepCounter = 0;
 	}
 
 	private void rebuild() {
+		confirmRelease = false;
 		clearPage();
 		if (chapter < CHAPTERS.length) {
 			parse(Component.translatable("chocobosreborn.almanac." + CHAPTERS[chapter] + ".body").getString());
@@ -145,6 +200,7 @@ public class AlmanacScreen extends Screen {
 		for (BirdRecord r : mine) {
 			Button b = Button.builder(label(r), btn -> {
 				shown = r;
+				confirmRelease = false;
 				scroll = 0;
 				rebuild();
 			}).bounds(pageX(), y, Math.min(pageW(), 240), 18).build();
@@ -192,15 +248,29 @@ public class AlmanacScreen extends Screen {
 		};
 	}
 
+	private int drawWrapped(GuiGraphics g, Component c, int x, int y, int maxW, int color) {
+		int yy = y;
+		for (FormattedCharSequence l : font.split(c, Math.max(8, maxW))) {
+			g.drawString(font, l, x, yy, color, false);
+			yy += LINE;
+		}
+		return yy;
+	}
+
 	private Block heading(String s) {
 		return new Block() {
 			public int height() {
-				return 16;
+				int lines = Math.max(1, font.split(Component.literal(s), Math.max(40, pageW())).size());
+				return 8 + lines * LINE;
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
-				g.drawString(font, s, x, y + 4, 0xFFE8A416, true);
-				g.fill(x, y + 14, x + w, y + 15, 0x66E8A416);
+				int yy = y + 4;
+				for (FormattedCharSequence l : font.split(Component.literal(s), Math.max(40, w))) {
+					g.drawString(font, l, x, yy, 0xFFE8A416, true);
+					yy += LINE;
+				}
+				g.fill(x, yy, x + w, yy + 1, 0x66E8A416);
 			}
 		};
 	}
@@ -250,7 +320,7 @@ public class AlmanacScreen extends Screen {
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
-				int cell = Math.max(60, w / 4);
+				int cell = Math.max(40, w / 4);
 				for (int i = 0; i < colors.length; i++) {
 					int cx = x + (i % 4) * cell + cell / 2;
 					int cy = y + (i / 4) * 78;
@@ -266,27 +336,38 @@ public class AlmanacScreen extends Screen {
 	private Block breedingDiagram() {
 		return new Block() {
 			public int height() {
-				return 96;
+				int extra = Math.max(0, font.split(Component.translatable("chocobosreborn.almanac.diagram.note"),
+						Math.max(40, pageW())).size() - 1);
+				return 96 + extra * LINE;
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
-				int col = Math.max(70, (w - 20) / 4);
-				box(g, x, y + 8, col - 8, "Yellow + Yellow", 0xFFF5B812, "chocobosreborn:carob_nut", "1 win each");
+				int col = Math.max(48, (w - 16) / 4);
+				box(g, x, y + 8, col - 8, "chocobosreborn.almanac.diagram.yy", 0xFFF5B812, "chocobosreborn:carob_nut",
+						"chocobosreborn.almanac.diagram.wins1");
 				arrow(g, x + col - 8, y + 28, x + col + 2);
-				box(g, x + col + 2, y + 8, col - 8, "Green or Blue", 0xFF4CB05A, "chocobosreborn:carob_nut", "2 wins each");
+				box(g, x + col + 2, y + 8, col - 8, "chocobosreborn.almanac.diagram.gb", 0xFF4CB05A, "chocobosreborn:carob_nut",
+						"chocobosreborn.almanac.diagram.wins2");
 				arrow(g, x + 2 * col - 6, y + 28, x + 2 * col + 4);
-				box(g, x + 2 * col + 4, y + 8, col - 8, "Black (miss: White)", 0xFF2C2A32, "chocobosreborn:zeio_nut", "3 wins each");
+				box(g, x + 2 * col + 4, y + 8, col - 8, "chocobosreborn.almanac.diagram.bw", 0xFF2C2A32, "chocobosreborn:zeio_nut",
+						"chocobosreborn.almanac.diagram.wins3");
 				arrow(g, x + 3 * col - 4, y + 28, x + 3 * col + 6);
-				box(g, x + 3 * col + 6, y + 8, col - 8, "Gold", 0xFFE8A416, null, "+ Wonderful Yellow");
-				g.drawString(font, Component.translatable("chocobosreborn.almanac.diagram.note"), x, y + 76, 0xFFAAAAAA, false);
+				box(g, x + 3 * col + 6, y + 8, col - 8, "chocobosreborn.almanac.diagram.gold", 0xFFE8A416, null,
+						"chocobosreborn.almanac.diagram.wonderful");
+				int ny = y + 76;
+				for (FormattedCharSequence l : font.split(Component.translatable("chocobosreborn.almanac.diagram.note"),
+						Math.max(40, w))) {
+					g.drawString(font, l, x, ny, 0xFFAAAAAA, false);
+					ny += LINE;
+				}
 			}
 		};
 	}
 
-	private void box(GuiGraphics g, int x, int y, int w, String title, int colour, @Nullable String nut, String sub) {
+	private void box(GuiGraphics g, int x, int y, int w, String titleKey, int colour, @Nullable String nut, String subKey) {
 		g.fill(x, y, x + w, y + 60, 0xFF202020);
 		g.fill(x, y, x + w, y + 3, colour | 0xFF000000);
-		List<FormattedCharSequence> t = font.split(Component.literal(title), w - 6);
+		List<FormattedCharSequence> t = font.split(Component.translatable(titleKey), w - 6);
 		int yy = y + 7;
 		for (FormattedCharSequence l : t) {
 			g.drawString(font, l, x + 3, yy, 0xFFFFFFFF, false);
@@ -295,7 +376,13 @@ public class AlmanacScreen extends Screen {
 		if (nut != null) {
 			g.renderItem(new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(nut))), x + 3, y + 38);
 		}
-		g.drawString(font, sub, x + (nut != null ? 22 : 3), y + 42, 0xFFBBBBBB, false);
+		int subX = x + (nut != null ? 22 : 3);
+		int subW = Math.max(16, w - (nut != null ? 26 : 6));
+		int sy = y + 42;
+		for (FormattedCharSequence l : font.split(Component.translatable(subKey), subW)) {
+			g.drawString(font, l, subX, sy, 0xFFBBBBBB, false);
+			sy += LINE;
+		}
 	}
 
 	private void arrow(GuiGraphics g, int x0, int y, int x1) {
@@ -307,33 +394,47 @@ public class AlmanacScreen extends Screen {
 
 	private void birdPage(BirdRecord r) {
 		ChocoboColor c = ChocoboColor.byId(r.color());
+		RaceClass rc = RaceClass.byId(r.raceClass());
+		int more = RaceScoring.winsUntilPromote(rc, r.classWins());
+		Component genes = Component.literal(tr("chocobosreborn.almanac.d.genes", colorName(r.color()),
+				Component.translatable(r.male() ? "chocobosreborn.sex.male" : "chocobosreborn.sex.female"),
+				gradeName(r.bornGrade()), gradeName(r.grade())));
+		Component racing = Component.literal(more == 0
+				? tr("chocobosreborn.almanac.d.racing_top",
+				Component.translatable("chocobosreborn.class." + rc.id()), r.wins())
+				: tr("chocobosreborn.almanac.d.racing",
+				Component.translatable("chocobosreborn.class." + rc.id()), r.classWins(), more));
+		Component born = Component.literal(tr("chocobosreborn.almanac.d.born", r.bornDay()));
+		int headerH = birdHeaderHeight(genes, racing, born);
 		blocks.add(new Block() {
 			public int height() {
-				return 100;
+				return headerH;
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
+				int tw = Math.max(40, w - 104);
 				g.fill(x, y, x + 96, y + 96, 0x33FFFFFF);
 				drawBird(g, c, true, x + 48, y + 84, 30, mx, my);
-				g.drawString(font, label(r), x + 104, y + 4, 0xFFFFFFFF, true);
-				g.drawString(font, tr("chocobosreborn.almanac.d.genes", colorName(r.color()),
-						Component.translatable(r.male() ? "chocobosreborn.sex.male" : "chocobosreborn.sex.female"),
-						gradeName(r.bornGrade()), gradeName(r.grade())), x + 104, y + 18, 0xFFE0E0E0, false);
-				g.drawString(font, tr("chocobosreborn.almanac.d.racing",
-						Component.translatable("chocobosreborn.class." + RaceClass.byId(r.raceClass()).id()), r.wins(),
-						Math.max(0, RaceClass.WINS_TO_PROMOTE - r.wins() % RaceClass.WINS_TO_PROMOTE)), x + 104, y + 30, 0xFFE0E0E0, false);
-				g.drawString(font, tr("chocobosreborn.almanac.d.born", r.bornDay()), x + 104, y + 42, 0xFFAAAAAA, false);
-				// training bars
+				int tx = x + 104;
+				int yy = y + 4;
+				g.drawString(font, label(r), tx, yy, 0xFFFFFFFF, true);
+				yy += LINE;
+				yy = drawWrapped(g, genes, tx, yy, tw, 0xFFE0E0E0);
+				yy = drawWrapped(g, racing, tx, yy, tw, 0xFFE0E0E0);
+				yy = drawWrapped(g, born, tx, yy, tw, 0xFFAAAAAA);
 				String[] names = {"chocobosreborn.tip.speed", "chocobosreborn.tip.stamina", "chocobosreborn.tip.intelligence", "chocobosreborn.tip.cooperation"};
 				int[] vals = {r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop()};
 				int[] cols = {0xFFE8A416, 0xFF4CB05A, 0xFF3A8FD0, 0xFFE078A8};
+				int labelW = 72;
+				int numW = 16;
+				int barX = tx + labelW;
+				int barW = Math.max(24, tw - labelW - numW);
 				for (int i = 0; i < 4; i++) {
-					int by = y + 56 + i * 11;
-					g.drawString(font, Component.translatable(names[i]), x + 104, by, 0xFFBBBBBB, false);
-					int bw = Math.max(60, w - 104 - 80 - 30);
-					g.fill(x + 180, by + 1, x + 180 + bw, by + 8, 0xFF303030);
-					g.fill(x + 180, by + 1, x + 180 + bw * vals[i] / 100, by + 8, cols[i]);
-					g.drawString(font, String.valueOf(vals[i]), x + 184 + bw, by, 0xFFFFFFFF, false);
+					int by = yy + 4 + i * 11;
+					g.drawString(font, Component.translatable(names[i]), tx, by, 0xFFBBBBBB, false);
+					g.fill(barX, by + 1, barX + barW, by + 8, 0xFF303030);
+					g.fill(barX, by + 1, barX + barW * vals[i] / 100, by + 8, cols[i]);
+					g.drawString(font, String.valueOf(vals[i]), barX + barW + 2, by, 0xFFFFFFFF, false);
 				}
 			}
 		});
@@ -357,14 +458,21 @@ public class AlmanacScreen extends Screen {
 		blocks.add(spacer(6));
 		blocks.add(heading(tr("chocobosreborn.almanac.d.breeding")));
 		blocks.add(text(breedingHint(r), 0));
-		layoutWidgets(r);
+		layoutWidgets(r, headerH);
+	}
+
+	private int birdHeaderHeight(Component genes, Component racing, Component born) {
+		int tw = Math.max(40, pageW() - 104);
+		int lines = 1 + font.split(genes, tw).size() + font.split(racing, tw).size()
+				+ font.split(born, tw).size();
+		return Math.max(100, 8 + lines * LINE + 4 * 11);
 	}
 
 	/** Rename box + button and Back, positioned by the current scroll. */
-	private void layoutWidgets(BirdRecord r) {
+	private void layoutWidgets(BirdRecord r, int headerH) {
 		int x = pageX();
-		int y = pageTop + 100 - (int) scroll;
-		int boxW = Math.min(160, pageW() - 70);
+		int y = pageTop + headerH + 4 - (int) scroll;
+		int boxW = Math.max(40, Math.min(160, pageW() - 104 - 64));
 		nameBox = new EditBox(font, x + 104, y, boxW, 16, Component.translatable("chocobosreborn.almanac.d.name"));
 		nameBox.setMaxLength(24);
 		nameBox.setValue(r.name());
@@ -375,8 +483,8 @@ public class AlmanacScreen extends Screen {
 			PacketDistributor.sendToServer(new RacePayloads.RenameBird(r.id(), n));
 			int i = birds.indexOf(r);
 			BirdRecord updated = new BirdRecord(r.id(), r.owner(), n, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),
-					r.wins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(), r.parentColorA(),
-					r.parentColorB(), r.nut(), r.bornDay(), r.alive(), n);
+					r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(),
+					r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), n);
 			if (i >= 0) {
 				birds.set(i, updated);
 			}
@@ -393,14 +501,25 @@ public class AlmanacScreen extends Screen {
 				b.setMessage(Component.translatable("chocobosreborn.almanac.d.release_sure"));
 				return;
 			}
+			if (living && birdIsRacing(r.id())) {
+				if (minecraft != null && minecraft.player != null) {
+					minecraft.player.displayClientMessage(Component.translatable("chocobosreborn.almanac.d.release_racing"), true);
+				}
+				confirmRelease = false;
+				b.setMessage(Component.translatable("chocobosreborn.almanac.d.release"));
+				return;
+			}
 			PacketDistributor.sendToServer(new RacePayloads.ReleaseBird(r.id(), !living));
-			birds.remove(r);
+			if (!living) {
+				birds.remove(r);
+				shown = null;
+				scroll = 0;
+			}
 			confirmRelease = false;
-			shown = null;
-			scroll = 0;
 			rebuild();
 		}).bounds(width - PAD - 60, PAD + 22, 60, 18).build();
 		pageWidgets.add(addRenderableWidget(holder[0]));
+		chromeWidgets.add(holder[0]);
 		Button back = Button.builder(Component.translatable("gui.back"), b -> {
 			confirmRelease = false;
 			shown = null;
@@ -408,6 +527,7 @@ public class AlmanacScreen extends Screen {
 			rebuild();
 		}).bounds(width - PAD - 60, PAD, 60, 18).build();
 		pageWidgets.add(addRenderableWidget(back));
+		chromeWidgets.add(back);
 	}
 
 	// ---------------------------------------------------------------- helpers
@@ -530,7 +650,25 @@ public class AlmanacScreen extends Screen {
 	@Override
 	public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partial) {
 		super.renderBackground(g, mouseX, mouseY, partial);
-		g.fill(pageX() - 4, PAD + 12, width - PAD + 2, height - PAD + 2, 0x66000000);
+		int x = pageX() - 6;
+		int y = PAD + 10;
+		int w = Math.max(32, pageW() + 12);
+		int h = Math.max(32, height - PAD * 2 - 10);
+		blitJournal(g, x, y, w, h);
+	}
+
+	/** Nine-slice the 256 journal so the gold frame stays 16px on any page size. */
+	private void blitJournal(GuiGraphics g, int x, int y, int w, int h) {
+		int b = 16;
+		g.blit(PAGE, x, y, b, b, 0, 0, b, b, 256, 256);
+		g.blit(PAGE, x + w - b, y, b, b, 256 - b, 0, b, b, 256, 256);
+		g.blit(PAGE, x, y + h - b, b, b, 0, 256 - b, b, b, 256, 256);
+		g.blit(PAGE, x + w - b, y + h - b, b, b, 256 - b, 256 - b, b, b, 256, 256);
+		g.blit(PAGE, x + b, y, w - 2 * b, b, b, 0, 256 - 2 * b, b, 256, 256);
+		g.blit(PAGE, x + b, y + h - b, w - 2 * b, b, b, 256 - b, 256 - 2 * b, b, 256, 256);
+		g.blit(PAGE, x, y + b, b, h - 2 * b, 0, b, b, 256 - 2 * b, 256, 256);
+		g.blit(PAGE, x + w - b, y + b, b, h - 2 * b, 256 - b, b, b, 256 - 2 * b, 256, 256);
+		g.blit(PAGE, x + b, y + b, w - 2 * b, h - 2 * b, b, b, 256 - 2 * b, 256 - 2 * b, 256, 256);
 	}
 
 	private int contentHeight() {
@@ -549,8 +687,8 @@ public class AlmanacScreen extends Screen {
 		scroll = Math.max(0.0D, Math.min(max, scroll - dy * 14.0D));
 		int shift = (int) before - (int) scroll;
 		for (var w : pageWidgets) {
-			if (w instanceof Button b && b.getY() == PAD) {
-				continue;   // the Back button stays put
+			if (chromeWidgets.contains(w)) {
+				continue;
 			}
 			w.setY(w.getY() + shift);
 		}

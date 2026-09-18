@@ -35,6 +35,7 @@ public final class HeatSchedule {
 		final long startTick;
 		final Map<UUID, UUID> entrants = new LinkedHashMap<>();
 		private int lastNotice = -1;   // seconds shown in the countdown
+		private int lastCall;          // 2 = two-minute call, 1 = one-minute call
 
 		Heat(RaceTrack track, long startTick) {
 			this.track = track;
@@ -59,26 +60,83 @@ public final class HeatSchedule {
 	}
 
 	private static final Map<RaceClass, Heat> HEATS = new EnumMap<>(RaceClass.class);
+	private static boolean loaded;
 
 	private HeatSchedule() {
 	}
 
-	/** Server stop: nothing pending for the next server in this JVM. */
+	/** Server stop: drop the in-memory book. Pass the Square to forget the saved timetable too. */
 	public static void reset() {
+		reset(null);
+	}
+
+	public static void reset(@Nullable ServerLevel square) {
 		HEATS.clear();
+		loaded = false;
+		if (square != null) {
+			SquareData.get(square).setHeats(new net.minecraft.nbt.CompoundTag());
+		}
 	}
 
 	public static @Nullable Heat pending(RaceClass raceClass) {
 		return HEATS.get(raceClass);
 	}
 
+	public static boolean entered(UUID player) {
+		for (Heat heat : HEATS.values()) {
+			if (heat.entered(player)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Scratch this rider off the timetable (pocketwatch home, or sneak-click Esther). */
+	public static boolean drop(ServerPlayer player) {
+		ServerLevel square = Square.level(player.server);
+		if (square != null) {
+			ensureLoaded(square);
+		}
+		for (RaceClass rc : new ArrayList<>(HEATS.keySet())) {
+			Heat heat = HEATS.get(rc);
+			if (heat.entrants.remove(player.getUUID()) == null) {
+				continue;
+			}
+			player.displayClientMessage(Component.translatable("chocobosreborn.heat.left",
+					Component.translatable("chocobosreborn.track." + heat.track.id())), false);
+			if (heat.entrants.isEmpty()) {
+				HEATS.remove(rc);
+				if (square != null) {
+					announce(square, Component.translatable("chocobosreborn.heat.scratched",
+							Component.translatable("chocobosreborn.track." + heat.track.id())));
+				}
+			}
+			if (square != null) {
+				persist(square);
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/** True when this bird is already on a queued heat (almanac must not release it). */
+	public static boolean hasBird(UUID bird) {
+		for (Heat heat : HEATS.values()) {
+			if (heat.entrants.containsValue(bird)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Game time of the next mark that leaves at least {@link #MIN_LEAD} ticks to get ready. */
 	public static long nextMark(long now) {
-		long mark = (now / PERIOD + 1) * PERIOD;
-		if (mark - now < MIN_LEAD) {
-			mark += PERIOD;
-		}
-		return mark;
+		return RaceScoring.nextHeatMark(now, PERIOD, MIN_LEAD);
+	}
+
+	/** A saved mark that is already due must not fire on the first tick after reload. */
+	public static long persistStart(long saved, long now) {
+		return RaceScoring.persistHeatStart(saved, now, PERIOD, MIN_LEAD);
 	}
 
 	/** Seconds until the heat, for messages. */
@@ -93,65 +151,124 @@ public final class HeatSchedule {
 	 * caller should open the picker.
 	 */
 	public static boolean joinOrPick(ServerPlayer player, ChocoboEntity bird) {
-		return false;   // the picker always opens: a bird may enter any course of its class or below
+		if (!(player.level() instanceof ServerLevel sl)) {
+			return false;
+		}
+		ensureLoaded(sl);
+		boolean sawHeat = false;
+		for (int id = bird.raceClass().getId(); id >= 0; id--) {
+			Heat h = HEATS.get(RaceClass.byId(id));
+			if (h == null) {
+				continue;
+			}
+			sawHeat = true;
+			if (!RaceScoring.joinSkipsFullHeat(h.entrants.size(), RaceSession.FIELD, h.entered(player.getUUID()))) {
+				continue;
+			}
+			if (enter(player, bird, h)) {
+				persist(sl);
+			}
+			return true;
+		}
+		if (sawHeat) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.heat.full"), false);
+		}
+		return false;   // no joinable heat: the caller opens the course picker
 	}
 
 	/** The course picker answered for a ranked heat: schedule it (or join the one already pending). */
 	public static void schedule(ServerPlayer player, ChocoboEntity bird, RaceTrack track) {
 		RaceClass rc = track.getRaceClass();
-		if (rc.getId() > bird.raceClass().getId()) {
+		if (!RaceScoring.mayEnterCourse(bird.raceClass().getId(), rc.getId())) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
 			return;
 		}
+		if (player.level() instanceof ServerLevel sl) {
+			ensureLoaded(sl);
+		}
 		Heat heat = HEATS.get(rc);
+		boolean created = false;
 		if (heat == null) {
 			long now = player.level().getGameTime();
 			heat = new Heat(track, nextMark(now));
+			created = true;
+		} else if (heat.track != track) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.heat.join_existing",
+					Component.translatable("chocobosreborn.track." + heat.track.id())), false);
+		}
+		if (!enter(player, bird, heat)) {
+			return;
+		}
+		if (created) {
 			HEATS.put(rc, heat);
+			long now = player.level().getGameTime();
 			announce(player.serverLevel(), Component.translatable("chocobosreborn.heat.scheduled",
 					Component.translatable("chocobosreborn.track." + track.id()), rc.name(),
 					clock(secondsLeft(heat, now))));
+			if (player.level() instanceof ServerLevel square && Square.isSquare(square)) {
+				SquareBuilder.buildTrack(square, track);
+			}
 		}
-		enter(player, bird, heat);
+		if (player.level() instanceof ServerLevel sl) {
+			persist(sl);
+		}
 	}
 
-	private static void enter(ServerPlayer player, ChocoboEntity bird, Heat heat) {
+	private static boolean enter(ServerPlayer player, ChocoboEntity bird, Heat heat) {
+		if (!bird.isOwnedBy(player) && !player.getAbilities().instabuild) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.square.need_bird"), true);
+			return false;
+		}
+		if (RaceManager.sessionOf(player.getUUID()) != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
+			return false;
+		}
 		long now = player.level().getGameTime();
 		for (Heat other : HEATS.values()) {
 			if (other != heat && other.entrants.containsKey(player.getUUID())) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.heat.entered_already",
 						Component.translatable("chocobosreborn.track." + other.track.id()), clock(secondsLeft(other, now))), false);
-				return;
+				return false;
 			}
 		}
 		if (heat.entrants.containsKey(player.getUUID())) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.heat.entered_already",
 					Component.translatable("chocobosreborn.track." + heat.track.id()), clock(secondsLeft(heat, now))), false);
-			return;
+			return false;
 		}
 		if (heat.entrants.size() >= RaceSession.FIELD) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.heat.full"), false);
-			return;
+			return false;
 		}
 		heat.entrants.put(player.getUUID(), bird.getUUID());
+		TradeDesk.withdraw(player);
+		DuelDesk.withdraw(player);
 		player.displayClientMessage(Component.translatable("chocobosreborn.heat.entered",
 				Component.translatable("chocobosreborn.track." + heat.track.id()), clock(secondsLeft(heat, now)),
 				heat.entrants.size(), RaceSession.FIELD), false);
+		return true;
 	}
 
 	/** Server tick in the Square: notices, countdown, and the start. */
 	public static void tick(ServerLevel square) {
+		ensureLoaded(square);
 		if (HEATS.isEmpty()) {
 			return;
 		}
 		long now = square.getGameTime();
+		boolean dirty = false;
 		for (RaceClass rc : new ArrayList<>(HEATS.keySet())) {
 			Heat heat = HEATS.get(rc);
 			long left = heat.startTick - now;
 			Component course = Component.translatable("chocobosreborn.track." + heat.track.id());
-			if (left == NOTICE_2MIN || left == NOTICE_1MIN) {
+			if (left <= NOTICE_2MIN && left > NOTICE_1MIN && heat.lastCall < 2) {
+				heat.lastCall = 2;
 				announce(square, Component.translatable("chocobosreborn.heat.notice", course, rc.name(),
-						left / 1200, heat.entrants.size(), RaceSession.FIELD));
+						2, heat.entrants.size(), RaceSession.FIELD));
+			} else if (left <= NOTICE_1MIN && left > NOTICE_10S && heat.lastCall < 1) {
+				heat.lastCall = 1;
+				announce(square, Component.translatable("chocobosreborn.heat.notice", course, rc.name(),
+						1, heat.entrants.size(), RaceSession.FIELD));
 			} else if (left > NOTICE_10S && left % 20 == 0) {
 				// the queue sees its timer ticking on the action bar
 				for (UUID id : heat.entrants.keySet()) {
@@ -170,10 +287,82 @@ public final class HeatSchedule {
 					}
 				}
 			} else if (left <= 0) {
+				if (RaceManager.trackBusy(heat.track)) {
+					Heat next = new Heat(heat.track, nextMark(now));
+					next.entrants.putAll(heat.entrants);
+					HEATS.put(rc, next);
+					announce(square, Component.translatable("chocobosreborn.race.occupied"));
+					dirty = true;
+					continue;
+				}
 				HEATS.remove(rc);
+				dirty = true;
 				start(square, rc, heat);
 			}
 		}
+		if (dirty) {
+			persist(square);
+		}
+	}
+
+	private static void ensureLoaded(ServerLevel square) {
+		if (loaded) {
+			return;
+		}
+		loaded = true;
+		if (read(SquareData.get(square).heats(), square.getGameTime())) {
+			persist(square);
+		}
+	}
+
+	private static void persist(ServerLevel square) {
+		SquareData.get(square).setHeats(write());
+	}
+
+	private static net.minecraft.nbt.CompoundTag write() {
+		net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+		net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+		for (Heat heat : HEATS.values()) {
+			net.minecraft.nbt.CompoundTag t = new net.minecraft.nbt.CompoundTag();
+			t.putInt("Track", heat.track.ordinal());
+			t.putLong("Start", heat.startTick);
+			net.minecraft.nbt.ListTag people = new net.minecraft.nbt.ListTag();
+			for (Map.Entry<UUID, UUID> e : heat.entrants.entrySet()) {
+				net.minecraft.nbt.CompoundTag row = new net.minecraft.nbt.CompoundTag();
+				row.putUUID("P", e.getKey());
+				row.putUUID("B", e.getValue());
+				people.add(row);
+			}
+			t.put("Entrants", people);
+			list.add(t);
+		}
+		tag.put("Entries", list);
+		return tag;
+	}
+
+	/** @return true when a saved mark had already passed and was bumped */
+	private static boolean read(net.minecraft.nbt.CompoundTag tag, long now) {
+		HEATS.clear();
+		boolean dirty = false;
+		for (net.minecraft.nbt.Tag raw : tag.getList("Entries", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
+			net.minecraft.nbt.CompoundTag t = (net.minecraft.nbt.CompoundTag) raw;
+			RaceTrack track = RaceTrack.byId(t.getInt("Track"));
+			long start = persistStart(t.getLong("Start"), now);
+			if (start != t.getLong("Start")) {
+				dirty = true;
+			}
+			Heat heat = new Heat(track, start);
+			for (net.minecraft.nbt.Tag rowRaw : t.getList("Entrants", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
+				net.minecraft.nbt.CompoundTag row = (net.minecraft.nbt.CompoundTag) rowRaw;
+				if (row.hasUUID("P") && row.hasUUID("B")) {
+					heat.entrants.put(row.getUUID("P"), row.getUUID("B"));
+				}
+			}
+			if (!heat.entrants.isEmpty()) {
+				HEATS.put(track.getRaceClass(), heat);
+			}
+		}
+		return dirty;
 	}
 
 	private static void start(ServerLevel square, RaceClass rc, Heat heat) {
@@ -182,12 +371,18 @@ public final class HeatSchedule {
 		for (Map.Entry<UUID, UUID> e : heat.entrants.entrySet()) {
 			ServerPlayer p = square.getServer().getPlayerList().getPlayer(e.getKey());
 			if (p == null || p.level() != square || RaceManager.sessionOf(p.getUUID()) != null) {
+				if (p != null) {
+					p.displayClientMessage(Component.translatable("chocobosreborn.heat.missed"), false);
+					RaceManager.refundPendingBet(p);
+				}
 				continue;
 			}
 			Entity v = p.getVehicle();
 			if (!(v instanceof ChocoboEntity bird) || !bird.getUUID().equals(e.getValue()) || !bird.saddled()
-					|| bird.isBaby() || bird.armor() != null || bird.raceClass().getId() < rc.getId()) {
+					|| bird.isBaby() || bird.armor() != null || bird.raceClass().getId() < rc.getId()
+					|| (!bird.isOwnedBy(p) && !p.getAbilities().instabuild)) {
 				p.displayClientMessage(Component.translatable("chocobosreborn.heat.missed"), false);
+				RaceManager.refundPendingBet(p);
 				continue;
 			}
 			players.add(p);
@@ -195,13 +390,20 @@ public final class HeatSchedule {
 		}
 		Component course = Component.translatable("chocobosreborn.track." + heat.track.id());
 		if (players.isEmpty()) {
+			for (UUID id : heat.entrants.keySet()) {
+				ServerPlayer p = square.getServer().getPlayerList().getPlayer(id);
+				if (p != null) {
+					RaceManager.refundPendingBet(p);
+				}
+			}
 			announce(square, Component.translatable("chocobosreborn.heat.scratched", course));
 			return;
 		}
 		if (RaceManager.trackBusy(heat.track)) {
-			for (ServerPlayer p : players) {
-				p.displayClientMessage(Component.translatable("chocobosreborn.race.occupied"), true);
-			}
+			Heat next = new Heat(heat.track, nextMark(square.getGameTime()));
+			next.entrants.putAll(heat.entrants);
+			HEATS.put(rc, next);
+			announce(square, Component.translatable("chocobosreborn.race.occupied"));
 			return;
 		}
 		announce(square, Component.translatable("chocobosreborn.heat.off", course, players.size()));

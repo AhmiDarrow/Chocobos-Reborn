@@ -33,6 +33,8 @@ public class SquareData extends SavedData {
 	private int courseVersion;
 	private boolean keepersSpawned;
 	private final Map<UUID, ReturnPoint> returns = new HashMap<>();
+	private final Map<UUID, Integer> owedGp = new HashMap<>();
+	private CompoundTag heats = new CompoundTag();
 
 	public static SquareData get(ServerLevel squareLevel) {
 		return squareLevel.getDataStorage().computeIfAbsent(
@@ -56,6 +58,14 @@ public class SquareData extends SavedData {
 			d.returns.put(r.getUUID("Player"), new ReturnPoint(dim,
 					new Vec3(r.getDouble("X"), r.getDouble("Y"), r.getDouble("Z")), r.getFloat("Yaw")));
 		}
+		ListTag owed = tag.getList("OwedGp", Tag.TAG_COMPOUND);
+		for (int i = 0; i < owed.size(); i++) {
+			CompoundTag r = owed.getCompound(i);
+			if (r.hasUUID("Player")) {
+				d.owedGp.put(r.getUUID("Player"), r.getInt("Amount"));
+			}
+		}
+		d.heats = tag.getCompound("Heats").copy();
 		return d;
 	}
 
@@ -78,7 +88,41 @@ public class SquareData extends SavedData {
 			list.add(r);
 		});
 		tag.put("Returns", list);
+		ListTag owed = new ListTag();
+		owedGp.forEach((id, n) -> {
+			CompoundTag r = new CompoundTag();
+			r.putUUID("Player", id);
+			r.putInt("Amount", n);
+			owed.add(r);
+		});
+		tag.put("OwedGp", owed);
+		tag.put("Heats", heats.copy());
 		return tag;
+	}
+
+	public CompoundTag heats() {
+		return heats.copy();
+	}
+
+	public void setHeats(CompoundTag tag) {
+		heats = tag == null ? new CompoundTag() : tag.copy();
+		setDirty();
+	}
+
+	public void oweGp(UUID player, int amount) {
+		if (amount > 0) {
+			owedGp.merge(player, amount, Integer::sum);
+			setDirty();
+		}
+	}
+
+	public int takeOwedGp(UUID player) {
+		Integer n = owedGp.remove(player);
+		if (n != null) {
+			setDirty();
+			return n;
+		}
+		return 0;
 	}
 
 	public boolean isBuilt(RaceTrack track) {

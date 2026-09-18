@@ -24,9 +24,10 @@ wild birds toward you and outlines them so you can spot tracks across a field.
 
 Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a
 wild bird (about one in three tries) and heals a hurt one. Every green trains
-speed, stamina, intelligence or cooperation; a bird eventually gets sated on each
-kind, so move up the ladder. Gysahl grows from seeds found in grass; the better
-greens come from Sage Wynn at the Square, race prizes, and lucky harvests.
+speed, stamina, intelligence or cooperation; a bird takes one training green every
+five minutes, and eventually gets sated on each kind, so move up the ladder. Gysahl
+grows from seeds found in grass; the better greens come from Sage Wynn at the Square,
+race prizes, and lucky harvests.
 
 ## Nuts (mating)
 
@@ -57,16 +58,16 @@ and give the rider water breathing), Black birds do both and see at night. Gold
 birds do everything: mountains, any water, fire, night sight, slow self-healing, and they
 fly (hold jump to flap, look up while moving to climb, hold sprint to dive; faster aloft than on
 foot). End birds climb, cross any water and let the rider drift down; only Gold flies. Nether
-birds shrug off fire and walk on lava. Sneak is down: fliers dive, water birds duck under;
-you can only sneak-dismount on solid ground. Your crosshair passes through the bird while
-riding, so doors and blocks work from the saddle; sneak to target the bird (empty hand takes
-the saddle back).
+birds shrug off fire and walk on lava. Sprint dives a flier; sneak ducks a water bird under.
+You can only sneak-dismount on solid ground. Your crosshair passes through the bird while
+riding, so doors and blocks work from the saddle; sneak to target the bird (empty hand opens
+equipment).
 
 ## Chocobo Farm
 
-Chocobo Farms dot the plains, meadows and savannas: a barn, a paddock with a couple
+Chocobo Farms dot the plains, meadows, savannas and cherry groves: a barn, a paddock with a couple
 of wild yellows, a gysahl patch, a Stablehand in the barn selling greens and nuts, and
-a Farmhand at the gate who can send a saddled rider on to the Square.
+a Farmhand at the gate who can send you on to the Square, on foot or in the saddle.
 
 ## Whiskerwind
 
@@ -77,10 +78,10 @@ the void, a shrine islet, its own birds wandering the streets, all under its own
 Nothing spawns there on its own and nothing there can be dug up. Reach it with a **Chocobo Pocketwatch** or through the **Farmhand** at any Chocobo
 Farm, on foot or in the saddle; your birds nearby come along.
 
-* Heats go off every five minutes. **Esther** under the arch enters you in the next heat of your
-  bird's class: the first rider picks the course from three sprints (one lap, a minute or more)
+* Heats go off every five minutes. **Esther** on the overlook enters you in the next heat of your
+  bird's class or any class below: the first rider picks the course from three sprints (one lap, a minute or more)
   and three grands prix (three laps of two minutes or more, longer up the classes), and everyone
-  else of that class who sees her joins, taking an AI racer's stall. She announces the heat at
+  else of that class or higher who sees her joins, taking an AI racer's stall. She announces the heat at
   two minutes and one minute and counts down the last ten seconds; be in the saddle. You are
   carried to the stalls, given a moment to settle, then a big five-second countdown starts the
   heat. Every AI bird has a kin jockey up; the crowd in the stands follows you round. Every course is a proper circuit on its own themed sky island: straights, sweepers,
@@ -111,8 +112,8 @@ Advancements track the whole line: first tame, first ride, first hatch, Green or
 Blue, Black, Gold, finding a farm, reaching Whiskerwind, a first-place finish and
 Class S.
 
-The Nether and End birds wear lava and end stone in their crest, ruff and tail; in the
-breeding pen they count as plain Yellows and never pass their colour on.
+The Nether and End birds wear lava and end stone in their crest, ruff and tail; they breed
+true, and no nut turns them into a farm-line colour.
 
 ## Build
 

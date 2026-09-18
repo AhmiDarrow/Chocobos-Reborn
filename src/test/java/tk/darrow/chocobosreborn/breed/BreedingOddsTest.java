@@ -79,4 +79,48 @@ class BreedingOddsTest {
 		assertEquals(0.10D, BreedingOdds.chanceFromWins(-2, 4), 1.0E-9);
 		assertEquals(0.10D, BreedingOdds.chanceFromWins(0, 12), 1.0E-9);
 	}
+
+	@Test
+	void endAndNetherParentsBreedTrueEvenOnACarobHit() {
+		assertEquals(ChocoboColor.PURPLE, BreedRules.resolve(
+				ChocoboColor.PURPLE, ChocoboColor.PURPLE,
+				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
+				ChocoboNut.PEPIO, 0, true, true, ChocoboColor.PURPLE));
+		assertEquals(ChocoboColor.PURPLE, BreedRules.resolve(
+				ChocoboColor.PURPLE, ChocoboColor.PURPLE,
+				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
+				ChocoboNut.CAROB, 8, true, true, ChocoboColor.PURPLE));
+		assertEquals(ChocoboColor.FLAME, BreedRules.resolve(
+				ChocoboColor.FLAME, ChocoboColor.FLAME,
+				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
+				ChocoboNut.CAROB, 8, true, false, ChocoboColor.FLAME));
+		assertEquals(ChocoboColor.GREEN, BreedRules.resolve(
+				ChocoboColor.YELLOW, ChocoboColor.YELLOW,
+				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
+				ChocoboNut.CAROB, 8, true, true, ChocoboColor.YELLOW));
+	}
+
+	@Test
+	void trainingBonusMustNotBeWrittenBackAsBornGrade() {
+		int born = ChocoboGrade.AVERAGE.getRank();
+		int trained = ChocoboGreen.gradeFromTraining(born, 120);
+		assertEquals(ChocoboGrade.GOOD.getRank(), trained);
+		assertEquals(trained, ChocoboGreen.gradeFromTraining(born, 120));
+		assertEquals(ChocoboGrade.GREAT.getRank(), ChocoboGreen.gradeFromTraining(trained, 120));
+	}
+
+	@Test
+	void trainingGreensWaitFiveMinutesBetweenFeeds() {
+		assertEquals(6000, ChocoboGreen.TRAIN_COOLDOWN_TICKS);
+		assertTrue(ChocoboGreen.trainReady(0L, 100L, false));
+		assertTrue(ChocoboGreen.trainReady(1000L, 1001L, true));
+		assertFalse(ChocoboGreen.trainReady(1000L, 1001L, false));
+		assertEquals(5999, ChocoboGreen.trainWaitTicks(1000L, 1001L));
+		assertEquals(0, ChocoboGreen.trainWaitTicks(1000L, 7000L));
+		assertTrue(ChocoboGreen.trainReady(1000L, 7000L, false));
+		assertEquals(ChocoboGreen.TRAIN_COOLDOWN_TICKS, ChocoboGreen.trainWaitTicks(5000L, 1000L));
+		assertEquals("5:00", ChocoboGreen.trainWaitClock(6000));
+		assertEquals("0:01", ChocoboGreen.trainWaitClock(1));
+		assertEquals("2:30", ChocoboGreen.trainWaitClock(3000));
+	}
 }

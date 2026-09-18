@@ -15,6 +15,9 @@ class RaceBettingTest {
 		assertEquals(1, RaceScoring.clampStake(1));
 		assertEquals(16, RaceScoring.clampStake(16));
 		assertEquals(16, RaceScoring.clampStake(64));
+		assertEquals(0, RaceScoring.clampDuelStake(-4));
+		assertEquals(32, RaceScoring.clampDuelStake(32));
+		assertEquals(32, RaceScoring.clampDuelStake(64));
 	}
 
 	@Test
@@ -72,12 +75,41 @@ class RaceBettingTest {
 	}
 
 	@Test
+	void aDnfAfterGoKeepsTheStakeAndAScratchRefundsSpectators() {
+		assertFalse(RaceScoring.refundBookieOnForfeit(true));
+		assertTrue(RaceScoring.refundBookieOnForfeit(false));
+		assertTrue(RaceScoring.scratchRefundsLeftoverBets(false));
+		assertFalse(RaceScoring.scratchRefundsLeftoverBets(true));
+		assertTrue(RaceScoring.spectatorMayBetOnFun(true, false));
+		assertTrue(RaceScoring.spectatorMayBetOnFun(false, true));
+		assertFalse(RaceScoring.spectatorMayBetOnFun(false, false));
+	}
+
+	@Test
 	void pendingPicksRemapWhenTheHeatDoesNotHaveThatBird() {
 		assertEquals(RaceScoring.BetPick.OPPONENT, RaceScoring.legalize(RaceScoring.BetPick.JOE, false, true));
 		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalize(RaceScoring.BetPick.SELF, false, true));
 		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.legalize(RaceScoring.BetPick.OPPONENT, true, true));
 		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.legalize(RaceScoring.BetPick.JOE, true, false));
 		assertEquals(RaceScoring.BetPick.JOE, RaceScoring.legalize(RaceScoring.BetPick.JOE, true, true));
+	}
+
+	@Test
+	void spectatorSelfBecomesTheFieldAndCycleSkipsMissingNamedBirds() {
+		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.SELF, true, false, true, true, false));
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.SELF, true, true, true, true, false));
+		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.JOE, true, true, false, true, false));
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.OPPONENT, false, true, false, false, false));
+		assertEquals(RaceScoring.BetPick.JOE, RaceScoring.nextLivePick(
+				RaceScoring.BetPick.SELF, true, false, true, true, false));
+		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.nextLivePick(
+				RaceScoring.BetPick.JOE, true, true, true, false, false));
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.nextLivePick(
+				RaceScoring.BetPick.SELF, false, true, false, false, false));
 	}
 
 	@Test

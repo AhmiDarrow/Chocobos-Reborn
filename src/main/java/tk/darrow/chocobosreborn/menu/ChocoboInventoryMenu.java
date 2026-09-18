@@ -36,6 +36,11 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 			public int getMaxStackSize() {
 				return 1;
 			}
+
+			@Override
+			public boolean mayPickup(Player player) {
+				return !bird.isVehicle();
+			}
 		});
 		addSlot(new Slot(inv, ARMOR, 8, 36) {
 			@Override
@@ -104,6 +109,9 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 		ItemStack stack = slot.getItem();
 		result = stack.copy();
 		int birdSlots = BAG_START + BAG_SIZE;
+		if ((index == BAGS || index == SADDLE) && !slot.mayPickup(player)) {
+			return ItemStack.EMPTY;
+		}
 		if (index < birdSlots) {
 			if (!moveItemStackTo(stack, birdSlots, slots.size(), true)) {
 				return ItemStack.EMPTY;
@@ -139,7 +147,8 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean stillValid(Player player) {
-		return bird.isAlive() && bird.distanceTo(player) < 8.0F && inv.stillValid(player);
+		return !bird.isRemoved() && tk.darrow.chocobosreborn.race.RaceScoring.saddleBagStillValid(bird.isAlive(), bird.racing(),
+				bird.distanceTo(player) < 8.0F) && inv.stillValid(player);
 	}
 
 	@Override

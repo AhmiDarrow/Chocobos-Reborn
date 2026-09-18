@@ -32,14 +32,14 @@ public record RacerProfile(double cruise, double dash, double energyDrain, doubl
 
 	public static RacerProfile of(RaceClass raceClass, Role role) {
 		RacerProfile base = switch (raceClass) {
-			// Cruise / dash are on the rider's scale (RacerMoveControl): a rider cruises at
-			// grade x training (0.86..1.32) and dashes at x1.62 on stamina. Each class's field
-			// averages ~95% of a well-ridden bird of that class's usual grade: hard, winnable.
+			// Cruise is discipline on top of the bird's own speedMul (grade x speed training).
+			// Divided by fieldTraining so a typical NPC of this class still sits near the old
+			// pace; a rival at 100 training then actually pulls away on stats.
 			// Reaction is measured from GO (the riders see the same countdown), so no field jumps the lights.
-			case C -> new RacerProfile(0.91D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.10D, 0.00D, 16, 30, 0.90D, 1.00D, 0.10D, 0.35D);
-			case B -> new RacerProfile(1.03D, 1.27D, 1.0D / 140.0D, 1.0D / 360.0D, 0.25D, 0.20D, 12, 20, 0.60D, 0.50D, 0.06D, 0.60D);
-			case A -> new RacerProfile(1.11D, 1.32D, 1.0D / 170.0D, 1.0D / 300.0D, 0.30D, 0.35D, 10, 14, 0.35D, 0.20D, 0.03D, 0.80D);
-			case S -> new RacerProfile(1.22D, 1.36D, 1.0D / 200.0D, 1.0D / 260.0D, 0.30D, 0.45D, 8, 11, 0.15D, 0.05D, 0.00D, 0.95D);
+			case C -> new RacerProfile(0.845D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.10D, 0.00D, 16, 30, 0.90D, 1.00D, 0.10D, 0.35D);
+			case B -> new RacerProfile(0.882D, 1.27D, 1.0D / 140.0D, 1.0D / 360.0D, 0.25D, 0.20D, 12, 20, 0.60D, 0.50D, 0.06D, 0.60D);
+			case A -> new RacerProfile(0.887D, 1.32D, 1.0D / 170.0D, 1.0D / 300.0D, 0.30D, 0.35D, 10, 14, 0.35D, 0.20D, 0.03D, 0.80D);
+			case S -> new RacerProfile(0.923D, 1.36D, 1.0D / 200.0D, 1.0D / 260.0D, 0.30D, 0.45D, 8, 11, 0.15D, 0.05D, 0.00D, 0.95D);
 		};
 		return switch (role) {
 			case FIELD -> base;
@@ -55,6 +55,11 @@ public record RacerProfile(double cruise, double dash, double energyDrain, doubl
 		return new RacerProfile(base.cruise * boost, Math.max(base.dash, s.dash), Math.min(base.energyDrain, s.energyDrain),
 				Math.max(base.energyRecover, s.energyRecover), s.dashThreshold, s.saveForLastLap, s.reactionMin, s.reactionMax,
 				s.wobble, s.stumbleChancePerLap, 0.0D, s.lineHold);
+	}
+
+	/** Chance the racer knows a bog when it sees one (45% + 55% × lineHold). */
+	public static double bogSavvyChance(double lineHold) {
+		return 0.45D + 0.55D * lineHold;
 	}
 
 	/** Average speed multiplier over a lap if the racer dashes whenever it can. */

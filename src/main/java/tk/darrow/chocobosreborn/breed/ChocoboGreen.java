@@ -21,6 +21,8 @@ public enum ChocoboGreen {
 	SYLKIS(8, 8, 6, 6, 12);
 
 	public static final int MAX_POINTS = 100;
+	/** One training green every 5 minutes. Satiety is a second, longer gate. */
+	public static final int TRAIN_COOLDOWN_TICKS = 6000;
 
 	private final int speed;
 	private final int stamina;
@@ -61,6 +63,34 @@ public enum ChocoboGreen {
 	public static int gradeFromTraining(int baseRank, int totalPoints) {
 		int bonus = totalPoints / 120;
 		return Math.min(ChocoboGrade.WONDERFUL.getRank(), baseRank + bonus);
+	}
+
+	/** Creative / instabuild skips the wait so a test feed still works. Never-fed is 0. */
+	public static boolean trainReady(long lastFeedGameTime, long now, boolean instabuild) {
+		return instabuild || trainWaitTicks(lastFeedGameTime, now) <= 0;
+	}
+
+	public static int trainWaitTicks(long lastFeedGameTime, long now) {
+		if (lastFeedGameTime <= 0L) {
+			return 0;
+		}
+		long elapsed = now - lastFeedGameTime;
+		if (elapsed < 0L) {
+			return TRAIN_COOLDOWN_TICKS;
+		}
+		if (elapsed >= TRAIN_COOLDOWN_TICKS) {
+			return 0;
+		}
+		return (int) (TRAIN_COOLDOWN_TICKS - elapsed);
+	}
+
+	/** Remaining wait as m:ss, rounding ticks up so 1 tick left is 0:01. */
+	public static String trainWaitClock(int waitTicks) {
+		int t = Math.max(0, waitTicks);
+		int totalSec = (t + 19) / 20;
+		int m = totalSec / 60;
+		int s = totalSec % 60;
+		return m + ":" + (s < 10 ? "0" : "") + s;
 	}
 
 	public String id() {

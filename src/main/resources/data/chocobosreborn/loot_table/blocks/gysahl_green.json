@@ -3,6 +3,11 @@
   "pools": [
     {
       "rolls": 1,
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
       "entries": [
         {
           "type": "minecraft:item",
@@ -13,6 +18,9 @@
     {
       "rolls": 1,
       "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        },
         {
           "condition": "minecraft:block_state_property",
           "block": "chocobosreborn:gysahl_green",
@@ -41,6 +49,9 @@
     {
       "rolls": 1,
       "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        },
         {
           "condition": "minecraft:block_state_property",
           "block": "chocobosreborn:gysahl_green",
@@ -79,6 +90,9 @@
       "rolls": 1,
       "conditions": [
         {
+          "condition": "minecraft:survives_explosion"
+        },
+        {
           "condition": "minecraft:block_state_property",
           "block": "chocobosreborn:gysahl_green",
           "properties": {
@@ -104,6 +118,9 @@
     {
       "rolls": 1,
       "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        },
         {
           "condition": "minecraft:block_state_property",
           "block": "chocobosreborn:gysahl_green",

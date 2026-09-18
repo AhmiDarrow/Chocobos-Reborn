@@ -42,5 +42,6 @@ public class GreensItem extends Item {
 		}
 		tip.add(Component.literal(sb.toString().trim()).withStyle(ChatFormatting.GREEN));
 		tip.add(Component.translatable("chocobosreborn.tip.satiety", green.satiety()).withStyle(ChatFormatting.DARK_GRAY));
+		tip.add(Component.translatable("chocobosreborn.tip.train_pace").withStyle(ChatFormatting.DARK_GRAY));
 	}
 }

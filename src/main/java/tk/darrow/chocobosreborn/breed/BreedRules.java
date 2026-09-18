@@ -14,9 +14,9 @@ public final class BreedRules {
 		return inherit == ChocoboColor.GOLD ? ChocoboColor.YELLOW : inherit;
 	}
 
-	/** The End and Nether birds count as Yellow in the farm line and cannot pass their colour on. */
+	/** End and Nether birds are not on the Yellow farm line; they still pass their own colour. */
 	public static ChocoboColor asBreedingColor(ChocoboColor c) {
-		return c == ChocoboColor.PURPLE || c == ChocoboColor.FLAME ? ChocoboColor.YELLOW : c;
+		return c;
 	}
 
 	public static boolean randomClauseMatches(String random, int randColor) {

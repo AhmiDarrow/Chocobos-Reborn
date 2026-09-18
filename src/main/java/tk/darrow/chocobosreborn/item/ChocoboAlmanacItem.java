@@ -33,23 +33,33 @@ public class ChocoboAlmanacItem extends Item {
 	@Override
 	public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
 		ItemStack stack = player.getItemInHand(hand);
-		if (level instanceof ServerLevel server && player instanceof ServerPlayer sp) {
-			ChocoboLedger ledger = ChocoboLedger.get(server);
-			// loaded birds first, so the page shows what the player just fed
-			for (ChocoboEntity bird : server.getEntitiesOfClass(ChocoboEntity.class,
-					sp.getBoundingBox().inflate(128.0D), b -> b.isTame() && sp.getUUID().equals(b.getOwnerUUID()))) {
-				ledger.update(bird);
-			}
-			CompoundTag data = new CompoundTag();
-			ListTag list = new ListTag();
-			for (BirdRecord r : ledger.forOwner(sp.getUUID())) {
-				list.add(r.save());
-			}
-			data.put("Birds", list);
-			data.putUUID("Player", sp.getUUID());
-			PacketDistributor.sendToPlayer(sp, new AlmanacPayload(data));
+		if (level instanceof ServerLevel && player instanceof ServerPlayer sp) {
+			send(sp);
 		}
 		return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+	}
+
+	/** Push the current ledger to the client (open or refresh the almanac). */
+	public static void send(ServerPlayer sp) {
+		ChocoboLedger ledger = ChocoboLedger.get(sp.serverLevel());
+		for (BirdRecord r : ledger.forOwner(sp.getUUID())) {
+			if (!r.alive()) {
+				continue;
+			}
+			for (ServerLevel sl : sp.getServer().getAllLevels()) {
+				if (sl.getEntity(r.id()) instanceof ChocoboEntity bird) {
+					ledger.update(bird);
+				}
+			}
+		}
+		CompoundTag data = new CompoundTag();
+		ListTag list = new ListTag();
+		for (BirdRecord r : ledger.forOwner(sp.getUUID())) {
+			list.add(r.save());
+		}
+		data.put("Birds", list);
+		data.putUUID("Player", sp.getUUID());
+		PacketDistributor.sendToPlayer(sp, new AlmanacPayload(data));
 	}
 
 	@Override

@@ -34,17 +34,15 @@ public class ChocoboPocketwatchItem extends Item {
 			return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
 		}
 		if (Square.isSquare(level)) {
-			if (RaceManager.sessionOf(sp.getUUID()) != null && RaceManager.sessionOf(sp.getUUID()).running()) {
-				sp.displayClientMessage(Component.translatable("chocobosreborn.watch.mid_heat"), true);
-				return InteractionResultHolder.fail(stack);
-			}
+			// leaveSquare forfeits only this rider; the course islands are too far
+			// from the return gate to walk, and racing cancels dismount.
 			RaceManager.leaveSquare(sp);
 		} else if (sp.getVehicle() instanceof ChocoboEntity bird) {
 			if (!RaceManager.enterSquare(sp, bird)) {
 				return InteractionResultHolder.fail(stack);
 			}
-		} else {
-			RaceManager.enterSquareOnFoot(sp);
+		} else if (!RaceManager.enterSquareOnFoot(sp)) {
+			return InteractionResultHolder.fail(stack);
 		}
 		sp.getCooldowns().addCooldown(this, COOLDOWN);
 		return InteractionResultHolder.success(stack);

@@ -28,7 +28,7 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
  * {@link RaceTrack#centerX()}). The village is a sky island of its own (VillagePlan).
  */
 public final class SquareBuilder {
-	static final int GROUND_Y = 64;
+	public static final int GROUND_Y = 64;
 	/** The village: z from PADDOCK_Z0 (return gate) to PADDOCK_Z1 (the race arch), x within ±PADDOCK_HALF_W. */
 	public static final int PADDOCK_Z0 = -104;
 	public static final int PADDOCK_Z1 = -40;
@@ -40,20 +40,20 @@ public final class SquareBuilder {
 	 * only for a deliberate village change; every bump scrubs and relays the village and
 	 * clears the built-course set on the next visit.
 	 */
-	public static final int PADDOCK_VERSION = 11;
+	public static final int PADDOCK_VERSION = 12;
 	/**
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * relaid on their next use, in place, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 2;
+	public static final int COURSE_VERSION = 5;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/** Birds that live in the village (untamable scenery). */
 	private static final int TOWN_BIRDS = 5;
 	private static final tk.darrow.chocobosreborn.breed.ChocoboColor[] TOWN_COLOURS = {
 			tk.darrow.chocobosreborn.breed.ChocoboColor.YELLOW, tk.darrow.chocobosreborn.breed.ChocoboColor.GREEN,
-			tk.darrow.chocobosreborn.breed.ChocoboColor.BLUE, tk.darrow.chocobosreborn.breed.ChocoboColor.YELLOW,
-			tk.darrow.chocobosreborn.breed.ChocoboColor.WHITE};
+			tk.darrow.chocobosreborn.breed.ChocoboColor.BLUE, tk.darrow.chocobosreborn.breed.ChocoboColor.WHITE,
+			tk.darrow.chocobosreborn.breed.ChocoboColor.BLACK};
 
 	private SquareBuilder() {
 	}
@@ -103,14 +103,45 @@ public final class SquareBuilder {
 		if (data.isBuilt(track)) {
 			return;
 		}
-		Map<RaceCourseLayout.Cell, String> plan = RaceCourseLayout.of(track).blocks();
+		RaceCourseLayout layout = RaceCourseLayout.of(track);
+		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
 		for (Map.Entry<RaceCourseLayout.Cell, String> e : plan.entrySet()) {
 			RaceCourseLayout.Cell c = e.getKey();
 			level.setBlock(new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()), 2);
 		}
+		RaceCourseLayout.BoardPost board = layout.courseBoard();
+		if (board != null) {
+			sign(level, board.x(), board.y(), board.z(), board.facing(), "chocobosreborn.track." + track.id(),
+					track.isShort() ? "chocobosreborn.select.short" : "chocobosreborn.select.long",
+					"chocobosreborn.sign.course.go");
+		}
 		data.setBuilt(track);
 		ChocobosReborn.LOGGER.info("Whiskerwind: built {} ({} blocks, {} chunks)", track.id(), plan.size(),
 				RaceCourseLayout.of(track).chunks().size());
+	}
+
+	/**
+	 * Drop leftover field NPCs and unmounted jockeys on this island (a crash
+	 * mid-heat leaves them; the next heat would otherwise double the field).
+	 * Live racers are kept. Fans stay until {@link #spawnKeepers} (they are not
+	 * {@link RaceManager#isActiveRacer}).
+	 */
+	public static void scrubCourse(ServerLevel level, RaceTrack track) {
+		double cx = track.centerX(), cz = track.centerZ();
+		AABB box = new AABB(cx - track.getRadiusX() - 32.0D, 0.0D, cz - track.getRadiusZ() - 32.0D,
+				cx + track.getRadiusX() + 32.0D, 256.0D, cz + track.getRadiusZ() + 32.0D);
+		for (ChocoboEntity bird : level.getEntities(ModEntities.CHOCOBO.get(), box, ChocoboEntity::raceNpc)) {
+			if (!RaceManager.isActiveRacer(bird.getUUID())) {
+				bird.discard();
+			}
+		}
+		for (KinStewardEntity k : level.getEntities(ModEntities.KIN_STEWARD.get(), box,
+				e -> !e.isRemoved() && e.role().jockey())) {
+			if (k.getVehicle() instanceof ChocoboEntity b && RaceManager.isActiveRacer(b.getUUID())) {
+				continue;
+			}
+			k.discard();
+		}
 	}
 
 	// ---------------------------------------------------------------- village
@@ -130,6 +161,17 @@ public final class SquareBuilder {
 		int y = GROUND_Y;
 		// clear the whole footprint (an older village may stand here), then the island
 		int r = VillagePlan.RADIUS + 12;
+		AABB scrub = new AABB(VillagePlan.CX - r, y - 20, VillagePlan.CZ - r,
+				VillagePlan.CX + r + 1, y + 31, VillagePlan.CZ + r + 31);
+		java.util.List<Entity> saved = new java.util.ArrayList<>();
+		saved.addAll(level.getEntitiesOfClass(net.minecraft.world.entity.player.Player.class, scrub));
+		saved.addAll(level.getEntitiesOfClass(ChocoboEntity.class, scrub));
+		saved.addAll(level.getEntitiesOfClass(KinStewardEntity.class, scrub));
+		saved.addAll(level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, scrub));
+		double holdY = y + 40;
+		for (Entity e : saved) {
+			e.teleportTo(Square.ARRIVAL.x, holdY, Square.ARRIVAL.z);
+		}
 		fill(level, VillagePlan.CX - r, y - 20, VillagePlan.CZ - r, VillagePlan.CX + r, y + 30, VillagePlan.CZ + r + 30, "air");
 		fill(level, 44, y - 12, -72, 66, y + 12, -48, "air");
 		VillagePlan.island(level);
@@ -176,8 +218,16 @@ public final class SquareBuilder {
 		// the race arch with Esther, the pier beyond it, the return portal, the shrine islet
 		VillagePlan.overlook(level, PADDOCK_Z1);
 		arch(level, y);
+		VillagePlan.funGates(level);
+		VillagePlan.gysahlPatch(level, VillageLayout.GYSAHL_CX, VillageLayout.GYSAHL_CZ);
 		VillagePlan.returnGate(level, PADDOCK_Z0);
 		VillagePlan.shrineIslet(level, 56, -60, 40, -60);
+		for (Entity e : saved) {
+			if (!e.isRemoved()) {
+				e.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+				e.fallDistance = 0.0F;
+			}
+		}
 		data.setPaddockVersion(PADDOCK_VERSION);
 		data.clearBuilt();   // the scrub can take a course lamp with it; lay the courses again
 		ChocobosReborn.LOGGER.info("Chocobo Square: village v{} built", PADDOCK_VERSION);
@@ -472,11 +522,22 @@ public final class SquareBuilder {
 				removed++;
 			}
 		}
-		for (ChocoboEntity bird : level.getEntities(ModEntities.CHOCOBO.get(), village.inflate(80.0D), ChocoboEntity::raceNpc)) {
+		for (ChocoboEntity bird : level.getEntities(ModEntities.CHOCOBO.get(), ChocoboEntity::raceNpc)) {
 			if (!RaceManager.isActiveRacer(bird.getUUID())) {
 				bird.discard();
 				removed++;
 			}
+		}
+		for (KinStewardEntity k : level.getEntities(ModEntities.KIN_STEWARD.get(),
+				e -> !e.isRemoved() && (e.role().fans() || e.role().jockey()))) {
+			if (k.getVehicle() instanceof ChocoboEntity b && RaceManager.isActiveRacer(b.getUUID())) {
+				continue;
+			}
+			if (RaceManager.heatContains(k.getX(), k.getZ())) {
+				continue;
+			}
+			k.discard();
+			removed++;
 		}
 		// the town's own birds: a few wander the village, never tamable, respawned when lost
 		if (complete) {

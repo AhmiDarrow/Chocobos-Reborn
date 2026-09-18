@@ -98,15 +98,18 @@ public final class ChocoboLedger extends SavedData {
 		if (clean.length() > 24) {
 			clean = clean.substring(0, 24);
 		}
+		boolean found = false;
 		for (ServerLevel level : player.getServer().getAllLevels()) {
 			if (level.getEntity(id) instanceof ChocoboEntity bird) {
 				bird.setCustomName(clean.isEmpty() ? null : net.minecraft.network.chat.Component.literal(clean));
 				bird.setCustomNameVisible(!clean.isEmpty());
+				found = true;
 			}
 		}
+		String pending = found ? "" : (clean.isEmpty() ? BirdRecord.PENDING_CLEAR : clean);
 		birds.put(id, new BirdRecord(r.id(), r.owner(), clean, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),
-				r.wins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(), r.parentColorA(),
-				r.parentColorB(), r.nut(), r.bornDay(), r.alive(), clean));
+				r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(),
+				r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), pending));
 		setDirty();
 	}
 
@@ -119,9 +122,20 @@ public final class ChocoboLedger extends SavedData {
 		if (r == null || !player.getUUID().equals(r.owner())) {
 			return;
 		}
+		if (tk.darrow.chocobosreborn.race.RaceManager.isActiveRacer(id)
+				|| tk.darrow.chocobosreborn.race.HeatSchedule.hasBird(id)) {
+			player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+					"chocobosreborn.almanac.d.release_racing"), true);
+			return;
+		}
 		boolean done = false;
 		for (ServerLevel level : player.getServer().getAllLevels()) {
 			if (level.getEntity(id) instanceof ChocoboEntity bird) {
+				if (bird.racing()) {
+					player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+							"chocobosreborn.almanac.d.release_racing"), true);
+					return;
+				}
 				setWild(bird);
 				done = true;
 			}
@@ -131,6 +145,9 @@ public final class ChocoboLedger extends SavedData {
 		}
 		birds.remove(id);
 		setDirty();
+		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+				"chocobosreborn.almanac.d.released"), false);
+		tk.darrow.chocobosreborn.item.ChocoboAlmanacItem.send(player);
 	}
 
 	/** Drop the record of a bird that has passed (Ahmi: "remove passed ones"). */
@@ -141,6 +158,7 @@ public final class ChocoboLedger extends SavedData {
 		}
 		birds.remove(id);
 		setDirty();
+		tk.darrow.chocobosreborn.item.ChocoboAlmanacItem.send(player);
 	}
 
 	/** A released bird that was unloaded at the time: make it wild now. Returns true when it was pending. */
@@ -157,6 +175,8 @@ public final class ChocoboLedger extends SavedData {
 	private static void setWild(ChocoboEntity bird) {
 		bird.dropEquipment();
 		bird.setOrderedToSit(false);
+		bird.resetLove();
+		bird.clearNut();
 		bird.setOwnerUUID(null);
 		bird.setTame(false, false);
 		bird.setCustomNameVisible(false);

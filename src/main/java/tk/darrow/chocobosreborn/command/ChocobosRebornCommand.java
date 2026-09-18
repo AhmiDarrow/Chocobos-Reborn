@@ -15,7 +15,7 @@ import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.race.SquareBuilder;
 
 /**
- * /chocobosreborn square enter|leave|build <track>|race <0|1> [fun]
+ * /chocobosreborn square enter|leave|build <track>|race <track|0-5> [fun]
  * Operator helpers for Chocobo Square; the in-game way is Esther and the gates.
  */
 public final class ChocobosRebornCommand {
@@ -66,14 +66,29 @@ public final class ChocobosRebornCommand {
 		if (player.getVehicle() instanceof ChocoboEntity bird) {
 			return RaceManager.enterSquare(player, bird) ? 1 : 0;
 		}
-		source.sendFailure(Component.translatable("chocobosreborn.square.need_bird"));
-		return 0;
+		return RaceManager.enterSquareOnFoot(player) ? 1 : 0;
 	}
 
 	private static int race(CommandSourceStack source, String course, boolean ranked)
 			throws com.mojang.brigadier.exceptions.CommandSyntaxException {
 		ServerPlayer player = source.getPlayerOrException();
-		int c = "1".equals(course) ? 1 : 0;
-		return RaceManager.startRace(player, c, ranked) ? 1 : 0;
+		RaceTrack track;
+		try {
+			track = RaceTrack.valueOf(course.toUpperCase(java.util.Locale.ROOT));
+		} catch (IllegalArgumentException e) {
+			int n;
+			try {
+				n = Integer.parseInt(course);
+			} catch (NumberFormatException nfe) {
+				source.sendFailure(Component.literal("Unknown course. A track id (c_meadow) or 0–5 of the mounted class."));
+				return 0;
+			}
+			if (n < 0 || n > 5) {
+				source.sendFailure(Component.literal("Course index must be 0–5 of the mounted class."));
+				return 0;
+			}
+			return RaceManager.startRace(player, n, ranked) ? 1 : 0;
+		}
+		return RaceManager.startRace(player, track, ranked) ? 1 : 0;
 	}
 }

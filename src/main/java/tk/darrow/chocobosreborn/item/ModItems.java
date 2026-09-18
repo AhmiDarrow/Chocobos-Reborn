@@ -64,8 +64,11 @@ public final class ModItems {
 	public static final DeferredItem<Item> ARMOR_NETHERITE = armor("netherite_chocobo_armor", ChocoboArmorItem.Tier.NETHERITE, Rarity.EPIC);
 
 	private static DeferredItem<Item> armor(String id, ChocoboArmorItem.Tier tier, Rarity rarity) {
-		return ITEMS.register(id, () -> new ChocoboArmorItem(tier, new Item.Properties().stacksTo(1).rarity(rarity)
-				.fireResistant()));
+		Item.Properties p = new Item.Properties().stacksTo(1).rarity(rarity);
+		if (tier == ChocoboArmorItem.Tier.NETHERITE) {
+			p.fireResistant();
+		}
+		return ITEMS.register(id, () -> new ChocoboArmorItem(tier, p));
 	}
 	public static final DeferredItem<BlockItem> BOOST_PAD = ITEMS.register("boost_pad",
 			() -> new BlockItem(ModBlocks.BOOST_PAD.get(), new Item.Properties()));
@@ -111,6 +114,19 @@ public final class ModItems {
 			case MIMETT -> MIMETT_GREEN.get();
 			case REAGAN -> REAGAN_GREEN.get();
 			case SYLKIS -> SYLKIS_GREEN.get();
+		};
+	}
+
+	public static Item eggItem(ChocoboColor color) {
+		return switch (color) {
+			case YELLOW -> YELLOW_EGG.get();
+			case GREEN -> GREEN_EGG.get();
+			case BLUE -> BLUE_EGG.get();
+			case WHITE -> WHITE_EGG.get();
+			case BLACK -> BLACK_EGG.get();
+			case GOLD -> GOLD_EGG.get();
+			case PURPLE -> PURPLE_EGG.get();
+			case FLAME -> FLAME_EGG.get();
 		};
 	}
 

@@ -13,7 +13,7 @@ import tk.darrow.chocobosreborn.race.RaceClass;
 import tk.darrow.chocobosreborn.race.RaceTrack;
 
 /**
- * Pick one of the class's six courses (three short drags, three long ovals).
+ * Pick one of the class's six courses (three sprints, three grands prix).
  * Ranked heats start at once; a duel challenge also picks a GP stake and then
  * waits for a second rider at the duel master.
  */
@@ -23,6 +23,10 @@ public class CourseSelectScreen extends Screen {
 	private final int mode;
 	private int stakeIdx;
 	private Button stakeButton;
+	private int scroll;
+	private int maxScroll;
+	private final java.util.ArrayList<Button> moving = new java.util.ArrayList<>();
+	private final java.util.ArrayList<Integer> movingBaseY = new java.util.ArrayList<>();
 
 	public CourseSelectScreen(int classId, int mode) {
 		super(Component.translatable(mode == 1 ? "chocobosreborn.select.duel_title" : "chocobosreborn.select.title"));
@@ -33,6 +37,9 @@ public class CourseSelectScreen extends Screen {
 	@Override
 	protected void init() {
 		// every course of the bird's class and below (lower classes pay half and do not count toward promotion)
+		moving.clear();
+		movingBaseY.clear();
+		scroll = 0;
 		int w = Math.min(340, width - 40);
 		int x = (width - w) / 2;
 		int y = 40;
@@ -48,8 +55,8 @@ public class CourseSelectScreen extends Screen {
 				Component tip = Component.translatable("chocobosreborn.select.tip", Math.round(t.lapLength()), t.getLaps(), features(t),
 						c < raceClass.getId() ? Component.translatable("chocobosreborn.select.lower") : Component.empty());
 				int bx = x + (t.isShort() ? 0 : col + 4), by = y + (i % 3) * 20;   // sprints left, grands prix right
-				addRenderableWidget(Button.builder(label, b -> choose(t)).bounds(bx, by, col, 18)
-						.tooltip(net.minecraft.client.gui.components.Tooltip.create(tip)).build());
+				track(addRenderableWidget(Button.builder(label, b -> choose(t)).bounds(bx, by, col, 18)
+						.tooltip(net.minecraft.client.gui.components.Tooltip.create(tip)).build()), by);
 			}
 			y += 3 * 20 + 4;
 		}
@@ -59,9 +66,49 @@ public class CourseSelectScreen extends Screen {
 				stakeIdx = (stakeIdx + 1) % STAKES.length;
 				stakeButton.setMessage(stakeLabel());
 			}).bounds(x, y, w, 20).build());
+			track(stakeButton, y);
 			y += 22;
 		}
-		addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose()).bounds(x, y + 4, w, 20).build());
+		track(addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose()).bounds(x, y + 4, w, 20).build()),
+				y + 4);
+		maxScroll = Math.max(0, y + 28 - (height - 8));
+	}
+
+	private void track(Button button, int baseY) {
+		moving.add(button);
+		movingBaseY.add(baseY);
+	}
+
+	private void applyScroll() {
+		for (int i = 0; i < moving.size(); i++) {
+			moving.get(i).setY(movingBaseY.get(i) - scroll);
+		}
+	}
+
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+		int next = net.minecraft.util.Mth.clamp(scroll - (int) Math.round(scrollY * 18), 0, maxScroll);
+		if (next != scroll) {
+			scroll = next;
+			applyScroll();
+		}
+		return true;
+	}
+
+	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (mouseY < 38) {
+			return false;
+		}
+		return super.mouseClicked(mouseX, mouseY, button);
+	}
+
+	@Override
+	public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
+		super.render(g, mouseX, mouseY, partial);
+		g.fill(0, 0, width, 38, 0xCC101010);
+		g.drawCenteredString(font, title, width / 2, 14, 0xFFE8A416);
+		g.drawCenteredString(font, Component.translatable("chocobosreborn.select.class", raceClass.name()), width / 2, 26, 0xFFCCCCCC);
 	}
 
 	private Component stakeLabel() {
@@ -87,13 +134,6 @@ public class CourseSelectScreen extends Screen {
 	private void choose(RaceTrack t) {
 		PacketDistributor.sendToServer(new RacePayloads.CourseChoice(t.ordinal(), mode, mode == 1 ? STAKES[stakeIdx] : 0));
 		onClose();
-	}
-
-	@Override
-	public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-		super.render(g, mouseX, mouseY, partial);
-		g.drawCenteredString(font, title, width / 2, 14, 0xFFE8A416);
-		g.drawCenteredString(font, Component.translatable("chocobosreborn.select.class", raceClass.name()), width / 2, 26, 0xFFCCCCCC);
 	}
 
 	@Override
