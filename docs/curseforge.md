@@ -19,6 +19,12 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.3 - Gysahl
+Uploaded 2026-09-17: `chocobosreborn-1.0.3.jar` as file **8908978** ("Chocobos Reborn 1.0.3 -
+Gysahl", release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.3.md`)
+via `tools/upload_curseforge.py`. GitHub:
+https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.3
+
 ## 1.0.2 - Lighter
 Uploaded 2026-09-17: `chocobosreborn-1.0.2.jar` as file **8908734** ("Chocobos Reborn 1.0.2 -
 Lighter", release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.2.md`)
