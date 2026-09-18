@@ -18,9 +18,9 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
   `Chocobos Reborn <version> - <subtitle>`.
 
 ## 1.0.1 - Whiskerwind
-Uploaded 2026-09-17: `chocobosreborn-1.0.1.jar` ("Chocobos Reborn 1.0.1 - Whiskerwind",
-release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.1.md`) via
-`tools/upload_curseforge.py`. GitHub:
+Uploaded 2026-09-17: `chocobosreborn-1.0.1.jar` as file **8908165** ("Chocobos Reborn 1.0.1 -
+Whiskerwind", release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.1.md`)
+via `tools/upload_curseforge.py`. GitHub:
 https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.1
 
 ## 1.0.0 - Whiskerwind
