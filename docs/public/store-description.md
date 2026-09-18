@@ -95,4 +95,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.0.1. Created by Ahmi Darrow.
+Version 1.0.3. Created by Ahmi Darrow.
