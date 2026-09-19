@@ -4,9 +4,9 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.5**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.6**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
-[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.5](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.5)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.6](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.6)
 
 Original work. Original birds, original calls, original art, original music. A fan work, not affiliated with Square Enix.
 
