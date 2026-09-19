@@ -4,7 +4,7 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.4**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.5**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
 [CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.4](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.4)
 
@@ -19,6 +19,8 @@ Original work. Original birds, original calls, original art, original music. A f
 Adults stand about twice a player's height, crest to claw. Chicobos hatch small and grow through three stages. Eight plumages: Yellow, Green, Blue, White, Black, Gold, the End bird in purple with end-stone feathers, and the Nether bird in red with lava feathers. Females wear a shorter crest.
 
 Craft a **Chocobo Almanac** (a book and a gysahl): the full guide, plus a live page for every bird you own with its genes, training, racing record and family line, with rename, release and remove.
+
+Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you (and come along to Whiskerwind and back), **Stay** put, or **Wander** within 24 blocks of where you left them. A plain right-click still sits a bird down or stands it back up.
 
 Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice. Nether birds are born in the Nether, End birds on the End's outer islands. Hold a **Chocobo Lure** and wild birds come to you and glow.
 
