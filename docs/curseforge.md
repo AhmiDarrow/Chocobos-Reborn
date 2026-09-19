@@ -19,6 +19,12 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.6 - Fair bets
+Uploaded 2026-09-19: `chocobosreborn-1.0.6.jar` as file **8923710** ("Chocobos Reborn 1.0.6 - Fair bets",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.6.md`) via
+`tools/upload_curseforge.py`. GitHub:
+https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.6
+
 ## 1.0.5 - Follow, Stay, Wander
 Uploaded 2026-09-19: `chocobosreborn-1.0.5.jar` as file **8922192** ("Chocobos Reborn 1.0.5 - Follow, Stay, Wander",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.5.md`) via
