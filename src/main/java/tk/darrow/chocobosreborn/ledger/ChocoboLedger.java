@@ -76,6 +76,9 @@ public final class ChocoboLedger extends SavedData {
 		BirdRecord now = old == null
 				? BirdRecord.of(bird, null, null, -1, -1, 0, day(bird.level().getGameTime()), true)
 				: old.refreshed(bird);
+		if (now.equals(old)) {
+			return;   // runs on every chunk save of every tame bird: rewrite the ledger only on a change
+		}
 		birds.put(bird.getUUID(), now);
 		setDirty();
 	}

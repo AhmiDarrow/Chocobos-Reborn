@@ -819,7 +819,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		if (isTame() && isOwnedBy(player)) {
 			if (stack.getItem() instanceof NutItem nutItem && !isBaby() && !racing()) {
-				// FF7: a nut is what mates two adults (Choco Billy's "mate").
+				// FF7: a nut is what mates two adults.
 				// Vanilla canFallInLove is false while inLove, so sneak-replace must run first.
 				if (isInLove() || fedNut() != ChocoboNut.NONE) {
 					if (!player.isSecondaryUseActive()) {
@@ -1170,6 +1170,17 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 * are movement-speed modifiers, so they work for riders and race AI alike.
 	 */
 	private void tickCourseEffects() {
+		if (!onCourseGround()) {
+			// a mangrove swamp's mud is not a course bog, and nothing here needs a block probe every tick
+			trackX = Double.NaN;
+			boostTicks = 0;
+			if (boosting()) {
+				this.entityData.set(DATA_BOOST, false);
+			}
+			speedMod(BOOST_ID, false, BOOST_POWER);
+			speedMod(BOG_ID, false, BOG_DRAG);
+			return;
+		}
 		double prevX = trackX, prevZ = trackZ;
 		double mx = Double.isNaN(prevX) ? 0.0D : getX() - prevX, mz = Double.isNaN(prevX) ? 0.0D : getZ() - prevZ;
 		trackX = getX();
@@ -1197,6 +1208,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		boolean ridden = getControllingPassenger() instanceof Player;
 		speedMod(BOOST_ID, boostTicks > 0 && !ridden, BOOST_POWER);
 		speedMod(BOG_ID, bog && !ridden, BOG_DRAG);
+	}
+
+	/** Boost pads and bogs are Whiskerwind course features (plus the GameTest stand-in for the Square). */
+	private boolean onCourseGround() {
+		return Square.isSquare(level()) || (tk.darrow.chocobosreborn.race.RaceManager.testLevel != null
+				&& level() == tk.darrow.chocobosreborn.race.RaceManager.testLevel);
 	}
 
 	/** Current block plus the path since last tick, so a dash cannot skip a 1-block strip. */
@@ -1352,8 +1369,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (boosting()) {
 			mul *= 1.0D + BOOST_POWER;   // boost pad: +55%, same as the AI attribute
 		}
-		if (onGround() && getBlockStateOn().is(Blocks.MUD)) {
-			mul *= 1.0D + BOG_DRAG;   // mud: same x0.45 the AI gets
+		if (onGround() && Square.isSquare(level()) && getBlockStateOn().is(Blocks.MUD)) {
+			mul *= 1.0D + BOG_DRAG;   // a course bog: same x0.45 the AI gets (not the Overworld's mud)
 		}
 		ChocoboColor c = color();
 		boolean water = isInWater() || (c.waterWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.WATER))

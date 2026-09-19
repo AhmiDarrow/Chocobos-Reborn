@@ -4,7 +4,7 @@ import java.util.Locale;
 
 /**
  * The eight Final Fantasy VII breeding nuts. Feeding a nut to two adults mates
- * them (Choco Billy's "mate"). Only Carob and Zeio change the farm line
+ * them, as in FF7. Only Carob and Zeio change the farm line
  * (Green / Blue / Black and Gold); the others pick the chick's talent.
  *
  * Ordinals 0..2 are NONE / CAROB / ZEIO so saved "Nut" values from earlier
