@@ -22,7 +22,7 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 ## 1.0.4 - Wild Gysahl
 Uploaded 2026-09-19: `chocobosreborn-1.0.4.jar` as file **8918139** ("Chocobos Reborn 1.0.4 - Wild Gysahl",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.4.md`) via
-`tools/upload_curseforge.py`. Tribal Power 3.5.0 requires it for its March compat. GitHub:
+`tools/upload_curseforge.py`. Tribal Power 3.5.0 grows its Wild Gysahl in The March when both mods are installed. GitHub:
 https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.4
 
 ## 1.0.3 - Gysahl
