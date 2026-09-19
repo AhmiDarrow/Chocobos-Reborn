@@ -9,7 +9,7 @@ import tk.darrow.chocobosreborn.item.ModItems;
 
 /**
  * Chocobo Square prizes. GP for placing, and the FF7 prize-table feel:
- * greens and nuts by class, Carob from A/S, a rare Zeio at S.
+ * greens and nuts by class; Carob on a B win (15%), an A win (40%) or any S race; a rare Zeio on an S win.
  */
 public final class RacePrizes {
 	private RacePrizes() {

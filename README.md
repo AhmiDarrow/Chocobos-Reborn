@@ -38,7 +38,7 @@ Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of t
 2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
 3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class A up pay out Carob, with a rare Zeio at Class S.
+As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight. Race wins also pay Carob: 15% of the time at Class B, 40% at Class A, and every Class S race, with a rare Zeio on a Class S win.
 
 ## Riding and fighting
 

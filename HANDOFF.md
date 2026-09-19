@@ -862,7 +862,10 @@ mesh by `ADULT_H / mesh.height`. Chicobos = adult mesh × `getAgeScale()`.
 Gameplay inventory is in `docs/SPEC.md` (greens, nuts, breeding line, riding,
 wild spawn, Chocobo Farm structure, Chocobo Square: Esther / Rook / Tack / Sage
 Wynn / Fair / Bilo / Marl, fans, village, advancements, items). Names: no FF7
-person names (Esther, Jolo/Teiyo, Sage Wynn, Bilo the Nutkeeper, Marl).
+person names for keepers, kin or places (Esther, Jolo/Teiyo, Sage Wynn, Bilo the
+Nutkeeper, Marl). The one exception, kept on purpose (Ahmi, 2026-09-19): the 64
+AI racer names in `race/FieldRoster.java` are FF character names and stay as they
+are, as a nod on the race card. Do not rename them.
 
 Kin (keepers, fans, farmhands) are Tribal Power kin: skins
 `textures/entity/kin/kin_{elder,drummer,hunter,weaver}.png` + `_glow` + tribe
