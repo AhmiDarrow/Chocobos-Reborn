@@ -19,6 +19,13 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.7 - Fresh paint
+Uploaded 2026-09-19: `chocobosreborn-1.0.7.jar` as file **8925242** ("Chocobos Reborn 1.0.7 - Fresh paint",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.7.md`) via
+`tools/upload_curseforge.py`. Items, blocks and crop stages redrawn at 32x32; course bogs, entered odds,
+scratching, crash-left fans, dismount lock and ledger saves fixed; Carob prize docs corrected. GitHub:
+https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.7
+
 ## 1.0.6 - Fair bets
 Uploaded 2026-09-19: `chocobosreborn-1.0.6.jar` as file **8923710** ("Chocobos Reborn 1.0.6 - Fair bets",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.6.md`) via
