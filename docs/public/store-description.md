@@ -10,6 +10,8 @@ Original work. Original birds, original calls, original art, original music. A f
 ![image](https://media.forgecdn.net/attachments/description/1699008/description_d32bc0ec-2a8f-42e7-a4b0-624e0dc268cc.png)
 Adults stand about twice a player's height, crest to claw. Chicobos hatch small and grow through three stages. Eight plumages: Yellow, Green, Blue, White, Black, Gold, the End bird in purple with end-stone feathers, and the Nether bird in red with lava feathers. Females wear a shorter crest.
 
+Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you (and come along to Whiskerwind and back), **Stay** put, or **Wander** within 24 blocks of where you left them. A plain right-click still sits a bird down or stands it back up.
+
 Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice. Nether birds are born in the Nether, End birds on the End's outer islands. Hold a **Chocobo Lure** and wild birds come to you and glow.
 
 ## Greens (training)
@@ -95,4 +97,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.0.3. Created by Ahmi Darrow.
+Version 1.0.5. Created by Ahmi Darrow.
