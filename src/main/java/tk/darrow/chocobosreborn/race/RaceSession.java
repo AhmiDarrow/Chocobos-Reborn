@@ -1138,6 +1138,11 @@ public class RaceSession {
 		return racers.stream().anyMatch(r -> r.bird.equals(bird));
 	}
 
+	/** A fan or jockey this heat spawned (course scrubs keep them). */
+	boolean ownsKin(Entity kin) {
+		return fans.contains(kin) || jockeys.contains(kin);
+	}
+
 	public void abort() {
 		aborting = true;
 		for (Racer h : humans()) {

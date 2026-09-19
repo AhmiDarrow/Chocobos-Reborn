@@ -91,6 +91,16 @@ public final class HeatSchedule {
 		return false;
 	}
 
+	/** Class of the heat this rider is entered in (it can be below their bird's class), or null. */
+	public static @Nullable RaceClass enteredClass(UUID player) {
+		for (Map.Entry<RaceClass, Heat> e : HEATS.entrySet()) {
+			if (e.getValue().entered(player)) {
+				return e.getKey();
+			}
+		}
+		return null;
+	}
+
 	/** Scratch this rider off the timetable (pocketwatch home, or sneak-click Esther). */
 	public static boolean drop(ServerPlayer player) {
 		ServerLevel square = Square.level(player.server);

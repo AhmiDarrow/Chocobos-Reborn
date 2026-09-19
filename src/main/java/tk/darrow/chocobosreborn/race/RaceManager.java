@@ -73,6 +73,11 @@ public final class RaceManager {
 		return SESSIONS.stream().anyMatch(s -> s.live() && s.hasRacer(bird));
 	}
 
+	/** True while a live heat spawned this kin (grandstand fan or jockey). */
+	static boolean isSessionKin(Entity kin) {
+		return SESSIONS.stream().anyMatch(s -> s.live() && s.ownsKin(kin));
+	}
+
 	/** True when a live heat's island covers this point (stray fans/jockeys on other islands can go). */
 	static boolean heatContains(double x, double z) {
 		for (RaceSession s : SESSIONS) {
@@ -466,17 +471,22 @@ public final class RaceManager {
 
 	@SubscribeEvent
 	public static void onMount(EntityMountEvent event) {
-		if (!event.isDismounting()) {
+		// The server decides who rides. The client only ever dismounts because a passengers packet
+		// told it to, and that packet lands before the bird's racing flag update: a client-side veto
+		// kept the player seated on a bird the server had already released (a /tp mid-heat).
+		if (!event.isDismounting() || event.getLevel().isClientSide()) {
 			return;
 		}
 		Entity vehicle = event.getEntityBeingMounted();
 		Entity rider = event.getEntityMounting();
+		// a logout dismounts too (PlayerList.remove): never hold a disconnected player
+		boolean leaving = rider instanceof ServerPlayer spl && (spl.isChangingDimension() || spl.hasDisconnected());
 		// only the rider's own sneak-dismount is locked: /tp, waystones and other teleports call
 		// stopRiding() before isChangingDimension() is set and must be let through
 		if (vehicle instanceof ChocoboEntity bird && !bird.racing() && bird.isAlive() && rider.isAlive()
 				&& rider.isShiftKeyDown()
 				&& rider == bird.getControllingPassenger() && !RELEASING.contains(bird.getUUID())
-				&& !(rider instanceof ServerPlayer sp0 && sp0.isChangingDimension())) {
+				&& !leaving) {
 			boolean inOrOnWater = bird.isInWater()
 					|| bird.level().getFluidState(bird.blockPosition().below()).is(net.minecraft.tags.FluidTags.WATER);
 			if (RaceScoring.lockOffCourseDismount(bird.color().fly(), bird.onGround(), bird.color().waterWalk(),
@@ -488,7 +498,7 @@ public final class RaceManager {
 		if (vehicle instanceof ChocoboEntity bird && bird.racing() && bird.isAlive() && !bird.isRemoved()
 				&& rider.isAlive() && !rider.isRemoved()
 				// a teleport / dimension change dismounts through the same hook: let it
-				&& !(rider instanceof ServerPlayer sp && sp.isChangingDimension())
+				&& !leaving
 				&& !RELEASING.contains(bird.getUUID())
 				&& RaceScoring.cancelPassengerDismount(true, false, false, true, true)) {
 			event.setCanceled(true);

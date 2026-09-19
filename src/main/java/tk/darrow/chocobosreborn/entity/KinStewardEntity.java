@@ -191,7 +191,12 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			return InteractionResult.CONSUME;
 		}
 		if (bird == null) {
-			if (player.isSecondaryUseActive()) {
+			if (player.isSecondaryUseActive() && tk.darrow.chocobosreborn.race.HeatSchedule.entered(player.getUUID())) {
+				// "sneak-click Esther to scratch": sneaking in the saddle dismounts first, so the
+				// scratch lands here on foot; it must not also send the rider home
+				tk.darrow.chocobosreborn.race.HeatSchedule.drop(player);
+				tk.darrow.chocobosreborn.race.RaceManager.refundPendingBet(player);
+			} else if (player.isSecondaryUseActive()) {
 				RaceManager.leaveSquare(player);
 			} else {
 				player.displayClientMessage(Component.translatable("chocobosreborn.square.home_hint"), true);
@@ -274,9 +279,12 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		// No heat yet: the bet waits for the next one Esther starts. Picks are offered
 		// for a ranked heat of the bird the player is riding (or the field if on foot).
 		boolean ranked = s == null || s.ranked();
-		boolean teioh = s != null ? s.track().getRaceClass().includesTeioh()
+		// an entered rider's odds are the heat's class, which may be below their bird's (half purse, lower odds)
+		tk.darrow.chocobosreborn.race.RaceClass heatClass = s != null ? s.track().getRaceClass()
+				: tk.darrow.chocobosreborn.race.HeatSchedule.enteredClass(player.getUUID());
+		boolean teioh = heatClass != null ? heatClass.includesTeioh()
 				: player.getVehicle() instanceof ChocoboEntity b && b.raceClass().includesTeioh();
-		int classId = s != null ? s.track().getRaceClass().getId()
+		int classId = heatClass != null ? heatClass.getId()
 				: player.getVehicle() instanceof ChocoboEntity b2 ? b2.raceClass().getId() : 0;
 		ItemStack hand = player.getMainHandItem();
 		if (!hand.is(ModItems.GP.get())) {

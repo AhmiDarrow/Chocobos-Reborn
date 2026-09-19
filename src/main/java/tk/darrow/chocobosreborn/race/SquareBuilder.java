@@ -121,10 +121,10 @@ public final class SquareBuilder {
 	}
 
 	/**
-	 * Drop leftover field NPCs and unmounted jockeys on this island (a crash
-	 * mid-heat leaves them; the next heat would otherwise double the field).
-	 * Live racers are kept. Fans stay until {@link #spawnKeepers} (they are not
-	 * {@link RaceManager#isActiveRacer}).
+	 * Drop leftover field NPCs, jockeys and grandstand fans on this island (a crash
+	 * mid-heat leaves them; the next heat would otherwise double the field and the
+	 * crowd). Live racers and the kin a live heat spawned are kept. The island is
+	 * only loaded during a heat, so {@link #spawnKeepers} never sees crash leftovers here.
 	 */
 	public static void scrubCourse(ServerLevel level, RaceTrack track) {
 		double cx = track.centerX(), cz = track.centerZ();
@@ -136,9 +136,12 @@ public final class SquareBuilder {
 			}
 		}
 		for (KinStewardEntity k : level.getEntities(ModEntities.KIN_STEWARD.get(), box,
-				e -> !e.isRemoved() && e.role().jockey())) {
+				e -> !e.isRemoved() && (e.role().jockey() || e.role().fans()))) {
 			if (k.getVehicle() instanceof ChocoboEntity b && RaceManager.isActiveRacer(b.getUUID())) {
 				continue;
+			}
+			if (RaceManager.isSessionKin(k)) {
+				continue;   // this heat's own crowd (or a jockey not yet seated)
 			}
 			k.discard();
 		}
