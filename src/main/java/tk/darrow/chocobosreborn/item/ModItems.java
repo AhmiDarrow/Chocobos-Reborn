@@ -27,6 +27,8 @@ public final class ModItems {
 	public static final DeferredItem<Item> GYSAHL_SEEDS = ITEMS.register("gysahl_green_seeds",
 			() -> new ItemNameBlockItem(ModBlocks.GYSAHL_GREEN.get(), new Item.Properties()));
 	public static final DeferredItem<Item> GYSAHL = green("gysahl_green", ChocoboGreen.GYSAHL, true);
+	public static final DeferredItem<BlockItem> WILD_GYSAHL = ITEMS.register("wild_gysahl",
+			() -> new BlockItem(ModBlocks.WILD_GYSAHL.get(), new Item.Properties()));
 	public static final DeferredItem<Item> KRAKKA_GREEN = green("krakka_green", ChocoboGreen.KRAKKA, false);
 	public static final DeferredItem<Item> TANTAL_GREEN = green("tantal_green", ChocoboGreen.TANTAL, false);
 	public static final DeferredItem<Item> PAHSANA_GREEN = green("pahsana_green", ChocoboGreen.PAHSANA, false);

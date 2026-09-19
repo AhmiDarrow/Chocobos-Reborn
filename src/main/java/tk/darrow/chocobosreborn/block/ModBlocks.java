@@ -20,6 +20,17 @@ public final class ModBlocks {
 					.sound(SoundType.CROP)
 					.pushReaction(PushReaction.DESTROY)));
 
+	/** Wild Gysahl: placed by worldgen, including other mods' biomes. */
+	public static final DeferredBlock<WildGysahlBlock> WILD_GYSAHL = BLOCKS.register("wild_gysahl",
+			() -> new WildGysahlBlock(BlockBehaviour.Properties.of()
+					.mapColor(MapColor.PLANT)
+					.noCollission()
+					.instabreak()
+					.sound(SoundType.CROP)
+					.offsetType(BlockBehaviour.OffsetType.XZ)
+					.ignitedByLava()
+					.pushReaction(PushReaction.DESTROY)));
+
 	public static final DeferredBlock<SquareGateBlock> SQUARE_GATE = BLOCKS.register("square_gate",
 			() -> new SquareGateBlock(BlockBehaviour.Properties.of()
 					.mapColor(MapColor.GOLD)

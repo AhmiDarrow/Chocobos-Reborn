@@ -37,8 +37,16 @@ public final class ChocobosReborn {
 		NeoForge.EVENT_BUS.addListener(ChocobosRebornCommand::register);
 	}
 
+	/**
+	 * The published jar leaves the tests out, but NeoForge still fires this in any development
+	 * environment (another mod's workspace, a pack dev's run), so look the class up by name.
+	 */
 	private void gameTests(net.neoforged.neoforge.event.RegisterGameTestsEvent event) {
-		event.register(tk.darrow.chocobosreborn.gametest.ChocobosRebornGameTests.class);
+		try {
+			event.register(Class.forName("tk.darrow.chocobosreborn.gametest.ChocobosRebornGameTests"));
+		} catch (ClassNotFoundException stripped) {
+			// A player jar: nothing to register.
+		}
 	}
 
 	private void payloads(net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent event) {

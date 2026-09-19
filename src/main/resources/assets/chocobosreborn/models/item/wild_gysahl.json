@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "chocobosreborn:block/gysahl_green4"
+  }
+}
