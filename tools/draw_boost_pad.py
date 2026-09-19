@@ -1,7 +1,16 @@
-"""Draw the boost pad's animated chevron texture (16x16, four scrolling frames):
+"""SUPERSEDED (2026-09-19): tools/pixel_items.py is the source of truth for these textures
+(32x32, Ninjacat Skies family style). Running this would overwrite them with the old art,
+so it refuses unless given --legacy.
+
+Draw the boost pad's animated chevron texture (16x16, four scrolling frames):
 
     python tools/draw_boost_pad.py
 """
+import sys as _sys
+if "--legacy" not in _sys.argv:
+    raise SystemExit("superseded by tools/pixel_items.py; pass --legacy to run anyway")
+_sys.argv = [a for a in _sys.argv if a != "--legacy"]
+
 import json
 from pathlib import Path
 

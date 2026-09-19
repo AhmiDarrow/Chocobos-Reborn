@@ -1,4 +1,8 @@
-"""Generate item / crop icons with Meshy text-to-image, then key the
+"""SUPERSEDED (2026-09-19): tools/pixel_items.py is the source of truth for these textures
+(32x32, Ninjacat Skies family style). Running this would overwrite them with the old art,
+so it refuses unless given --legacy.
+
+Generate item / crop icons with Meshy text-to-image, then key the
 background to alpha and downsample to clean 32x32 pixel art.
 
 Key file: $MESHY_KEY_FILE (default ~/.meshy_key). Never printed, never
@@ -253,6 +257,10 @@ def run(names):
 
 
 if __name__ == "__main__":
+    import sys as _sys
+    if "--legacy" not in _sys.argv:
+        raise SystemExit("superseded by tools/pixel_items.py; pass --legacy to run anyway")
+    _sys.argv = [a for a in _sys.argv if a != "--legacy"]
     mode = sys.argv[1] if len(sys.argv) > 1 else "test"
     if mode == "test":
         run(["gysahl_green"])

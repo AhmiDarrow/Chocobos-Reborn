@@ -872,8 +872,22 @@ Power and copy the PNGs across.
 Almanac chapters live in `en_us.json` (`chocobosreborn.almanac.*`).
 Calls: `tools/wark_candidates.py --ship G` (synthesised, `synth_wark.py`). Race
 music: Ahmi's own Suno generations (check the Suno plan's terms before publishing
-under CC-BY-SA as the README says). Items: `tools/meshy_icons.py`. Datapack:
+under CC-BY-SA as the README says). Items/blocks/GUI: `tools/pixel_items.py` (see below). Datapack:
 `tools/write_datapack.py`; farm template: `tools/write_farm_structure.py`.
+
+## Item / block art (2026-09-19 cohesion pass)
+
+Every item, crop stage, gate, the boost pad and `gui/almanac.png` are drawn by
+`python tools/pixel_items.py [name-filter...]` (primitives in `tools/pixelkit.py`):
+native 32x32 (boost pad 32x128, 4 frames, same `.mcmeta`), hard alpha, 1 px outline
+tinted from ink `#111a22`, 5-tone hue-shifted ramps, top-left light — the Ninjacat
+Skies family style shared with Tribal Power. It is the source of truth: edit the
+drawing function, rerun, never hand-edit the PNGs. The almanac GUI keeps the old
+geometry (16 px nine-slice in `AlmanacScreen`), recoloured navy / copper / teal.
+`tools/meshy_icons.py`, `tools/paint_item_art.py` and `tools/draw_boost_pad.py` are
+kept for history but refuse to run without `--legacy` (they would overwrite this art
+with the old 16 px Meshy downsamples). The bird is not touched by any of this.
+The mod has no particle textures of its own.
 
 ## Open
 

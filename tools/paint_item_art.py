@@ -1,4 +1,8 @@
-"""Hand-painted 16x16 item/block icons: gates, pocketwatch, almanac.
+"""SUPERSEDED (2026-09-19): tools/pixel_items.py is the source of truth for these textures
+(32x32, Ninjacat Skies family style). Running this would overwrite them with the old art,
+so it refuses unless given --legacy.
+
+Hand-painted 16x16 item/block icons: gates, pocketwatch, almanac.
 
 Meshy downsample made the gates muddy and the two items were 5-6 colour blobs.
 Vanilla Minecraft wants hard pixels, a dark outline, and two-tone shading.
@@ -224,4 +228,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+	import sys as _sys
+	if "--legacy" not in _sys.argv:
+	    raise SystemExit("superseded by tools/pixel_items.py; pass --legacy to run anyway")
+	_sys.argv = [a for a in _sys.argv if a != "--legacy"]
 	main()
