@@ -324,12 +324,13 @@ public final class RaceManager {
 		}
 	}
 
-	/** Owned, awake birds near the player follow them through a teleport. */
+	/** Owned birds set to Follow near the player come with them through a teleport. */
 	public static void bringBirds(ServerPlayer player, ServerLevel from, net.minecraft.world.phys.Vec3 origin,
 	                              ServerLevel target, net.minecraft.world.phys.Vec3 dest, float yaw) {
 		java.util.List<ChocoboEntity> birds = from.getEntitiesOfClass(ChocoboEntity.class,
 				new net.minecraft.world.phys.AABB(origin, origin).inflate(16.0D),
-				b -> b.isTame() && player.getUUID().equals(b.getOwnerUUID()) && !b.isOrderedToSit() && !b.racing()
+				b -> b.isTame() && player.getUUID().equals(b.getOwnerUUID())
+						&& b.command() == ChocoboEntity.Command.FOLLOW && !b.racing()
 						&& !b.isVehicle());
 		int i = 0;
 		for (ChocoboEntity b : birds) {

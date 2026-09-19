@@ -8,9 +8,14 @@ import net.minecraft.world.item.ItemStack;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu;
 
-/** Horse-style equipment screen: a drawn panel, slot wells, the bird's name and the bags' name. */
+/**
+ * Horse-style equipment screen: a drawn panel, slot wells, the bird's name and the bags' name,
+ * and Follow / Stay / Wander tabs between the equipment and the bags.
+ */
 public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInventoryMenu> {
 	private static final int PANEL = 0xFFC6C6C6, EDGE_L = 0xFFFFFFFF, EDGE_D = 0xFF555555, WELL = 0xFF8B8B8B, WELL_D = 0xFF373737;
+	/** Command tabs, relative to the panel: one per {@link ChocoboEntity.Command}, stacked beside the equipment wells. */
+	private static final int TAB_X = 29, TAB_Y = 18, TAB_W = 46, TAB_H = 16, TAB_STEP = 18;
 
 	public ChocoboInventoryScreen(ChocoboInventoryMenu menu, Inventory inv, Component title) {
 		super(menu, inv, title);
@@ -23,6 +28,49 @@ public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInven
 	public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
 		super.render(g, mouseX, mouseY, partial);
 		renderTooltip(g, mouseX, mouseY);
+		int tab = tabAt(mouseX, mouseY);
+		if (tab >= 0 && menu.getCarried().isEmpty()) {
+			g.renderTooltip(font, font.split(Component.translatable("chocobosreborn.command."
+					+ ChocoboEntity.Command.values()[tab].id() + ".desc"), 160), mouseX, mouseY);
+		}
+	}
+
+	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		int tab = tabAt(mouseX, mouseY);
+		if (tab >= 0 && button == 0) {
+			if (tab != menu.bird().command().ordinal() && minecraft != null && minecraft.gameMode != null) {
+				minecraft.gameMode.handleInventoryButtonClick(menu.containerId, tab);
+				minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+						net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+			}
+			return true;
+		}
+		return super.mouseClicked(mouseX, mouseY, button);
+	}
+
+	private int tabAt(double mouseX, double mouseY) {
+		double rx = mouseX - leftPos - TAB_X, ry = mouseY - topPos - TAB_Y;
+		if (rx < 0 || rx >= TAB_W || ry < 0) {
+			return -1;
+		}
+		int i = (int) (ry / TAB_STEP);
+		return i < ChocoboEntity.Command.values().length && ry - i * TAB_STEP < TAB_H ? i : -1;
+	}
+
+	/** Raised button, or a sunk well for the bird's current order. */
+	private void tabs(GuiGraphics g, int mouseX, int mouseY) {
+		ChocoboEntity.Command current = menu.bird().command();
+		int hover = tabAt(mouseX, mouseY);
+		for (ChocoboEntity.Command c : ChocoboEntity.Command.values()) {
+			int x = leftPos + TAB_X, y = topPos + TAB_Y + c.ordinal() * TAB_STEP;
+			boolean on = c == current;
+			g.fill(x, y, x + TAB_W, y + TAB_H, on ? EDGE_L : EDGE_D);
+			g.fill(x, y, x + TAB_W - 1, y + TAB_H - 1, on ? WELL_D : EDGE_L);
+			g.fill(x + 1, y + 1, x + TAB_W - 1, y + TAB_H - 1, on ? WELL : c.ordinal() == hover ? 0xFFDADADA : PANEL);
+			Component label = Component.translatable("chocobosreborn.command." + c.id());
+			g.drawString(font, label, x + (TAB_W - font.width(label)) / 2, y + 4, on ? 0xFFFFFFFF : 0xFF404040, on);
+		}
 	}
 
 	@Override
@@ -57,6 +105,7 @@ public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInven
 		hint(g, x + 8, y + 18, 0, "S");
 		hint(g, x + 8, y + 36, 1, "A");
 		hint(g, x + 8, y + 54, 2, "B");
+		tabs(g, mouseX, mouseY);
 	}
 
 	private void hint(GuiGraphics g, int x, int y, int slot, String letter) {

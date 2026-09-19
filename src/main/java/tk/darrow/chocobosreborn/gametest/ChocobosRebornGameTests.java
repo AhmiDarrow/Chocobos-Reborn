@@ -64,6 +64,30 @@ public class ChocobosRebornGameTests {
 	}
 
 	@GameTest(template = EMPTY)
+	public static void followStayWanderCommands(GameTestHelper helper) {
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		Player p = owner(helper, bird);
+		helper.assertTrue(bird.command() == ChocoboEntity.Command.FOLLOW, "tame bird starts on Follow");
+		bird.giveCommand(ChocoboEntity.Command.WANDER, p);
+		helper.runAtTickTime(3, () -> {
+			helper.assertTrue(bird.command() == ChocoboEntity.Command.WANDER, "Wander");
+			helper.assertTrue(bird.hasRestriction() && bird.getRestrictRadius() == ChocoboEntity.WANDER_RANGE,
+					"a wandering bird keeps to its spot");
+			// Stay on top of Wander, then stand up: back to wandering, not following
+			bird.giveCommand(ChocoboEntity.Command.STAY, p);
+			helper.assertTrue(bird.isOrderedToSit() && bird.command() == ChocoboEntity.Command.STAY, "Stay sits");
+			bird.setOrderedToSit(false);
+			helper.assertTrue(bird.command() == ChocoboEntity.Command.WANDER, "standing up resumes Wander");
+			CompoundTag saved = bird.saveWithoutId(new CompoundTag());
+			helper.assertTrue(saved.getBoolean("Wander") && saved.contains("WanderHome"), "Wander is saved");
+			bird.giveCommand(ChocoboEntity.Command.FOLLOW, p);
+			helper.assertTrue(bird.command() == ChocoboEntity.Command.FOLLOW && !bird.hasRestriction(),
+					"Follow drops the wander range");
+			helper.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY)
 	public static void chocoboSpawnsAndGrows(GameTestHelper helper) {
 		ChocoboEntity chick = helper.spawn(ModEntities.CHOCOBO.get(), new BlockPos(2, 1, 2));
 		chick.setAge(-24000);

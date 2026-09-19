@@ -99,6 +99,19 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 		return bird;
 	}
 
+	/** The Follow / Stay / Wander tabs: button id is the {@link ChocoboEntity.Command} ordinal. */
+	@Override
+	public boolean clickMenuButton(Player player, int id) {
+		if (id < 0 || id >= ChocoboEntity.Command.values().length || !bird.isOwnedBy(player) || bird.racing()) {
+			return false;
+		}
+		ChocoboEntity.Command command = ChocoboEntity.Command.values()[id];
+		if (command != bird.command()) {
+			bird.giveCommand(command, player);
+		}
+		return true;
+	}
+
 	@Override
 	public ItemStack quickMoveStack(Player player, int index) {
 		ItemStack result = ItemStack.EMPTY;

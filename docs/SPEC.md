@@ -51,7 +51,15 @@ holder.
 ## Taming
 
 A Gysahl Green handed to a wild bird tames it with a 1-in-3 chance per feed
-(`mobInteract`). Tame birds sit, follow, and say "kweh"; wild or hurt birds "wark".
+(`mobInteract`). Tame birds say "kweh"; wild or hurt birds "wark".
+
+Commands (`ChocoboEntity.Command`, synced for the screen): **Follow** (vanilla follow-owner;
+the only birds `RaceManager.bringBirds` takes to and from the Square), **Stay** (vanilla
+ordered-to-sit) and **Wander** (no follow; strolls within `WANDER_RANGE` 24 blocks of where
+it was told, and leading or riding it moves that spot). Set from tabs on the equipment
+screen (`ChocoboInventoryMenu.clickMenuButton`, button id = ordinal) or a plain right-click,
+which switches Stay on and off and goes back to Follow or Wander, whichever was set. Each
+order plays its own kweh (`kweh_follow` / `kweh_stay` / `kweh_wander`) with an action-bar line.
 
 ## Greens (FF7 training)
 

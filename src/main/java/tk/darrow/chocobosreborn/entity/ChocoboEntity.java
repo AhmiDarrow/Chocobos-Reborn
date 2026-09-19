@@ -98,6 +98,24 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private static final EntityDataAccessor<Boolean> DATA_TOWN_BIRD = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Boosting from a pad (synced: the rider's client scales its own input from it). */
 	private static final EntityDataAccessor<Boolean> DATA_BOOST = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
+	/** {@link Command} ordinal, synced so the equipment screen shows the current order. */
+	private static final EntityDataAccessor<Integer> DATA_COMMAND = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+
+	/** What a tame bird does when nobody is riding it. Stay is vanilla's ordered-to-sit. */
+	public enum Command {
+		FOLLOW, STAY, WANDER;
+
+		public static Command byId(int id) {
+			return id >= 0 && id < values().length ? values()[id] : FOLLOW;
+		}
+
+		public String id() {
+			return name().toLowerCase(java.util.Locale.ROOT);
+		}
+	}
+
+	/** A wandering bird strolls within this many blocks of where it was told to wander. */
+	public static final int WANDER_RANGE = 24;
 
 	/** Steve is 1.8 m. Hitbox height of a grown bird (3.25 m to the crest, ~1.8x Steve). */
 	public static final float PLAYER_H = 1.8F;
@@ -122,6 +140,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private long lastGreensDay = Long.MIN_VALUE;
 	/** Game time of the last training green. 0 = never trained. */
 	private long lastGreensFeed;
+	/** Wander mode (kept under Stay, so standing up returns to wandering, not following). */
+	private boolean wander;
+	/** Centre of a wandering bird's range; null until it is first set down. */
+	@Nullable
+	private BlockPos wanderHome;
 
 	public ChocoboEntity(EntityType<? extends ChocoboEntity> type, Level level) {
 		super(type, level);
@@ -162,6 +185,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		builder.define(DATA_RACE_NPC, false);
 		builder.define(DATA_TOWN_BIRD, false);
 		builder.define(DATA_BOOST, false);
+		builder.define(DATA_COMMAND, Command.FOLLOW.ordinal());
 	}
 
 	@Override
@@ -183,12 +207,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.goalSelector.addGoal(3, new FollowOwnerGoal(this, 1.2D, 8.0F, 3.0F) {
 			@Override
 			public boolean canUse() {
-				return !Square.isSquare(level()) && super.canUse();
+				return !wander && !Square.isSquare(level()) && super.canUse();
 			}
 
 			@Override
 			public boolean canContinueToUse() {
-				return !Square.isSquare(level()) && super.canContinueToUse();
+				return !wander && !Square.isSquare(level()) && super.canContinueToUse();
 			}
 		});
 		this.goalSelector.addGoal(3, new TemptGoal(this, 1.1D,
@@ -298,6 +322,79 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	public boolean racing() {
 		return this.entityData.get(DATA_RACING);
+	}
+
+	public Command command() {
+		return Command.byId(this.entityData.get(DATA_COMMAND));
+	}
+
+	/** Owner's order from the equipment screen or a plain right-click: say it, and kweh it. */
+	public void giveCommand(Command command, @Nullable Player player) {
+		if (command != Command.STAY) {
+			boolean wasWander = wander;
+			wander = command == Command.WANDER;
+			if (wander && !wasWander) {
+				wanderHome = blockPosition();
+			} else if (!wander && wasWander) {
+				clearWanderRange();
+			}
+		}
+		setOrderedToSit(command == Command.STAY);
+		if (!level().isClientSide) {
+			playSound(switch (command) {
+				case FOLLOW -> ModSounds.KWEH_FOLLOW.get();
+				case STAY -> ModSounds.KWEH_STAY.get();
+				case WANDER -> ModSounds.KWEH_WANDER.get();
+			}, 0.8F, 1.0F);
+			if (player != null) {
+				player.displayClientMessage(Component.translatable("chocobosreborn.command." + command.id() + ".told", getDisplayName()), true);
+			}
+		}
+	}
+
+	@Override
+	public void setOrderedToSit(boolean sit) {
+		super.setOrderedToSit(sit);
+		syncCommand();
+	}
+
+	private void syncCommand() {
+		Command c = isOrderedToSit() ? Command.STAY : wander ? Command.WANDER : Command.FOLLOW;
+		this.entityData.set(DATA_COMMAND, c.ordinal());
+	}
+
+	/** Drop the wander range. By radius, not centre: the spot may already be forgotten mid-ride. */
+	private void clearWanderRange() {
+		if (hasRestriction() && getRestrictRadius() == WANDER_RANGE) {
+			clearRestriction();
+		}
+		wanderHome = null;
+	}
+
+	/**
+	 * Keep a wandering bird near its spot. Leading or riding it somewhere moves the
+	 * spot (as does a far jump, e.g. a teleport), so it wanders wherever it was left.
+	 */
+	private void tickWanderRange() {
+		if (wander && !isTame()) {
+			// released to the wild (almanac): no more orders, no range
+			wander = false;
+			clearWanderRange();
+			syncCommand();
+		}
+		if (!wander || Square.isSquare(level())) {
+			return;
+		}
+		if (isLeashed() || isVehicle() || isPassenger()) {
+			wanderHome = null;
+			return;
+		}
+		if (wanderHome == null || !wanderHome.closerToCenterThan(position(), WANDER_RANGE * 3)) {
+			wanderHome = blockPosition();
+		}
+		if (!hasRestriction() || !getRestrictCenter().equals(wanderHome) || getRestrictRadius() != WANDER_RANGE) {
+			restrictTo(wanderHome, WANDER_RANGE);
+		}
 	}
 
 	/** Almanac release: a nut in the bird must not finish a pairing after it goes wild. */
@@ -596,6 +693,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putIntArray("GreensFed", greensFed.clone());
 		tag.putBoolean("RaceNpc", raceNpc());
 		tag.putBoolean("TownBird", townBird());
+		tag.putBoolean("Wander", wander);
+		if (wanderHome != null) {
+			tag.putLong("WanderHome", wanderHome.asLong());
+		}
 		if (lastGreensDay != Long.MIN_VALUE) {
 			tag.putLong("LastGreensDay", lastGreensDay);
 		}
@@ -641,6 +742,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		this.entityData.set(DATA_RACE_NPC, tag.getBoolean("RaceNpc"));
 		this.entityData.set(DATA_TOWN_BIRD, tag.getBoolean("TownBird"));
+		wander = tag.getBoolean("Wander");
+		wanderHome = tag.contains("WanderHome") ? BlockPos.of(tag.getLong("WanderHome")) : null;
+		// vanilla reads "Sitting" into its field directly, past setOrderedToSit
+		syncCommand();
 		if (tag.contains("LastGreensDay")) {
 			lastGreensDay = tag.getLong("LastGreensDay");
 		}
@@ -794,7 +899,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
 			if (!player.isSecondaryUseActive() && !racing()) {
-				setOrderedToSit(!isOrderedToSit());
+				if (!level().isClientSide) {
+					giveCommand(isOrderedToSit() ? (wander ? Command.WANDER : Command.FOLLOW) : Command.STAY, player);
+				}
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
 		}
@@ -1395,6 +1502,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (isInLove() && isOrderedToSit()) {
 				setOrderedToSit(false);
 			}
+			tickWanderRange();
 			// A nut stays until they hatch; keep the love window open so a missed path
 			// does not lock Carob/Zeio forever.
 			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove()) {
