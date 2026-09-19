@@ -35,6 +35,10 @@ public class SquareData extends SavedData {
 	private final Map<UUID, ReturnPoint> returns = new HashMap<>();
 	private final Map<UUID, Integer> owedGp = new HashMap<>();
 	private CompoundTag heats = new CompoundTag();
+	/** Bookie and duel stakes held by live heats and open duel challenges; anything still here on load was lost to a crash. */
+	private final Map<UUID, Integer> heldStakes = new HashMap<>();
+	/** Course chunks a live heat has force-loaded; anything still here at server start is unforced. */
+	private final java.util.Set<Long> forcedChunks = new java.util.HashSet<>();
 
 	public static SquareData get(ServerLevel squareLevel) {
 		return squareLevel.getDataStorage().computeIfAbsent(
@@ -66,6 +70,18 @@ public class SquareData extends SavedData {
 			}
 		}
 		d.heats = tag.getCompound("Heats").copy();
+		// stakes a heat was holding when the server went down uncleanly: hand them back
+		ListTag held = tag.getList("HeldStakes", Tag.TAG_COMPOUND);
+		for (int i = 0; i < held.size(); i++) {
+			CompoundTag r = held.getCompound(i);
+			if (r.hasUUID("Player") && r.getInt("Amount") > 0) {
+				d.owedGp.merge(r.getUUID("Player"), r.getInt("Amount"), Integer::sum);
+				d.setDirty();
+			}
+		}
+		for (long key : tag.getLongArray("ForcedChunks")) {
+			d.forcedChunks.add(key);
+		}
 		return d;
 	}
 
@@ -97,7 +113,52 @@ public class SquareData extends SavedData {
 		});
 		tag.put("OwedGp", owed);
 		tag.put("Heats", heats.copy());
+		ListTag held = new ListTag();
+		heldStakes.forEach((id, n) -> {
+			CompoundTag r = new CompoundTag();
+			r.putUUID("Player", id);
+			r.putInt("Amount", n);
+			held.add(r);
+		});
+		tag.put("HeldStakes", held);
+		tag.putLongArray("ForcedChunks", forcedChunks.stream().mapToLong(Long::longValue).toArray());
 		return tag;
+	}
+
+	public void holdStake(UUID player, int amount) {
+		if (amount > 0) {
+			heldStakes.merge(player, amount, Integer::sum);
+			setDirty();
+		}
+	}
+
+	public void releaseStake(UUID player, int amount) {
+		if (amount > 0 && heldStakes.containsKey(player)) {
+			heldStakes.computeIfPresent(player, (k, n) -> n - amount > 0 ? n - amount : null);
+			setDirty();
+		}
+	}
+
+	public void addForcedChunks(java.util.Collection<Long> keys) {
+		if (forcedChunks.addAll(keys)) {
+			setDirty();
+		}
+	}
+
+	public void removeForcedChunks(java.util.Collection<Long> keys) {
+		if (forcedChunks.removeAll(keys)) {
+			setDirty();
+		}
+	}
+
+	/** Server start: chunks a crashed heat left force-loaded. Clears the record. */
+	public java.util.Set<Long> takeForcedChunks() {
+		java.util.Set<Long> out = new java.util.HashSet<>(forcedChunks);
+		if (!out.isEmpty()) {
+			forcedChunks.clear();
+			setDirty();
+		}
+		return out;
 	}
 
 	public CompoundTag heats() {

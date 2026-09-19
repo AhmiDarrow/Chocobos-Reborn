@@ -36,6 +36,22 @@ public final class Square {
 
 	/** Move any entity, changing dimension if needed. Returns the live entity afterwards. */
 	public static @Nullable Entity teleport(Entity e, ServerLevel target, Vec3 pos, float yaw) {
+		// changeDimension never dismounts: a player still in a boat / minecart / on a horse
+		// would arrive attached to a vehicle left behind in the old dimension
+		if (e.isPassenger()) {
+			Entity vehicle = e.getVehicle();
+			boolean bird = vehicle instanceof ChocoboEntity;
+			if (bird) {
+				RaceManager.RELEASING.add(vehicle.getUUID());
+			}
+			try {
+				e.stopRiding();
+			} finally {
+				if (bird) {
+					RaceManager.RELEASING.remove(vehicle.getUUID());
+				}
+			}
+		}
 		if (e.level() == target) {
 			e.teleportTo(pos.x, pos.y, pos.z);
 			e.setYRot(yaw);

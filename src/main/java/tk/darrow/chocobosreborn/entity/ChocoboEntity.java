@@ -1007,7 +1007,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public void openCustomInventoryScreen(Player player) {
-		if (player instanceof net.minecraft.server.level.ServerPlayer sp && !isBaby() && !racing()) {
+		// the riding path (inventory key) skips mobInteract's owner check
+		if (player instanceof net.minecraft.server.level.ServerPlayer sp && !isBaby() && !racing()
+				&& (isOwnedBy(player) || player.getAbilities().instabuild)) {
 			sp.openMenu(new net.minecraft.world.SimpleMenuProvider(
 					(id, inv, p) -> new tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu(id, inv, this), getDisplayName()),
 					buf -> buf.writeVarInt(getId()));

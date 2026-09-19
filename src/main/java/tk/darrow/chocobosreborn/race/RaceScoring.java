@@ -342,6 +342,10 @@ public final class RaceScoring {
 	 */
 	public static BetPick legalizeBettor(BetPick pick, boolean ranked, boolean racerInHeat,
 	                                    boolean hasJoe, boolean hasTeioh, boolean hasOpponent) {
+		if (racerInHeat) {
+			// a racer may only back themselves: anything else pays when they lose
+			return BetPick.SELF;
+		}
 		BetPick now = legalize(pick, ranked, hasJoe || hasTeioh);
 		if (ranked) {
 			if (now == BetPick.JOE && !hasJoe) {
@@ -363,6 +367,9 @@ public final class RaceScoring {
 	public static BetPick nextLivePick(BetPick current, boolean ranked, boolean racerInHeat, boolean hasJoe,
 	                                   boolean hasTeioh, boolean hasOpponent) {
 		BetPick now = current == null ? BetPick.SELF : current;
+		if (racerInHeat) {
+			return BetPick.SELF;
+		}
 		if (!ranked) {
 			if (!hasOpponent) {
 				return BetPick.SELF;
@@ -573,7 +580,8 @@ public final class RaceScoring {
 		};
 	}
 
-	public static int odds(BetPick pick, int classId) {
+	/** @param fieldBirds AI birds on the card other than Teiyo and Jolo, i.e. how many a FIELD bet covers */
+	public static int odds(BetPick pick, int classId, int fieldBirds) {
 		if (pick == null) {
 			return selfOdds(classId);
 		}
@@ -581,9 +589,22 @@ public final class RaceScoring {
 			case SELF -> selfOdds(classId);
 			case JOE -> 3;
 			case TEIOH -> 2;
-			case FIELD -> 6;
+			case FIELD -> fieldOdds(fieldBirds);
 			case OPPONENT -> 2;
 		};
+	}
+
+	/** Roughly fair on a six-bird card: 6x for a lone field bird, 2x for three or four, evens for five. */
+	public static int fieldOdds(int fieldBirds) {
+		if (fieldBirds <= 0) {
+			return 6;
+		}
+		return Math.max(1, Math.round(6.0F / fieldBirds));
+	}
+
+	/** Field birds on a ranked card with {@code humans} riders (Teiyo and Jolo take two slots when they run). */
+	public static int expectedFieldBirds(int humans, boolean includesTeioh) {
+		return Math.max(0, 6 - humans - (includesTeioh ? 2 : 0));
 	}
 
 	public static int payout(int stake, int multiplier, boolean won) {

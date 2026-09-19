@@ -280,7 +280,7 @@ public final class RaceManager {
 			b.displayClientMessage(Component.translatable("chocobosreborn.race.occupied"), true);
 			return false;
 		}
-		DuelDesk.consume(a.getUUID());
+		DuelDesk.consume(a.server, a.getUUID());
 		DuelDesk.withdraw(b);
 		TradeDesk.withdraw(a);
 		TradeDesk.withdraw(b);
@@ -361,6 +361,9 @@ public final class RaceManager {
 		if (SESSIONS.stream().anyMatch(RaceSession::live) && !HeatSchedule.entered(player.getUUID())) {
 			return false;
 		}
+		if (HeatSchedule.entered(player.getUUID()) && pick != RaceScoring.BetPick.SELF) {
+			return false;   // entered racers may only back themselves
+		}
 		if (!RaceScoring.mayPlaceBet(true, tag.contains(PENDING_BET), amount)) {
 			return false;
 		}
@@ -417,7 +420,14 @@ public final class RaceManager {
 		if (pending == null || n <= 0) {
 			return 0;
 		}
-		s.takeBookieBet(player.getUUID(), s.legalPick(pending, player.getUUID()), n);
+		RaceScoring.BetPick legal = s.legalPick(pending, player.getUUID());
+		if (legal == RaceScoring.BetPick.SELF && pending != RaceScoring.BetPick.SELF) {
+			// the bettor is riding in this heat: a pick that pays when they lose goes back
+			DuelDesk.giveGp(player, n);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+			return 0;
+		}
+		s.takeBookieBet(player.getUUID(), legal, n);
 		return n;
 	}
 
@@ -461,7 +471,10 @@ public final class RaceManager {
 		}
 		Entity vehicle = event.getEntityBeingMounted();
 		Entity rider = event.getEntityMounting();
+		// only the rider's own sneak-dismount is locked: /tp, waystones and other teleports call
+		// stopRiding() before isChangingDimension() is set and must be let through
 		if (vehicle instanceof ChocoboEntity bird && !bird.racing() && bird.isAlive() && rider.isAlive()
+				&& rider.isShiftKeyDown()
 				&& rider == bird.getControllingPassenger() && !RELEASING.contains(bird.getUUID())
 				&& !(rider instanceof ServerPlayer sp0 && sp0.isChangingDimension())) {
 			boolean inOrOnWater = bird.isInWater()
@@ -515,6 +528,18 @@ public final class RaceManager {
 			case EVENT, SPAWN_EGG, BREEDING, COMMAND, BUCKET, DISPENSER, TRIGGERED -> {
 			}
 			default -> event.setSpawnCancelled(true);
+		}
+	}
+
+	/** A crash mid-heat leaves the course force-loaded (forced chunks are saved with the world): let them go. */
+	@SubscribeEvent
+	public static void onServerStarted(net.neoforged.neoforge.event.server.ServerStartedEvent event) {
+		ServerLevel square = Square.level(event.getServer());
+		if (square == null) {
+			return;
+		}
+		for (long key : SquareData.get(square).takeForcedChunks()) {
+			square.setChunkForced((int) (key >> 32), (int) key, false);
 		}
 	}
 

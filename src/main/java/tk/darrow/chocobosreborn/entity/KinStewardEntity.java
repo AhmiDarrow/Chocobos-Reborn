@@ -282,19 +282,24 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		if (!hand.is(ModItems.GP.get())) {
 			hand = player.getOffhandItem();
 		}
+		// entered in the next heat: a racer may only back themselves
+		boolean racing = s == null && tk.darrow.chocobosreborn.race.HeatSchedule.entered(player.getUUID());
 		RaceScoring.BetPick pick = pickFor(player);
 		if (s != null) {
 			pick = s.legalPick(pick, player.getUUID());
 		} else {
-			pick = RaceScoring.legalize(pick, ranked, teioh);
+			pick = racing ? RaceScoring.BetPick.SELF : RaceScoring.legalize(pick, ranked, teioh);
 		}
 		setPick(player, pick);
 		if (!hand.is(ModItems.GP.get())) {
-			pick = s != null ? s.nextPick(pick, player.getUUID()) : RaceScoring.nextPick(pick, ranked, teioh);
+			pick = s != null ? s.nextPick(pick, player.getUUID())
+					: racing ? RaceScoring.BetPick.SELF : RaceScoring.nextPick(pick, ranked, teioh);
 			setPick(player, pick);
+			int odds = s != null ? s.odds(pick)
+					: RaceScoring.odds(pick, classId, RaceScoring.expectedFieldBirds(1, teioh));
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.pick",
 					Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT)),
-					RaceScoring.odds(pick, classId)), true);
+					odds), true);
 			return InteractionResult.CONSUME;
 		}
 		if (s != null && RaceManager.hasPendingBet(player)) {

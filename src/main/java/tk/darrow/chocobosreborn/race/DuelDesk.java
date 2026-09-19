@@ -33,9 +33,31 @@ public final class DuelDesk {
 		OPEN.clear();
 	}
 
+	/** A posted stake is written to {@link SquareData} so a crash hands it back (as owed GP) on the next load. */
+	private static void hold(net.minecraft.server.MinecraftServer server, UUID player, int amount) {
+		ServerLevel square = Square.level(server);
+		if (square != null) {
+			SquareData.get(square).holdStake(player, amount);
+		}
+	}
+
+	/** Take a challenge off the book and drop its stake from the saved record; the caller settles the GP. */
+	@Nullable
+	private static Challenge remove(net.minecraft.server.MinecraftServer server, UUID player) {
+		Challenge c = OPEN.remove(player);
+		if (c != null && c.stake() > 0) {
+			ServerLevel square = Square.level(server);
+			if (square != null) {
+				SquareData.get(square).releaseStake(player, c.stake());
+			}
+		}
+		return c;
+	}
+
 	/** Server stop: give back stakes still sitting in the book. */
 	public static void refundAndClear(net.minecraft.server.MinecraftServer server) {
 		for (Challenge c : new ArrayList<>(OPEN.values())) {
+			remove(server, c.challenger());
 			if (c.stake() > 0) {
 				ServerPlayer p = server.getPlayerList().getPlayer(c.challenger());
 				if (p != null) {
@@ -80,7 +102,7 @@ public final class DuelDesk {
 			return false;
 		}
 		if (prev != null) {
-			OPEN.remove(player.getUUID());
+			remove(player.server, player.getUUID());
 		}
 		int extra = stake - posted;
 		if (extra > 0) {
@@ -90,22 +112,23 @@ public final class DuelDesk {
 		}
 		OPEN.put(player.getUUID(), new Challenge(player.getUUID(), player.getName().getString(), track, stake,
 				player.level().getGameTime()));
+		hold(player.server, player.getUUID(), stake);
 		player.displayClientMessage(Component.translatable("chocobosreborn.duel.posted",
 				Component.translatable("chocobosreborn.track." + track.id()), stake), false);
 		return true;
 	}
 
 	public static void withdraw(ServerPlayer player) {
-		Challenge c = OPEN.remove(player.getUUID());
+		Challenge c = remove(player.server, player.getUUID());
 		if (c != null && c.stake() > 0) {
 			giveGp(player, c.stake());
 			player.displayClientMessage(Component.translatable("chocobosreborn.duel.withdrawn", c.stake()), true);
 		}
 	}
 
-	/** Take a posted challenge off the book without returning the GP: it is now the duel pot. */
-	public static void consume(UUID player) {
-		OPEN.remove(player);
+	/** Take a posted challenge off the book without returning the GP: it is now the duel pot (the session holds it). */
+	public static void consume(net.minecraft.server.MinecraftServer server, UUID player) {
+		remove(server, player);
 	}
 
 	/** Drop challenges whose poster left or that sat too long. */
@@ -117,7 +140,7 @@ public final class DuelDesk {
 			ServerPlayer poster = level.getServer().getPlayerList().getPlayer(c.challenger());
 			boolean gone = poster == null || !Square.isSquare(poster.level());
 			if (gone || level.getGameTime() - c.postedTick() > EXPIRY_TICKS) {
-				OPEN.remove(c.challenger());
+				remove(level.getServer(), c.challenger());
 				if (c.stake() > 0) {
 					if (poster != null) {
 						giveGp(poster, c.stake());
@@ -159,7 +182,7 @@ public final class DuelDesk {
 				}
 				continue;
 			}
-			OPEN.remove(c.challenger());
+			remove(acceptor.server, c.challenger());   // normally already consumed by startDuel
 			withdraw(acceptor);
 			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.accepting", c.name(),
 					Component.translatable("chocobosreborn.track." + c.track().id()), c.stake()), false);

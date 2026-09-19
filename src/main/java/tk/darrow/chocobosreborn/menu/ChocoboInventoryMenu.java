@@ -80,7 +80,14 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 				addSlot(new Slot(inv, BAG_START + row * 5 + col, 80 + col * 18, 18 + row * 18) {
 					@Override
 					public boolean isActive() {
-						return ChocoboInventoryMenu.this.bird.hasSaddlebags();
+						// leftovers stay reachable if the bags went some other way than this screen
+						return ChocoboInventoryMenu.this.bird.hasSaddlebags() || hasItem();
+					}
+
+					/** Server-side too: isActive only hides the slot on the client. Taking out is always allowed. */
+					@Override
+					public boolean mayPlace(ItemStack stack) {
+						return ChocoboInventoryMenu.this.bird.hasSaddlebags() && super.mayPlace(stack);
 					}
 				});
 			}
@@ -160,7 +167,8 @@ public class ChocoboInventoryMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean stillValid(Player player) {
-		return !bird.isRemoved() && tk.darrow.chocobosreborn.race.RaceScoring.saddleBagStillValid(bird.isAlive(), bird.racing(),
+		// a traded / gifted / released bird closes the old owner's screen
+		return !bird.isRemoved() && (bird.isOwnedBy(player) || player.getAbilities().instabuild) && tk.darrow.chocobosreborn.race.RaceScoring.saddleBagStillValid(bird.isAlive(), bird.racing(),
 				bird.distanceTo(player) < 8.0F) && inv.stillValid(player);
 	}
 

@@ -37,10 +37,14 @@ class RaceBettingTest {
 		assertEquals(3, RaceScoring.selfOdds(RaceClass.B.getId()));
 		assertEquals(4, RaceScoring.selfOdds(RaceClass.A.getId()));
 		assertEquals(5, RaceScoring.selfOdds(RaceClass.S.getId()));
-		assertEquals(3, RaceScoring.odds(RaceScoring.BetPick.JOE, 0));
-		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.TEIOH, 3));
-		assertEquals(6, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0));
-		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.OPPONENT, 1));
+		assertEquals(3, RaceScoring.odds(RaceScoring.BetPick.JOE, 0, 3));
+		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.TEIOH, 3, 3));
+		assertEquals(6, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, 1));
+		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.OPPONENT, 1, 3));
+		// FIELD is priced by how many AI birds it covers: five of six is close to evens
+		assertEquals(1, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, RaceScoring.expectedFieldBirds(1, false)));
+		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, 4));
+		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.FIELD, 3, RaceScoring.expectedFieldBirds(1, true)));
 	}
 
 	@Test
@@ -101,13 +105,20 @@ class RaceBettingTest {
 		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
 				RaceScoring.BetPick.SELF, true, true, true, true, false));
 		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.legalizeBettor(
-				RaceScoring.BetPick.JOE, true, true, false, true, false));
+				RaceScoring.BetPick.JOE, true, false, false, true, false));
+		// a racer may only back themselves
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.FIELD, true, true, true, true, false));
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
+				RaceScoring.BetPick.OPPONENT, false, true, false, false, true));
 		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.legalizeBettor(
 				RaceScoring.BetPick.OPPONENT, false, true, false, false, false));
 		assertEquals(RaceScoring.BetPick.JOE, RaceScoring.nextLivePick(
 				RaceScoring.BetPick.SELF, true, false, true, true, false));
 		assertEquals(RaceScoring.BetPick.FIELD, RaceScoring.nextLivePick(
-				RaceScoring.BetPick.JOE, true, true, true, false, false));
+				RaceScoring.BetPick.JOE, true, false, true, false, false));
+		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.nextLivePick(
+				RaceScoring.BetPick.SELF, true, true, true, true, false));
 		assertEquals(RaceScoring.BetPick.SELF, RaceScoring.nextLivePick(
 				RaceScoring.BetPick.SELF, false, true, false, false, false));
 	}

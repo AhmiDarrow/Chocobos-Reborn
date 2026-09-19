@@ -114,6 +114,8 @@ public class RaceSession {
 	private int duelStake;
 	private boolean duelPaid;
 	private boolean aborting;
+	/** The first human to drop out on their own (not a server-stop abort): a duel's pot goes to the other. */
+	@Nullable private Racer firstQuit;
 	/** Ranked bookie bets (one per human in a shared heat). */
 	private final List<BookieBet> bets = new ArrayList<>();
 	@Nullable private UUID bettor;
@@ -156,6 +158,7 @@ public class RaceSession {
 	void takeBookieBet(UUID player, RaceScoring.BetPick pick, int amount) {
 		RaceScoring.BetPick legal = legalLivePick(pick, player);
 		bets.add(new BookieBet(player, legal, amount));
+		hold(player, amount);
 		if (this.bet == null) {
 			this.bet = legal;
 			this.stake = amount;
@@ -196,6 +199,11 @@ public class RaceSession {
 		this.track = track;
 		this.ranked = ranked;
 		this.duelStake = duelStake;
+		if (duelStake > 0) {
+			for (ServerPlayer p : players) {
+				hold(p.getUUID(), duelStake);
+			}
+		}
 		this.layout = RaceCourseLayout.of(track);
 		forceChunks(true);
 		SquareBuilder.buildTrack(level, track);
@@ -227,9 +235,18 @@ public class RaceSession {
 					continue;
 				}
 				int n = RaceManager.takePendingStake(p);
+				if (pending != RaceScoring.BetPick.SELF) {
+					// a racer may only back themselves: a pick that pays when they lose goes back
+					if (n > 0) {
+						DuelDesk.giveGp(p, n);
+						p.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+					}
+					continue;
+				}
 				RaceScoring.BetPick legal = legalLivePick(pending, p.getUUID());
 				if (n > 0) {
 					bets.add(new BookieBet(p.getUUID(), legal, n));
+					hold(p.getUUID(), n);
 				}
 				if (this.bet == null) {
 					this.bet = legal;
@@ -245,15 +262,23 @@ public class RaceSession {
 	}
 
 	private void forceChunks(boolean on) {
+		// forced chunks are saved with the world: note them so a crash does not leave the course loaded forever
+		SquareData d = Square.isSquare(level) ? SquareData.get(level) : null;
 		if (on) {
 			for (long key : layout.chunks()) {
 				int cx = (int) (key >> 32), cz = (int) key;
 				level.setChunkForced(cx, cz, true);
 				forced.add(key);
 			}
+			if (d != null) {
+				d.addForcedChunks(forced);
+			}
 		} else {
 			for (long key : forced) {
 				level.setChunkForced((int) (key >> 32), (int) key, false);
+			}
+			if (d != null) {
+				d.removeForcedChunks(forced);
 			}
 			forced.clear();
 		}
@@ -721,8 +746,12 @@ public class RaceSession {
 			if (!bird.isAlive()) {
 				bird.ejectPassengers();
 			} else if (bird.level() == level) {
-				moveRidden(bird, Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+				// a rider forfeiting by dying must not be force-seated again as a corpse
+				moveRidden(bird, Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z, player == null || player.isAlive());
 			}
+		}
+		if (!aborting && firstQuit == null) {
+			firstQuit = me;
 		}
 		if (player != null && Square.isSquare(player.level())
 				&& (bird == null || player.getVehicle() != bird)) {
@@ -851,6 +880,11 @@ public class RaceSession {
 		}
 		duelPaid = true;
 		List<Racer> hs = humans();
+		for (Racer h : hs) {
+			if (h.player != null) {
+				release(h.player, duelStake);
+			}
+		}
 		Racer winner = null;
 		for (Racer h : hs) {
 			if (h.forfeited) {
@@ -865,6 +899,10 @@ public class RaceSession {
 					winner = h;
 				}
 			}
+		}
+		if (winner == null && firstQuit != null && hs.size() == 2) {
+			// both gone, but one walked out first: the other side of the duel takes the pot
+			winner = hs.get(0) == firstQuit ? hs.get(1) : hs.get(0);
 		}
 		if (winner == null || (winner.finishIndex < 0 && hs.stream().noneMatch(r -> r.forfeited))) {
 			for (Racer h : hs) {
@@ -926,8 +964,9 @@ public class RaceSession {
 		}
 		boolean won = RaceScoring.pickWon(b.pick, ranked, playerFirst, joeFirst, teiohFirst, fieldFirst, opponentFirst);
 		int held = b.stake;
-		int pay = RaceScoring.payout(held, RaceScoring.odds(b.pick, track.getRaceClass().getId()), won);
+		int pay = RaceScoring.payout(held, odds(b.pick), won);
 		b.stake = 0;
+		release(id, held);
 		clearFirstSlotIf(id);
 		if (pay > 0) {
 			if (player != null) {
@@ -951,6 +990,7 @@ public class RaceSession {
 		}
 		int n = b.stake;
 		b.stake = 0;
+		release(player.getUUID(), n);
 		clearFirstSlotIf(player.getUUID());
 		for (int stack : RaceCurrency.stacks(n, 64)) {
 			give(player, new ItemStack(ModItems.GP.get(), stack));
@@ -969,12 +1009,46 @@ public class RaceSession {
 				refundStake(p);
 			} else {
 				RaceManager.oweGp(level.getServer(), b.player, b.stake);
+				release(b.player, b.stake);
 				b.stake = 0;
 			}
 		}
 		bet = null;
 		stake = 0;
 		bettor = null;
+	}
+
+	/** Payout multiplier on this card: FIELD is priced by how many AI birds it actually covers. */
+	public int odds(RaceScoring.BetPick pick) {
+		return RaceScoring.odds(pick, track.getRaceClass().getId(), fieldBirds());
+	}
+
+	/** AI racers that are neither Teiyo nor Jolo: the ones a FIELD bet backs. */
+	private int fieldBirds() {
+		return (int) racers.stream()
+				.filter(r -> !r.human() && !NAME_TEIYO.equals(r.name) && !NAME_JOLO.equals(r.name))
+				.count();
+	}
+
+	@Nullable
+	private SquareData squareData() {
+		ServerLevel square = Square.level(level.getServer());
+		return square == null ? null : SquareData.get(square);
+	}
+
+	/** GP taken from a player and not yet paid out or refunded: written to disk so a crash refunds it. */
+	private void hold(UUID player, int amount) {
+		SquareData d = squareData();
+		if (d != null) {
+			d.holdStake(player, amount);
+		}
+	}
+
+	private void release(UUID player, int amount) {
+		SquareData d = squareData();
+		if (d != null) {
+			d.releaseStake(player, amount);
+		}
 	}
 
 	private static void give(ServerPlayer player, ItemStack stack) {
