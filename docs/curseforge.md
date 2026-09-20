@@ -19,6 +19,15 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.8 - Solid ground
+Uploaded 2026-09-19: `chocobosreborn-1.0.8.jar` as file **8926685** ("Chocobos Reborn 1.0.8 - Solid ground",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.8.md`) via
+`tools/upload_curseforge.py`. Course islands no longer have holes to fall through and the fall rescue catches
+every drop; scenery, rails and pools stay off the racing line and pools are walled; every terrain feature
+re-placed so a colour is worth about 2 % of a lap on all 24 courses; three boosts per sprint and five per
+grand prix on corner exits; a landmark of its own on every course; riders invulnerable in Whiskerwind.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.8
+
 ## 1.0.7 - Fresh paint
 Uploaded 2026-09-19: `chocobosreborn-1.0.7.jar` as file **8925242** ("Chocobos Reborn 1.0.7 - Fresh paint",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.7.md`) via
