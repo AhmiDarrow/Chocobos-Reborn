@@ -460,6 +460,19 @@ public final class RaceManager {
 			TradeDesk.tick(square);
 			HeatSchedule.tick(square);
 		}
+		if (square != null) {
+			for (ServerPlayer p : square.players()) {
+				// invulnerable is not the same as unstoppable: a visitor who goes over the edge
+				// still falls for ever, and out-of-world damage bypasses protection anyway
+				if (RaceScoring.squareVisitorFallRescue(p.getY(), p.getVehicle() != null)) {
+					p.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
+					p.resetFallDistance();
+				}
+				if (p.isOnFire()) {
+					p.setRemainingFireTicks(0);   // a lava feature cannot hurt them; do not leave them alight
+				}
+			}
+		}
 		if (SESSIONS.isEmpty()) {
 			return;
 		}
@@ -467,6 +480,23 @@ public final class RaceManager {
 			s.tick();
 		}
 		SESSIONS.removeIf(s -> !s.live());
+	}
+
+	/**
+	 * Nothing in Whiskerwind hurts a visitor. The birds are already protected there
+	 * ({@link ChocoboEntity#isInvulnerableTo}); without this the rider of a bird that
+	 * cannot take a lava feature burned to death on the course while the bird it was
+	 * sitting on walked out unharmed, and their inventory dropped into the void.
+	 */
+	@SubscribeEvent
+	public static void onInvulnerabilityCheck(net.neoforged.neoforge.event.entity.EntityInvulnerabilityCheckEvent event) {
+		if (!(event.getEntity() instanceof net.minecraft.world.entity.player.Player player)) {
+			return;
+		}
+		if (RaceScoring.squareRiderProtected(Square.isSquare(player.level()),
+				event.getSource().is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY))) {
+			event.setInvulnerable(true);
+		}
 	}
 
 	@SubscribeEvent

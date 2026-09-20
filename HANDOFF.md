@@ -892,6 +892,153 @@ kept for history but refuse to run without `--legacy` (they would overwrite this
 with the old 16 px Meshy downsamples). The bird is not touched by any of this.
 The mod has no particle textures of its own.
 
+## Falling through a course (2026-09-19, Ahmi: "once in a class B race player seems to fall through the map or the map and all textures besides the skybox vanish")
+
+Both symptoms are one fault: the rider drops out of the world and keeps falling, so
+in a void dimension nothing is left on screen but the sky.
+
+* **Cause.** `RaceCourseLayout` stamped the island along the centre line every 0.5
+  blocks with lanes every 0.5 blocks. On the outside of a tight corner, over the lip
+  of a hill and at the mouth of a detour, consecutive stamps land more than a block
+  apart, so whole block columns were never written — a hole clean through the island
+  (no road, no rock, nothing). Measured before the fix: 761 empty columns under the
+  racing area across the 24 courses, 152 of them a 2x2 square or larger, which is
+  wide enough for the 1.75-wide bird hitbox to fall through. B_GLACIER, B_FORD,
+  C_SHORE, A_CRYSTAL, A_EMBER, A_TEMPLE and all four S sprints had one.
+* **Why nothing caught it.** `RaceScoring.squareFallRescue(y, onCourse)` only fired
+  `y < 50 && !onCourse`, and `RaceCourseLayout.onCourse` is true within a block of any
+  road tile — which is exactly where these holes are. A rider who fell through one was
+  never rescued: they fell for ever.
+* **Fix.** Terrain is stamped by `stampSection`, called twice per decoration step
+  (0.25 blocks along the line) with lanes every `LANE_STEP` = 0.25; the decoration
+  cadence (`i % 16`, `i % 24`, kerb and rainbow striping) is untouched, so the courses
+  look the same. `plugHoles()` then fills any column left empty under the road and its
+  one-block skirt, at the level most of its neighbours sit at. Islands grew 0.5-1.6 %
+  in blocks and 0-1 chunks each; silhouettes unchanged. `squareFallRescue(y)` now
+  rescues any racer below y 50 wherever they are (nothing legitimate is below the
+  islands at y 59 — flight is blocked during a heat).
+* **`COURSE_VERSION` 5 -> 6**, so islands laid by an older build are re-laid on their
+  next use; an existing world fixes itself the first time a course is raced again.
+* **Regression test** `race/CourseIslandTest`: no void column under the road or its
+  skirt, a floor under every lane at 0.25 resolution, and every stall over solid
+  ground, for all 24 courses. Gates green: 130 unit tests, 11 GameTests, jar builds.
+* Still worth an in-game look: the plugged columns use `theme.road` inside the band
+  and `theme.ground` outside it, so a patch in a water or lava feature reads as road.
+
+## Course polish pass (2026-09-19, Ahmi: "look for further issues and areas of polish in the race courses")
+
+Audited all 24 course plans block by block. The fall-through fix above came from one
+stamp pass overlapping itself; the same cause was leaving other things on the courses.
+
+* **The plan is stamped in layers now** (`RaceCourseLayout` constructor): ground and
+  margins for the whole lap, then the road band (features first, plain road second),
+  then kerbs and rails, then scenery, then the structures. A circuit folds back on
+  itself on a tight corner, so in a single pass a later section overwrote road an
+  earlier one had already laid. Measured on the racing line before / after: cacti,
+  camp fire, leaves, flowers and ferns on the road 0 (was ~90 blocks' worth), fence
+  and wall rails standing in the band 5-25 samples (was 250-770 per course), stray
+  water / lava / mud from a feature on a completely different part of the lap 0-4
+  samples (was 44-171). Whole-course surface purity: 0.61 % -> 0.16 % of band samples
+  not road, and most of what is left is the gold start arrow, which belongs there.
+  `put` refuses to touch a road tile while `sparingRoad` is set (scenery, kerbs,
+  rails, lamps, warning posts); the gantry, line, grid, arrow and stand still cross it.
+* **Pools are sealed.** Water and lava are placed as source blocks with no block
+  update, so they sit still until something disturbs them and then drain over the
+  island. Every pool had 4-38 open faces on the detour side, where the kerb was
+  skipped to open the detour. Both sides are kerbed alongside a pool now, and the
+  strip between band and kerb is walled (one kerb stamp per step steps diagonally on
+  a diagonal leg and leaked through the corner). All 24 courses: 0 open faces.
+* **`COURSE_VERSION` 6 -> 7**, so islands are re-laid again on next use.
+* **Tests** (`race/CourseIslandTest`, 6): no void column under the racing area, a
+  floor under every lane, every stall on solid ground, pools cannot drain, nothing
+  standing in the racing line, no stray terrain off its own feature.
+
+### Open question: what a detour costs (numbers, no change made)
+
+The terrain features are meant to pay off for the bird that suits them. Measuring the
+real path (swing out, round, swing back) against the direct line:
+
+| cheap (nearly free) | fair | expensive |
+| --- | --- | --- |
+| S_STARFALL water +4.7 / +6.3 | most features +13 to +20 | S_VOID mud +50 |
+| A_INFERNO ridge +7.2, S_MAELSTROM ridge +7.3 | | S_KEEP lava +32.4 |
+| S_CITADEL lava +7.6, A_TEMPLE mud +7.7 | | A_DEEPS water +33.6 |
+
+All in blocks, laps are 600-1600. The spread is geometry, not design: a detour laid
+on the outside of a bend is long, one on a straight or the inside of a bend costs only
+the two connectors. So a Blue bird gains ~0.4 % of a lap on S_STARFALL and ~5 % on
+A_DEEPS for the same ability. If this should be evened out, the options are to pick
+the detour side per feature (whichever is longer — touches `RacerGoal`'s lane choice
+and the island spacing) or to scale the detour offset per feature to hit a target
+cost. Ahmi's call; nothing was changed.
+
+Also noticed, not changed: a bird is invulnerable in the Square (`squareProtected`)
+but **its rider is not**, so a player who drives a non-lava bird into a lava feature
+burns and can die on the course (A_EMBER, A_INFERNO, S_KEEP, S_CITADEL). Death in the
+Square is already handled (forfeit + return), so this may be intended; fire resistance
+for a racing rider would make it a racing mistake instead of an inventory loss.
+
+## Detour balance, rider safety, course polish (2026-09-19, Ahmi: "1 balance detours 2 make player invincible as well in the square seems an easy fix"; "then polish every course, every one should feel amazing, unique and fun")
+
+### 1. Detours are worth the same everywhere
+
+`RaceTrack.detourCost(f)` measures what a feature is actually worth: the blocks a
+detour-taker travels over the bird that goes straight through, the swing out and back
+included. `RaceTrack.detourTarget()` is what it should be — 2 % of a lap, floored at 13
+blocks and capped at 28. Before this pass the spread was -6 to +50 blocks: on
+S_STARFALL the water detour was *shorter* than the direct line, so a Blue bird lost
+time by using its ability, while S_VOID's bog cost 50. It is geometry: a detour on a
+straight costs only the two connectors, one round the outside of a big bend costs a
+tenth of a lap.
+
+Every terrain feature was re-placed by a solver (a DP over a 0.01 grid of the lap)
+under these constraints, and the spans in the course table are its output:
+
+* each detour as near `detourTarget()` as the course allows — now 13 to 29 blocks,
+  every colour feature inside 0.55x-1.3x its course's target (was 0.4 %-5 % of a lap,
+  now 1.0 %-2.1 %);
+* a bog aims at 45 % of the target and must be the cheapest thing on the course to go
+  round — nobody suits a bog, so its detour is everyone's route, not a toll;
+* features sit level on the hill profile (a pool on a slope steps), spread round the
+  lap rather than bunched in one half, and clear of the opening stretch where the
+  field is still bunched off the grid;
+* boost strips take the corner exits that are left: **three on a sprint, five on a
+  grand prix** (was two or three), each on a straight, clear of every detour connector.
+
+`CourseBalanceTest` holds all of it. The solver itself was scratch — the numbers are
+baked into `RaceTrack` so a course can still be hand-tuned; re-run the maths by
+comparing `detourCost` against `detourTarget` if a shape ever changes.
+
+### 2. A rider is as safe as the bird
+
+`RaceManager.onInvulnerabilityCheck` (NeoForge `EntityInvulnerabilityCheckEvent`) makes
+a player in Whiskerwind invulnerable to everything that does not bypass invulnerability,
+the same rule the birds have had (`ChocoboEntity.isInvulnerableTo`). Riding a bird that
+cannot take a lava feature now costs a place, not a life and an inventory in the void.
+`/kill` still works. The Square tick also puts out a burning rider and teleports any
+visitor who is below y 50 and not in a saddle back to the paddock (a rider in the
+saddle is the session's to rescue, bird and all). `RaceScoring.squareRiderProtected`
+and `squareVisitorFallRescue` are the rules, unit-tested.
+
+### 3. Every course has its own landmark
+
+The set pieces were one per theme, and two courses share a theme, so the sprint and the
+grand prix of each looked the same. The sprints keep theirs; the twelve grand prix
+courses get their own (`grandPrixLandmark`): windmill (C_DOWNS), cider barn (C_CIDER),
+beached shipwreck (C_LAGOON), terracotta arch (B_MESA), mill wheel (B_RAPIDS), frozen
+waterfall (B_GLACIER), dripstone hall (A_DEEPS), mossy idol with gold eyes (A_TEMPLE),
+bone arch over a soul fire (A_INFERNO), a ring hung over the road (S_STARFALL), a
+banner gatehouse (S_CITADEL), a caged crystal (S_MAELSTROM). Landmarks are stamped with
+`sparingRoad` set, so a fold of the course cannot end up wearing one.
+`CourseIdentityTest` pins that each of the twenty-four lays its own signature blocks.
+
+**Preview**: `python tools/track_sheet.py` builds `art/preview/track_maps.png` — all 24
+courses four to a row on their class colour, with lap length, laps, features and boost
+count under each. Run the `CourseMapDumpTest` first to refresh `build/track_maps/`.
+The sheet is the working preview, **not the gate** — the gate is the saddle.
+
+Gates: 136 unit tests, 11 GameTests, jar builds.
+
 ## Open
 
 1. In-game test pass: the new circuits (hills, kerbs, rails, detours, boost pads,

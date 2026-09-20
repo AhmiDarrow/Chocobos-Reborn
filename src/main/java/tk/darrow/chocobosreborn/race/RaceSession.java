@@ -641,7 +641,7 @@ public class RaceSession {
 			}
 			double progress = track.progressAt(e.getX(), e.getZ());
 			boolean onCourse = layout.onCourse(e.getX(), e.getZ());
-			if (RaceScoring.squareFallRescue(e.getY(), onCourse)) {
+			if (RaceScoring.squareFallRescue(e.getY())) {
 				RacePoint back = track.pointAtLane(progress, r.lane);
 				moveRidden(e, back.x(), back.y(), back.z());
 			}

@@ -23,36 +23,45 @@ import tk.darrow.chocobosreborn.breed.ChocoboColor;
  * Class C is open road with boosts; B adds one feature, A two plus a bog, S three or
  * more, with taller ridges. Lap progress is by nearest point on the centre line,
  * so the direct line and the detour credit the same progress.
+ * <p>
+ * Where a feature sits decides what a colour is worth. A detour round a feature on a
+ * straight is the same length as the straight and costs only the swing out and back;
+ * one round the outside of a big bend costs a tenth of a lap. So the spans below are
+ * not free-hand: each sits on a level stretch of a bend that puts its detour near
+ * {@link #detourTarget()} ({@link #detourCost}), spread round the lap, clear of the
+ * bunched field off the grid, with the bog always the cheapest thing to go round.
+ * Boost strips take what is left on the corner exits — three on a sprint, five on a
+ * grand prix. {@code CourseBalanceTest} holds all of that in place.
  */
 public enum RaceTrack {
 	// ---- C: meadow, orchard, shore
-	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 600, 1, boost(0.30), boost(0.62)),
-	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 612, 1, boost(0.22), boost(0.70)),
-	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 624, 1, boost(0.40), boost(0.85)),
-	C_DOWNS(RaceClass.C, 3, Theme.MEADOW, Shape.ROVAL, 1150, 3, boost(0.20), boost(0.55), boost(0.80)),
-	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 3, boost(0.26), boost(0.58), boost(0.86)),
-	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 3, boost(0.33), boost(0.77)),
+	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 600, 1, boost(0.10), boost(0.56), boost(0.93)),
+	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 612, 1, boost(0.18), boost(0.36), boost(0.93)),
+	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 624, 1, boost(0.19), boost(0.80), boost(0.93)),
+	C_DOWNS(RaceClass.C, 3, Theme.MEADOW, Shape.ROVAL, 1150, 3, boost(0.11), boost(0.47), boost(0.58), boost(0.66), boost(0.93)),
+	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 3, boost(0.42), boost(0.59), boost(0.70), boost(0.85), boost(0.93)),
+	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 3, boost(0.10), boost(0.22), boost(0.46), boost(0.81), boost(0.92)),
 	// ---- B: canyon, river, snow
-	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 650, 1, ridge(0.36, 0.40), boost(0.15), boost(0.72)),
-	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.LOLLIPOP, 662, 1, water(0.50, 0.55), boost(0.24), boost(0.80)),
-	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.KIDNEY, 674, 1, ridge(0.60, 0.64), boost(0.30), boost(0.86)),
-	B_MESA(RaceClass.B, 3, Theme.CANYON, Shape.SERPENT, 1280, 3, ridge(0.30, 0.34), boost(0.18), boost(0.55), boost(0.82)),
-	B_RAPIDS(RaceClass.B, 4, Theme.RIVER, Shape.HAIRPIN, 1300, 3, water(0.42, 0.47), boost(0.20), boost(0.62), boost(0.88)),
-	B_GLACIER(RaceClass.B, 5, Theme.SNOW, Shape.STAIRS, 1320, 3, water(0.58, 0.63), boost(0.22), boost(0.44), boost(0.84)),
+	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 650, 1, ridge(0.50, 0.54), boost(0.31), boost(0.71), boost(0.93)),
+	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.LOLLIPOP, 662, 1, water(0.59, 0.64), boost(0.14), boost(0.68), boost(0.93)),
+	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.KIDNEY, 674, 1, ridge(0.47, 0.51), boost(0.41), boost(0.77), boost(0.92)),
+	B_MESA(RaceClass.B, 3, Theme.CANYON, Shape.SERPENT, 1280, 3, ridge(0.44, 0.48), boost(0.20), boost(0.35), boost(0.53), boost(0.83), boost(0.91)),
+	B_RAPIDS(RaceClass.B, 4, Theme.RIVER, Shape.HAIRPIN, 1300, 3, water(0.51, 0.56), boost(0.22), boost(0.39), boost(0.60), boost(0.75), boost(0.92)),
+	B_GLACIER(RaceClass.B, 5, Theme.SNOW, Shape.STAIRS, 1320, 3, water(0.33, 0.38), boost(0.45), boost(0.58), boost(0.66), boost(0.78), boost(0.87)),
 	// ---- A: cavern, jungle, nether
-	A_CRYSTAL(RaceClass.A, 0, Theme.CAVERN, Shape.DEE, 700, 1, ridge(0.28, 0.32), water(0.60, 0.65), mud(0.82, 0.85), boost(0.16), boost(0.46)),
-	A_CANOPY(RaceClass.A, 1, Theme.JUNGLE, Shape.ELBOW, 712, 1, water(0.22, 0.27), ridge(0.55, 0.59), mud(0.72, 0.75), boost(0.40), boost(0.88)),
-	A_EMBER(RaceClass.A, 2, Theme.NETHER, Shape.TRIDENT, 724, 1, lava(0.35, 0.40), ridge(0.66, 0.70), mud(0.86, 0.89), boost(0.15), boost(0.52)),
-	A_DEEPS(RaceClass.A, 3, Theme.CAVERN, Shape.SWITCHBACK, 1420, 3, ridge(0.20, 0.24), water(0.52, 0.57), mud(0.78, 0.81), boost(0.12), boost(0.40), boost(0.66)),
-	A_TEMPLE(RaceClass.A, 4, Theme.JUNGLE, Shape.CASTLE, 1440, 3, water(0.30, 0.35), ridge(0.62, 0.66), mud(0.84, 0.87), boost(0.18), boost(0.48), boost(0.74)),
-	A_INFERNO(RaceClass.A, 5, Theme.NETHER, Shape.CROWN, 1460, 3, lava(0.18, 0.23), lava(0.56, 0.61), ridge(0.80, 0.84), mud(0.88, 0.91), boost(0.10), boost(0.40), boost(0.70)),
+	A_CRYSTAL(RaceClass.A, 0, Theme.CAVERN, Shape.DEE, 700, 1, ridge(0.12, 0.16), water(0.51, 0.56), mud(0.80, 0.83), boost(0.46), boost(0.72), boost(0.93)),
+	A_CANOPY(RaceClass.A, 1, Theme.JUNGLE, Shape.ELBOW, 712, 1, water(0.34, 0.39), ridge(0.46, 0.50), mud(0.78, 0.81), boost(0.10), boost(0.68), boost(0.92)),
+	A_EMBER(RaceClass.A, 2, Theme.NETHER, Shape.TRIDENT, 724, 1, lava(0.31, 0.36), ridge(0.54, 0.58), mud(0.84, 0.87), boost(0.22), boost(0.73), boost(0.93)),
+	A_DEEPS(RaceClass.A, 3, Theme.CAVERN, Shape.SWITCHBACK, 1420, 3, ridge(0.13, 0.17), water(0.49, 0.54), mud(0.77, 0.80), boost(0.23), boost(0.41), boost(0.60), boost(0.68), boost(0.84)),
+	A_TEMPLE(RaceClass.A, 4, Theme.JUNGLE, Shape.CASTLE, 1440, 3, water(0.15, 0.20), ridge(0.48, 0.52), mud(0.70, 0.73), boost(0.34), boost(0.57), boost(0.77), boost(0.84), boost(0.92)),
+	A_INFERNO(RaceClass.A, 5, Theme.NETHER, Shape.CROWN, 1460, 3, lava(0.19, 0.24), lava(0.38, 0.43), ridge(0.68, 0.72), mud(0.86, 0.89), boost(0.11), boost(0.30), boost(0.50), boost(0.63), boost(0.79)),
 	// ---- S: skyway, keep, end
-	S_SKYWAY(RaceClass.S, 0, Theme.SKYWAY, Shape.BOOMERANG, 750, 1, ridge(0.14, 0.18), water(0.44, 0.50), ridge(0.72, 0.76), boost(0.08), boost(0.36), boost(0.62)),
-	S_KEEP(RaceClass.S, 1, Theme.KEEP, Shape.RAMPART, 762, 1, lava(0.20, 0.25), ridge(0.44, 0.48), mud(0.62, 0.65), lava(0.84, 0.88), boost(0.12), boost(0.54)),
-	S_VOID(RaceClass.S, 2, Theme.END, Shape.HAMMER, 774, 1, water(0.15, 0.20), ridge(0.48, 0.52), mud(0.70, 0.73), boost(0.08), boost(0.36), boost(0.86)),
-	S_STARFALL(RaceClass.S, 3, Theme.SKYWAY, Shape.SWEEPS, 1560, 3, ridge(0.16, 0.20), water(0.40, 0.46), ridge(0.66, 0.70), water(0.86, 0.90), boost(0.08), boost(0.30), boost(0.56)),
-	S_CITADEL(RaceClass.S, 4, Theme.KEEP, Shape.HOOK, 1580, 3, lava(0.14, 0.19), ridge(0.38, 0.42), mud(0.58, 0.61), lava(0.82, 0.87), boost(0.08), boost(0.30), boost(0.70)),
-	S_MAELSTROM(RaceClass.S, 5, Theme.END, Shape.BEE, 1600, 3, water(0.12, 0.17), ridge(0.34, 0.38), water(0.56, 0.62), ridge(0.80, 0.84), boost(0.06), boost(0.26), boost(0.46));
+	S_SKYWAY(RaceClass.S, 0, Theme.SKYWAY, Shape.BOOMERANG, 750, 1, ridge(0.23, 0.27), water(0.67, 0.73), ridge(0.82, 0.86), boost(0.11), boost(0.41), boost(0.50)),
+	S_KEEP(RaceClass.S, 1, Theme.KEEP, Shape.RAMPART, 762, 1, lava(0.09, 0.14), ridge(0.36, 0.40), mud(0.61, 0.64), lava(0.80, 0.84), boost(0.52), boost(0.73), boost(0.93)),
+	S_VOID(RaceClass.S, 2, Theme.END, Shape.HAMMER, 774, 1, water(0.20, 0.25), ridge(0.67, 0.71), mud(0.87, 0.90), boost(0.37), boost(0.47), boost(0.58)),
+	S_STARFALL(RaceClass.S, 3, Theme.SKYWAY, Shape.SWEEPS, 1560, 3, ridge(0.09, 0.13), water(0.22, 0.28), ridge(0.49, 0.53), water(0.68, 0.72), boost(0.44), boost(0.60), boost(0.76), boost(0.81), boost(0.89)),
+	S_CITADEL(RaceClass.S, 4, Theme.KEEP, Shape.HOOK, 1580, 3, lava(0.25, 0.30), ridge(0.56, 0.60), mud(0.65, 0.68), lava(0.74, 0.79), boost(0.11), boost(0.34), boost(0.51), boost(0.83), boost(0.87)),
+	S_MAELSTROM(RaceClass.S, 5, Theme.END, Shape.BEE, 1600, 3, water(0.15, 0.20), ridge(0.28, 0.32), water(0.62, 0.68), ridge(0.88, 0.92), boost(0.10), boost(0.49), boost(0.54), boost(0.75), boost(0.80));
 
 	/** A stretch of the direct line: terrain (with a detour road around it) or a boost strip. */
 	public record Feature(Type type, double start, double end) {
@@ -324,6 +333,44 @@ public enum RaceTrack {
 
 	public double centerZ() {
 		return 0.5D + ROW_Z0 + raceClass.getId() * ROW_DZ;
+	}
+
+	/**
+	 * Extra blocks a bird that takes the detour travels over one that goes straight
+	 * through {@code f}, the swing out and back included. This is what a colour's
+	 * ability is worth on this course, so features are placed to keep it even: see
+	 * {@link #detourTarget()}.
+	 */
+	public double detourCost(Feature f) {
+		double connect = 0.012D, lane = -(DETOUR_INNER + DETOUR_OUTER) / 2.0D;
+		double from = f.start() - connect, to = f.end() + connect;
+		int n = 400;
+		double direct = 0.0D, detour = 0.0D;
+		RacePoint pc = null, pd = null;
+		for (int i = 0; i <= n; i++) {
+			double p = from + (to - from) * i / (double) n;
+			double o = p < f.start() ? lane * (p - from) / connect
+					: p > f.end() ? lane * (to - p) / connect : lane;
+			RacePoint c = pointAt(p);
+			RacePoint d = pointAtLane(p, o);
+			if (pc != null) {
+				direct += Math.hypot(c.x() - pc.x(), c.z() - pc.z());
+				detour += Math.hypot(d.x() - pd.x(), d.z() - pd.z());
+			}
+			pc = c;
+			pd = d;
+		}
+		return detour - direct;
+	}
+
+	/**
+	 * What a colour feature's detour should cost here: 2 % of a lap, floored at 13
+	 * blocks so a short course still rewards the ability and capped at 28 so a long
+	 * one does not decide the race on colour alone. A bog aims at 45 % of this — nobody
+	 * suits a bog, so its detour is everyone's smart route and should be easy to take.
+	 */
+	public double detourTarget() {
+		return Math.max(13.0D, Math.min(28.0D, 0.02D * lapLength()));
 	}
 
 	/** Blocks per lap along the centre line. */

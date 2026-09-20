@@ -4,9 +4,9 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.7**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.8**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
-[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.7](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.7)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.8](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.8)
 
 Original work. Original birds, original calls, original art, original music. A fan work, not affiliated with Square Enix.
 
@@ -64,7 +64,7 @@ The town: a plaza round the arrival medallion, the chocobo fountain, awninged ma
 
 **Heats go off every five minutes.** Esther on the overlook enters you in the next heat of your bird's class or any class below: the first rider picks the course, riders of that class or higher who see her join, taking an AI racer's stall. You may race any course of your class or below (lower classes pay half and don't count toward promotion). She calls the heat at two minutes and one minute, counts the last ten seconds, and you are carried to the stalls for a big five-second countdown.
 
-**Twenty-four courses**, six per class, every one a different circuit: sprints of one lap and grands prix of three, with straights, sweepers, hairpins, chicanes and hills, striped kerbs, a grandstand full of fans in the infield, themed from meadow and shore through canyon, snow, cavern, jungle and the Nether to a rainbow skyway, an obsidian keep and the End. **Boost strips** cover one lane of the road; water, ridges, lava and bogs cross the direct line with a slower road round, and the bird that suits the terrain takes the short way. Six racers, every AI bird with a kin jockey up; from Class B on, Jolo and Teiyo are in the field, and every racer runs its own form each heat.
+**Twenty-four courses**, six per class, every one a different circuit: sprints of one lap and grands prix of three, with straights, sweepers, hairpins, chicanes and hills, striped kerbs, a grandstand full of fans in the infield, themed from meadow and shore through canyon, snow, cavern, jungle and the Nether to a rainbow skyway, an obsidian keep and the End. **Boost strips** cover one lane of the road, three on a sprint and five on a grand prix, each on a corner exit; water, ridges, lava and bogs cross the direct line with a slower road round, laid on a bend so the way round really costs you and the bird that suits the terrain takes the short way. Every course has its own landmark, from a windmill and a beached shipwreck to a bone arch, a ring hung over the road and a caged crystal. Nothing in Whiskerwind can hurt a rider or a bird: a bad line costs a place, not a life. Six racers, every AI bird with a kin jockey up; from Class B on, Jolo and Teiyo are in the field, and every racer runs its own form each heat.
 
 - **Rook the Bookie** takes one bet per heat.
 - **Sable the Duel Master** runs two-rider races outside the ladder with an optional GP side bet.

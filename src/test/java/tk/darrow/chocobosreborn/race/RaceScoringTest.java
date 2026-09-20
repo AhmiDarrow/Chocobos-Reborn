@@ -397,11 +397,24 @@ class RaceScoringTest {
 	}
 
 	@Test
-	void squareVoidRescueSkipsBirdsStillOnTheCourse() {
-		assertTrue(RaceScoring.squareFallRescue(10.0D, false));
-		assertFalse(RaceScoring.squareFallRescue(10.0D, true));
-		assertFalse(RaceScoring.squareFallRescue(65.0D, false));
-		assertFalse(RaceScoring.squareFallRescue(50.0D, false));
+	void whiskerwindProtectsTheRiderAsWellAsTheBird() {
+		assertTrue(RaceScoring.squareRiderProtected(true, false));
+		assertFalse(RaceScoring.squareRiderProtected(false, false));   // only in the Square
+		assertFalse(RaceScoring.squareRiderProtected(true, true));     // /kill still works
+		assertTrue(RaceScoring.squareVisitorFallRescue(10.0D, false));
+		assertFalse(RaceScoring.squareVisitorFallRescue(65.0D, false));
+		// a rider in the saddle is the session's to rescue, bird and all
+		assertFalse(RaceScoring.squareVisitorFallRescue(10.0D, true));
+	}
+
+	@Test
+	void squareVoidRescueCatchesEveryFall() {
+		assertTrue(RaceScoring.squareFallRescue(10.0D));
+		// a drop through a gap in the road is still a drop: the old on-course exception
+		// left the rider falling out of the world
+		assertTrue(RaceScoring.squareFallRescue(-20.0D));
+		assertFalse(RaceScoring.squareFallRescue(65.0D));
+		assertFalse(RaceScoring.squareFallRescue(50.0D));
 		assertTrue(RaceScoring.squarePetFallRescue(10.0D, false));
 		assertFalse(RaceScoring.squarePetFallRescue(10.0D, true));
 		assertFalse(RaceScoring.squarePetFallRescue(65.0D, false));

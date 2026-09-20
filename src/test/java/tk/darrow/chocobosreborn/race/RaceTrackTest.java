@@ -176,11 +176,11 @@ class RaceTrackTest {
 		assertFalse(mud.suits(ChocoboColor.GOLD));
 		assertTrue(boost.suits(ChocoboColor.YELLOW) && !boost.terrain());
 		assertTrue(water.suits(ChocoboColor.GOLD) && ridge.suits(ChocoboColor.GOLD));
-		assertTrue(RaceTrack.B_FORD.isWaterSection(0.52D));
-		assertTrue(RaceTrack.B_CANYON.isSpaceSection(0.38D));
+		assertTrue(RaceTrack.B_FORD.isWaterSection(midOf(RaceTrack.B_FORD, RaceTrack.Feature.Type.WATER)));
+		assertTrue(RaceTrack.B_CANYON.isSpaceSection(midOf(RaceTrack.B_CANYON, RaceTrack.Feature.Type.RIDGE)));
 		assertFalse(RaceTrack.C_MEADOW.isWaterSection(0.5D));
-		assertNotNull(RaceTrack.C_MEADOW.featureAt(0.305D));
-		assertEquals(null, RaceTrack.C_MEADOW.terrainAt(0.305D));
+		assertNotNull(RaceTrack.C_MEADOW.featureAt(boostMid(RaceTrack.C_MEADOW, 0)));
+		assertEquals(null, RaceTrack.C_MEADOW.terrainAt(boostMid(RaceTrack.C_MEADOW, 0)));
 	}
 
 	@Test
@@ -224,41 +224,63 @@ class RaceTrackTest {
 		}
 	}
 
+	/** Middle of the first feature of this type on the course (the table moves them about). */
+	private static double midOf(RaceTrack track, RaceTrack.Feature.Type type) {
+		for (RaceTrack.Feature f : track.features()) {
+			if (f.type() == type) {
+				return (f.start() + f.end()) / 2.0D;
+			}
+		}
+		throw new AssertionError(track + " has no " + type);
+	}
+
+	/** Middle of the n-th boost strip. */
+	private static double boostMid(RaceTrack track, int n) {
+		int seen = 0;
+		for (RaceTrack.Feature f : track.features()) {
+			if (f.type() == RaceTrack.Feature.Type.BOOST && seen++ == n) {
+				return (f.start() + f.end()) / 2.0D;
+			}
+		}
+		throw new AssertionError(track + " has no boost " + n);
+	}
+
 	@Test
 	void layoutStampsRoadFeaturesDetoursBoostsAndTheGrandstand() {
 		RaceCourseLayout l = RaceCourseLayout.of(RaceTrack.B_FORD);
 		RaceTrack t = RaceTrack.B_FORD;
-		var mid = t.pointAtLane(0.525D, 0.0D);
+		double ford = midOf(t, RaceTrack.Feature.Type.WATER);
+		var mid = t.pointAtLane(ford, 0.0D);
 		assertEquals("water", l.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(mid.x()), (int) mid.y() - 1, (int) Math.floor(mid.z()))));
-		var detour = t.pointAtLane(0.525D, -(RaceTrack.DETOUR_INNER + RaceTrack.DETOUR_OUTER) / 2.0D);
+		var detour = t.pointAtLane(ford, -(RaceTrack.DETOUR_INNER + RaceTrack.DETOUR_OUTER) / 2.0D);
 		assertTrue(l.onCourse(detour.x(), detour.z()), "detour is on course");
-		var inside = t.pointAtLane(0.525D, RaceTrack.DETOUR_OUTER);
+		var inside = t.pointAtLane(ford, RaceTrack.DETOUR_OUTER);
 		assertFalse(l.onCourse(inside.x(), inside.z()), "infield is not road");
-		var plain = t.pointAtLane(0.75D, 0.0D);
+		var plain = t.pointAtLane(t.terrainFeatures().get(0).end() + 0.15D, 0.0D);
 		assertTrue(l.onCourse(plain.x(), plain.z()));
 		assertTrue(l.chunks().size() > 50, "chunk set for force-loading");
 		// ridge wall
 		RaceCourseLayout r = RaceCourseLayout.of(RaceTrack.B_CANYON);
-		var top = RaceTrack.B_CANYON.pointAtLane(0.38D, 0.0D);
+		var top = RaceTrack.B_CANYON.pointAtLane(midOf(RaceTrack.B_CANYON, RaceTrack.Feature.Type.RIDGE), 0.0D);
 		assertTrue(r.blocks().containsKey(new RaceCourseLayout.Cell((int) Math.floor(top.x()), (int) top.y() - 1 + RaceTrack.B_CANYON.ridgeHeight(), (int) Math.floor(top.z()))), "ridge wall");
 		// boost pad lies on the road at standing level, pointing along the track
 		RaceCourseLayout c = RaceCourseLayout.of(RaceTrack.C_MEADOW);
 		// the first strip of a course sits on the outside lane, the second in the centre: one lane, not the road
-		var pad = RaceTrack.C_MEADOW.pointAtLane(0.306D, -3.0D);
+		var pad = RaceTrack.C_MEADOW.pointAtLane(boostMid(RaceTrack.C_MEADOW, 0), -3.0D);
 		String padBlock = c.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(pad.x()), (int) pad.y(), (int) Math.floor(pad.z())));
 		assertNotNull(padBlock, "boost pad");
 		assertTrue(padBlock.startsWith("chocobosreborn:boost_pad[facing="), padBlock);
-		var clear = RaceTrack.C_MEADOW.pointAtLane(0.306D, 3.0D);
+		var clear = RaceTrack.C_MEADOW.pointAtLane(boostMid(RaceTrack.C_MEADOW, 0), 3.0D);
 		assertEquals(null, c.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(clear.x()), (int) clear.y(), (int) Math.floor(clear.z()))), "inside lane is clear");
-		var centre = RaceTrack.C_MEADOW.pointAtLane(0.626D, 0.0D);
+		var centre = RaceTrack.C_MEADOW.pointAtLane(boostMid(RaceTrack.C_MEADOW, 1), 0.0D);
 		assertNotNull(c.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(centre.x()), (int) centre.y(), (int) Math.floor(centre.z()))), "second strip in the centre");
 		// bog
 		RaceCourseLayout a = RaceCourseLayout.of(RaceTrack.A_CRYSTAL);
-		var bog = RaceTrack.A_CRYSTAL.pointAtLane(0.835D, 0.0D);
+		var bog = RaceTrack.A_CRYSTAL.pointAtLane(midOf(RaceTrack.A_CRYSTAL, RaceTrack.Feature.Type.MUD), 0.0D);
 		assertEquals("mud", a.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(bog.x()), (int) bog.y() - 1, (int) Math.floor(bog.z()))));
 		// lava on the Nether course
 		RaceCourseLayout n = RaceCourseLayout.of(RaceTrack.A_EMBER);
-		var lava = RaceTrack.A_EMBER.pointAtLane(0.375D, 0.0D);
+		var lava = RaceTrack.A_EMBER.pointAtLane(midOf(RaceTrack.A_EMBER, RaceTrack.Feature.Type.LAVA), 0.0D);
 		assertEquals("lava", n.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(lava.x()), (int) lava.y() - 1, (int) Math.floor(lava.z()))));
 		// a landmark stands beside every course's far side
 		for (RaceTrack track : RaceTrack.values()) {
@@ -285,8 +307,11 @@ class RaceTrackTest {
 	}
 
 	@Test
-	void courseVersionFiveRelaysTheIslands() {
-		assertEquals(5, SquareBuilder.COURSE_VERSION);
+	void courseVersionSevenRelaysTheIslands() {
+		// 6: the stamp gaps that dropped a racer through the island into the void are
+		// plugged; 7: the plan is stamped in layers, so scenery, rails and pools no
+		// longer land on the racing line. Older islands have to be re-laid either way.
+		assertEquals(7, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

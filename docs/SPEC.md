@@ -126,7 +126,12 @@ shrine islet. Each of the 24 courses is its own circuit island built on first us
 `RaceTrack.centerX/Z()`. The dimension is a true void (`the_void` biome, no layers), natural
 spawns are cancelled (`RaceManager.onFinalizeSpawn`), blocks cannot be broken or placed by
 players (`onBreak` / `onPlace`, creative operators excepted), and five untamable town birds
-(`ChocoboEntity.townBird`) wander the village. Music: the village theme loops in Whiskerwind, the course loop
+(`ChocoboEntity.townBird`) wander the village. Nothing there hurts anyone: race birds and
+town birds are invulnerable (`ChocoboEntity.isInvulnerableTo`) and so is a visiting player
+(`RaceManager.onInvulnerabilityCheck`, anything short of `BYPASSES_INVULNERABILITY`), a
+burning rider is put out, and a visitor who goes over the edge is set down in the paddock
+(`RaceScoring.squareVisitorFallRescue`; a racer below y 50 is put back on the road by the
+session). Music: the village theme loops in Whiskerwind, the course loop
 during a heat (`client/RaceMusic`). Sky: `client/SquareSky`, the Tribal Power day / night
 panoramas over the void with a real day cycle.
 
@@ -146,10 +151,16 @@ gantry, a yellow arrow just past it, warning posts before terrain, margins of th
 decoration and an infield grandstand on the start straight where the crowd
 (`RaceSession.spawnFans`) stands.
 Features across the direct line: BOOST strips (every class; `boost_pad` block, +55%
-for 50 ticks), WATER (river birds walk it), RIDGE (3-5 blocks; climbers go over), LAVA
-(Nether bird and Gold), MUD bogs (everyone -55%), each terrain feature with a detour
-road outside (`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A
-two plus a bog, S three or four. Lap progress is the nearest centre-line sample, so
+for 50 ticks; three per sprint, five per grand prix, each on a corner exit), WATER
+(river birds walk it), RIDGE (3-5 blocks; climbers go over), LAVA (Nether bird and
+Gold), MUD bogs (everyone -55%), each terrain feature with a detour road outside
+(`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A two plus a bog,
+S three or four. Where a feature sits decides what a colour is worth, so the spans are
+placed, not free-hand: `RaceTrack.detourCost` measures the blocks a detour-taker gives
+away (swing out, round, swing back) and every feature sits on a level stretch of a bend
+that puts that near `detourTarget()` (2 % of a lap, 13-28 blocks), spread round the lap,
+clear of the bunched field off the grid, with the bog always the cheapest thing to go
+round. `CourseBalanceTest` and `CourseIslandTest` hold it. Lap progress is the nearest centre-line sample, so
 both routes credit progress; `RacerGoal` brakes for corners and takes the detour when
 its bird does not suit the feature (C birds sometimes blunder into bogs).
 `RaceCourseLayout` stamps the island, features, detours, stand and lists chunks;

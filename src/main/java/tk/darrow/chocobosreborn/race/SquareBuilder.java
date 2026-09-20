@@ -45,7 +45,7 @@ public final class SquareBuilder {
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * relaid on their next use, in place, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 5;
+	public static final int COURSE_VERSION = 7;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/** Birds that live in the village (untamable scenery). */

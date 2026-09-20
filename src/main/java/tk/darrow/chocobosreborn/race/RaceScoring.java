@@ -428,6 +428,20 @@ public final class RaceScoring {
 		return townBird || raceNpc || racing || assignedCourse;
 	}
 
+	/**
+	 * Whiskerwind is a show, not a hazard: a rider is as safe there as the birds are
+	 * ({@link #squareNpcProtected}). Riding a bird that does not suit a lava or water
+	 * feature should cost a place, not a life and an inventory in the void.
+	 */
+	public static boolean squareRiderProtected(boolean inSquare, boolean bypassesInvulnerability) {
+		return inSquare && !bypassesInvulnerability;
+	}
+
+	/** A visitor below the island, racing or not, is falling: put them back in the paddock. */
+	public static boolean squareVisitorFallRescue(double y, boolean ridingSomething) {
+		return y < 50.0D && !ridingSomething;
+	}
+
 	/** Join a pending heat only when there is a stall, or this rider is already in it. */
 	public static boolean joinSkipsFullHeat(int entrants, int field, boolean alreadyIn) {
 		return alreadyIn || entrants < field;
@@ -476,8 +490,14 @@ public final class RaceScoring {
 		return Math.abs(offset) <= halfWidth;
 	}
 
-	public static boolean squareFallRescue(double y, boolean onCourse) {
-		return y < 50.0D && !onCourse;
+	/**
+	 * A racer below the island is falling, wherever it is: the lowest course rock sits
+	 * at y 59, so nothing legitimate is down here (flight is blocked during a heat).
+	 * This used to skip a bird that was still over the road, which meant a drop through
+	 * a gap in the course was never caught at all and the rider fell out of the world.
+	 */
+	public static boolean squareFallRescue(double y) {
+		return y < 50.0D;
 	}
 
 	/** Owned pets in Whiskerwind: catch a fall into the void, not a Gold flying between islands. */
