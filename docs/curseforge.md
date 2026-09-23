@@ -19,6 +19,13 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.11 - Fine feathers
+Uploaded 2026-09-23: `chocobosreborn-1.0.11.jar` as file **8957333** ("Chocobos Reborn 1.0.11 - Fine feathers",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.11.md`) via
+`tools/upload_curseforge.py`. Tame adults shed a feather every 5 to 10 minutes and a brush frees one;
+a sated or digesting bird that is hurt eats a green to heal without training.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.11
+
 ## 1.0.10 - Level field
 Uploaded 2026-09-23: `chocobosreborn-1.0.10.jar` as file **8957253** ("Chocobos Reborn 1.0.10 - Level field",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.10.md`) via
