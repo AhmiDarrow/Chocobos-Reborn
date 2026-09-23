@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.10 - Level field
+Uploaded 2026-09-23: `chocobosreborn-1.0.10.jar` as file **8957253** ("Chocobos Reborn 1.0.10 - Level field",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.10.md`) via
+`tools/upload_curseforge.py`. Distance LODs for the birds; host and guests on one clock at the finish
+(ping credit, sub-tick crossings) and client-timed boost pads; duels one on one for the pot only;
+course relays clear old leftovers, the River cairn's spring in a basin, watertight boost pads.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.10
+
 ## 1.0.9 - Follow me
 Uploaded 2026-09-23: `chocobosreborn-1.0.9.jar` as file **8954786** ("Chocobos Reborn 1.0.9 - Follow me",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.9.md`) via
