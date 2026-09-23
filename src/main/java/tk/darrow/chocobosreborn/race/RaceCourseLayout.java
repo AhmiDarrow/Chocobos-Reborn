@@ -753,8 +753,8 @@ public final class RaceCourseLayout {
 				put(x, y + 10, z, "terracotta");
 				put(x + 1, y + 10, z, "terracotta");
 			}
-			case RIVER -> {   // a mossy cairn with a spring
-				for (int h = 0; h < 4; h++) {
+			case RIVER -> {   // a mossy cairn with a spring in a basin on top
+				for (int h = 0; h < 3; h++) {
 					int r = 3 - h;
 					for (int dx = -r; dx <= r; dx++) {
 						for (int dz = -r; dz <= r; dz++) {
@@ -762,7 +762,9 @@ public final class RaceCourseLayout {
 						}
 					}
 				}
-				put(x, y + 4, z, "water");
+				// sunk into the top step and ringed by it: a source set on the peak ran down
+				// the cairn and over the road the first time anything touched it
+				put(x, y + 2, z, "water");
 			}
 			case SNOW -> {   // an ice spire
 				for (int h = 0; h < 10; h++) {
@@ -1371,6 +1373,65 @@ public final class RaceCourseLayout {
 
 	public Set<Tile> road() {
 		return Collections.unmodifiableSet(road);
+	}
+
+	/**
+	 * Chunks to clear before this island is laid again: its own, plus a ring for what an
+	 * older, wider plan left at the edges. A relay only overwrites the plan's own cells,
+	 * so an old pool or spring that the new plan does not cover would stay, its rim now
+	 * perhaps road, and flood the course (and wash the boost pads out) the first time
+	 * something touched it. Nothing near another island or the village is in the set.
+	 */
+	public Set<Long> clearChunks() {
+		Set<Long> out = new HashSet<>();
+		for (long key : chunks) {
+			int cx = (int) (key >> 32), cz = (int) key;
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					int x = cx + dx, z = cz + dz;
+					if (!nearVillage(x, z) && !nearOtherIsland(x, z)) {
+						out.add(chunkKey(x, z));
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Lowest and highest y the plan uses. */
+	public int minY() {
+		return blocks.keySet().stream().mapToInt(Cell::y).min().orElse(0);
+	}
+
+	public int maxY() {
+		return blocks.keySet().stream().mapToInt(Cell::y).max().orElse(0);
+	}
+
+	/** Within a chunk of the footprint {@code SquareBuilder.buildPaddock} scrubs (village and shrine islet). */
+	static boolean nearVillage(int cx, int cz) {
+		int r = VillageLayout.RADIUS + 12;
+		return inChunks(cx, cz, VillageLayout.CX - r, VillageLayout.CZ - r, VillageLayout.CX + r, VillageLayout.CZ + r + 30)
+				|| inChunks(cx, cz, 44, -72, 66, -48);
+	}
+
+	/** Within a chunk of another course's island (its half extents plus a 16-block pad). */
+	private boolean nearOtherIsland(int cx, int cz) {
+		for (RaceTrack other : RaceTrack.values()) {
+			if (other == track) {
+				continue;
+			}
+			double rx = other.getRadiusX() + 16.0D, rz = other.getRadiusZ() + 16.0D;
+			if (inChunks(cx, cz, floor(other.centerX() - rx), floor(other.centerZ() - rz),
+					floor(other.centerX() + rx), floor(other.centerZ() + rz))) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Chunk (cx, cz) touches the block box, grown by one chunk each way. */
+	private static boolean inChunks(int cx, int cz, int x0, int z0, int x1, int z1) {
+		return cx >= (x0 >> 4) - 1 && cx <= (x1 >> 4) + 1 && cz >= (z0 >> 4) - 1 && cz <= (z1 >> 4) + 1;
 	}
 
 	/** Chunk keys ({@link #chunkKey}) the course touches, for force-loading during a heat. */

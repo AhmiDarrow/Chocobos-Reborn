@@ -10,19 +10,28 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.LiquidBlockContainer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.entity.player.Player;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Kart-racer boost strip: a carpet-thin pad with scrolling chevrons laid across
  * the road on Whiskerwind's courses. A chocobo running over it (feet in this
  * block) gets a burst of speed; see {@code ChocoboEntity#tickCourseEffects}.
  * FACING is the direction the chevrons point (the direction of travel).
+ * <p>
+ * Watertight: a carpet-thin block is otherwise washed out by any flow that reaches it
+ * and dropped as an item a rider picks up mid-heat. As a {@link LiquidBlockContainer}
+ * that takes no liquid, water and lava treat it as a wall.
  */
-public class BoostPadBlock extends HorizontalDirectionalBlock {
+public class BoostPadBlock extends HorizontalDirectionalBlock implements LiquidBlockContainer {
 	public static final MapCodec<BoostPadBlock> CODEC = simpleCodec(BoostPadBlock::new);
 	private static final VoxelShape SHAPE = Block.box(0.0D, 0.0D, 0.0D, 16.0D, 1.0D, 16.0D);
 
@@ -39,6 +48,16 @@ public class BoostPadBlock extends HorizontalDirectionalBlock {
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
 		builder.add(FACING);
+	}
+
+	@Override
+	public boolean canPlaceLiquid(@Nullable Player player, BlockGetter level, BlockPos pos, BlockState state, Fluid fluid) {
+		return false;
+	}
+
+	@Override
+	public boolean placeLiquid(LevelAccessor level, BlockPos pos, BlockState state, FluidState fluid) {
+		return false;
 	}
 
 	@Override

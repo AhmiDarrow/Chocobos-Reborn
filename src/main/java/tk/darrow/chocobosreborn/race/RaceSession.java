@@ -27,7 +27,7 @@ import tk.darrow.chocobosreborn.sound.ModSounds;
  * One heat at Whiskerwind: countdown at the stalls, laps, finish order,
  * awards (class wins, GP prizes, bets, duel stakes) and the walk back to the
  * paddock. A ranked heat has one human and five named AI regulars (Jolo and
- * Teiyo from Class B); a duel has two humans and four named pace birds. The
+ * Teiyo from Class B); a duel is the two riders alone, no AI field. The
  * course's chunks are force-loaded for the duration so the field keeps running
  * out of the riders' sight.
  */
@@ -54,6 +54,13 @@ public class RaceSession {
 		final ChocoboEntity ref;
 		int laps;
 		int finishIndex = -1;
+		/**
+		 * Crossed the line at this tick (fractional, less the rider's ping credit) but not
+		 * placed yet: {@link #settleFinishes} places finishers in crossing order.
+		 */
+		double finishTime = Double.NaN;
+		/** Fine lap progress at the end of the last tick, for timing the crossing inside a tick. */
+		double lastFine = Double.NaN;
 		boolean forfeited;
 		boolean settled;
 		@Nullable RacerGoal goal;
@@ -69,6 +76,16 @@ public class RaceSession {
 
 		boolean human() {
 			return player != null;
+		}
+
+		/** Over the line, waiting to be placed. */
+		boolean pending() {
+			return finishIndex < 0 && !Double.isNaN(finishTime);
+		}
+
+		/** Still racing: not forfeited, not over the line (placed or pending). */
+		boolean running() {
+			return RaceScoring.stillOnCourse(forfeited, finishIndex) && !pending();
 		}
 
 		@Nullable ChocoboEntity entity() {
@@ -110,6 +127,10 @@ public class RaceSession {
 	/** Bet placed at the bookie before the start (ranked, first human). */
 	@Nullable RaceScoring.BetPick bet;
 	int stake;
+	/** Riders only, no AI field (Sable's duels). */
+	private final boolean duel;
+	/** Stalls on the grid: the full field, or just the duellists (centred on the road). */
+	private final int grid;
 	/** Duel: GP each side put up; the winner takes both. */
 	private int duelStake;
 	private boolean duelPaid;
@@ -189,15 +210,21 @@ public class RaceSession {
 
 	/** Ranked heat, or a friendly against the field: one human. */
 	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, ServerPlayer player, ChocoboEntity bird) {
-		this(level, track, ranked, List.of(player), List.of(bird), 0);
+		this(level, track, ranked, List.of(player), List.of(bird), false, 0);
 	}
 
-	/** A heat with one or two humans; {@code duelStake} > 0 means both put GP up (already taken). */
+	/**
+	 * A heat with one or more humans. A {@code duel} is those riders alone on the two
+	 * centre stalls, no AI field, and pays only the pot; {@code duelStake} > 0 means both
+	 * put GP up (already taken).
+	 */
 	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, List<ServerPlayer> players,
-	                   List<ChocoboEntity> birds, int duelStake) {
+	                   List<ChocoboEntity> birds, boolean duel, int duelStake) {
 		this.level = level;
 		this.track = track;
 		this.ranked = ranked;
+		this.duel = duel;
+		this.grid = duel ? players.size() : FIELD;
 		this.duelStake = duelStake;
 		if (duelStake > 0) {
 			for (ServerPlayer p : players) {
@@ -209,21 +236,23 @@ public class RaceSession {
 		SquareBuilder.buildTrack(level, track);
 		SquareBuilder.scrubCourse(level, track);
 		for (int i = 0; i < players.size(); i++) {
-			RacePoint stall = track.stallPos(i, FIELD);
+			RacePoint stall = track.stallPos(i, grid);
 			racers.add(new Racer(birds.get(i), players.get(i).getUUID(), players.get(i).getName().getString(),
-					RaceTrack.stallOffset(i, FIELD), track.progressAt(stall.x(), stall.z())));
+					RaceTrack.stallOffset(i, grid), track.progressAt(stall.x(), stall.z())));
 			birds.get(i).setRacing(true);
 			birds.get(i).setRaceTrack(track.ordinal());
 			birds.get(i).setOrderedToSit(false);
 		}
-		spawnField(players.size(), track.getRaceClass());
+		if (!duel) {
+			spawnField(players.size(), track.getRaceClass());
+		}
 		spawnFans();
 		for (Racer r : racers) {
 			ChocoboEntity e = r.entity();
 			if (e == null) {
 				continue;
 			}
-			RacePoint stall = track.stallPos(racers.indexOf(r), FIELD);
+			RacePoint stall = track.stallPos(racers.indexOf(r), grid);
 			moveRidden(e, stall.x(), stall.y(), stall.z(), false);
 			e.setYRot(track.facingYaw());
 			e.setYBodyRot(track.facingYaw());
@@ -463,6 +492,16 @@ public class RaceSession {
 		return track;
 	}
 
+	/** Birds on the grid, riders and AI alike (tests). */
+	public int fieldSize() {
+		return racers.size();
+	}
+
+	/** AI racers on the grid (tests: a duel has none). */
+	public long aiRacers() {
+		return racers.stream().filter(r -> !r.human()).count() + jockeys.size();
+	}
+
 	/** Racers that have crossed the finish (tests, HUD). */
 	public int finished() {
 		return finishCount;
@@ -498,7 +537,7 @@ public class RaceSession {
 		}
 		tick++;
 		for (Racer me : humans()) {
-			if (!RaceScoring.stillOnCourse(me.forfeited, me.finishIndex)) {
+			if (!me.running()) {
 				continue;
 			}
 			ServerPlayer player = me.serverPlayer();
@@ -548,7 +587,7 @@ public class RaceSession {
 			if (e == null || e.level() != level) {
 				continue;
 			}
-			RacePoint stall = track.stallPos(i, FIELD);
+			RacePoint stall = track.stallPos(i, grid);
 			if (RaceScoring.driftedFromStall(e.getX() - stall.x(), e.getY() - stall.y(), e.getZ() - stall.z())) {
 				moveRidden(e, stall.x(), stall.y(), stall.z());
 			}
@@ -590,7 +629,8 @@ public class RaceSession {
 					Titles.count(p, left / 20);
 				}
 			}
-			level.playSound(null, track.stallPos(2, FIELD).x(), track.stallPos(2, FIELD).y(), track.stallPos(2, FIELD).z(),
+			RacePoint mid = track.stallPos((grid - 1) / 2, grid);
+			level.playSound(null, mid.x(), mid.y(), mid.z(),
 					net.minecraft.sounds.SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.NEUTRAL, 1.5F, left <= 20 ? 1.4F : 1.0F);
 		}
 		if (left <= 0) {
@@ -634,18 +674,21 @@ public class RaceSession {
 			}
 			ChocoboEntity e = r.entity();
 			if (e == null) {
-				if (r.finishIndex < 0) {
+				if (r.finishIndex < 0 && !r.pending()) {
 					r.forfeited = true;
 				}
 				continue;
 			}
 			double progress = track.progressAt(e.getX(), e.getZ());
+			double fine = track.progressFineAt(e.getX(), e.getZ());
+			double fineBefore = Double.isNaN(r.lastFine) ? fine : r.lastFine;
+			r.lastFine = fine;
 			boolean onCourse = layout.onCourse(e.getX(), e.getZ());
 			if (RaceScoring.squareFallRescue(e.getY())) {
 				RacePoint back = track.pointAtLane(progress, r.lane);
 				moveRidden(e, back.x(), back.y(), back.z());
 			}
-			if (r.finishIndex >= 0) {
+			if (r.finishIndex >= 0 || r.pending()) {
 				continue;
 			}
 			if (!r.human() && r.goal != null) {
@@ -657,7 +700,9 @@ public class RaceSession {
 				r.laps++;
 				ServerPlayer player = r.serverPlayer();
 				if (RaceScoring.finished(r.laps, track.getLaps())) {
-					r.finishIndex = finishCount++;
+					// the crossing inside this tick, less the rider's ping: host, guests and AI on one clock
+					r.finishTime = tick - 1 + RaceScoring.crossFraction(fineBefore, fine)
+							- (player == null ? 0.0D : RaceScoring.lagCreditTicks(player.connection.latency()));
 					if (r.human()) {
 						e.setRacing(false);   // unlock dismount; grace must not DNF a placed rider
 						if (firstFinishTick < 0) {
@@ -667,20 +712,17 @@ public class RaceSession {
 					if (r.goal != null) {
 						r.goal.lapsDone = r.laps;
 					}
-					if (player != null) {
-						player.displayClientMessage(Component.translatable("chocobosreborn.race.finish",
-								RaceScoring.placeOf(r.finishIndex, finishCount)), false);
-					}
 				} else if (player != null) {
 					player.displayClientMessage(Component.translatable("chocobosreborn.race.lap",
 							RaceScoring.displayLap(r.laps, track.getLaps()), track.getLaps()), true);
 				}
 			}
 		}
+		settleFinishes(false);
 		if (tick % 10 == 0) {
 			for (Racer me : humans()) {
 				ServerPlayer player = me.serverPlayer();
-				if (player == null || me.finishIndex >= 0 || me.forfeited) {
+				if (player == null || !me.running()) {
 					continue;
 				}
 				ChocoboEntity mine = me.entity();
@@ -695,6 +737,32 @@ public class RaceSession {
 		boolean timedOut = tick > HOLD_TICKS + RUN_CAP_TICKS;
 		if (allDone || grace || timedOut || (humansDone && tick - firstFinishTick > 60)) {
 			finish();
+		}
+	}
+
+	/**
+	 * Place finishers in crossing order. A crossing is only placed once no racer still
+	 * on course could report an earlier one ({@link RaceScoring#finishSettled}); with
+	 * {@code all} (the heat is ending) everyone over the line is placed now.
+	 */
+	private void settleFinishes(boolean all) {
+		List<Racer> waiting = new ArrayList<>();
+		for (Racer r : racers) {
+			if (r.pending()) {
+				waiting.add(r);
+			}
+		}
+		waiting.sort(java.util.Comparator.comparingDouble(r -> r.finishTime));
+		for (Racer r : waiting) {
+			if (!all && !RaceScoring.finishSettled(r.finishTime, tick)) {
+				break;
+			}
+			r.finishIndex = finishCount++;
+			ServerPlayer player = r.serverPlayer();
+			if (player != null) {
+				player.displayClientMessage(Component.translatable("chocobosreborn.race.finish",
+						RaceScoring.placeOf(r.finishIndex, finishCount)), false);
+			}
 		}
 	}
 
@@ -773,6 +841,7 @@ public class RaceSession {
 		if (state == State.DONE) {
 			return;
 		}
+		settleFinishes(true);
 		for (Racer me : humans()) {
 			if (me.settled) {
 				continue;
@@ -789,7 +858,7 @@ public class RaceSession {
 			}
 			if (player == null) {
 				if (me.player != null) {
-					int gp = completed && duelStake <= 0 ? RacePrizes.gp(track.getRaceClass(), place, ranked) : 0;
+					int gp = completed && !duel ? RacePrizes.gp(track.getRaceClass(), place, ranked) : 0;
 					if (below) {
 						gp /= 2;
 					}
@@ -801,7 +870,7 @@ public class RaceSession {
 				continue;
 			}
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.result", place, racers.size()), false);
-			int gp = completed && duelStake <= 0 ? RacePrizes.gp(track.getRaceClass(), place, ranked) : 0;
+			int gp = completed && !duel ? RacePrizes.gp(track.getRaceClass(), place, ranked) : 0;
 			if (below) {
 				gp /= 2;
 				player.displayClientMessage(Component.translatable("chocobosreborn.race.below_class"), false);
@@ -1144,9 +1213,10 @@ public class RaceSession {
 	}
 
 	public void abort() {
+		settleFinishes(true);
 		aborting = true;
 		for (Racer h : humans()) {
-			if (RaceScoring.stillOnCourse(h.forfeited, h.finishIndex)) {
+			if (h.running()) {
 				forfeit(h, h.serverPlayer());
 			}
 		}
@@ -1166,7 +1236,7 @@ public class RaceSession {
 	/** One rider left (logout): the rest of the heat keeps running. */
 	void forfeitPlayer(ServerPlayer player) {
 		for (Racer me : humans()) {
-			if (player.getUUID().equals(me.player) && RaceScoring.stillOnCourse(me.forfeited, me.finishIndex)) {
+			if (player.getUUID().equals(me.player) && me.running()) {
 				forfeit(me, player);
 				return;
 			}

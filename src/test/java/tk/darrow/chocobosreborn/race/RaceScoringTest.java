@@ -480,4 +480,38 @@ class RaceScoringTest {
 		assertEquals(RaceClass.S, toS.raceClass());
 		assertTrue(toS.promoted());
 	}
+
+	/** A host (~0 ms), a guest (120 ms) and an AI bird that all cross together finish together. */
+	@Test
+	void lagCreditPutsHostGuestAndFieldOnOneClock() {
+		assertEquals(0.0D, RaceScoring.lagCreditTicks(0), 1e-9);
+		assertEquals(2.4D, RaceScoring.lagCreditTicks(120), 1e-9);
+		assertEquals(RaceScoring.MAX_LAG_CREDIT_TICKS, RaceScoring.lagCreditTicks(5000), 1e-9);
+		assertEquals(0.0D, RaceScoring.lagCreditTicks(-5), 1e-9);
+		// the guest's crossing reaches the server 2.4 ticks after the host's; credited, they tie
+		double host = 100 - 1 + 0.5 - RaceScoring.lagCreditTicks(0);
+		double guest = 102.4 - 1 + 0.5 - RaceScoring.lagCreditTicks(120);
+		assertEquals(host, guest, 1e-9);
+	}
+
+	@Test
+	void crossFractionTimesTheLineInsideATick() {
+		assertEquals(0.5D, RaceScoring.crossFraction(0.99D, 0.01D), 1e-9);
+		assertEquals(0.25D, RaceScoring.crossFraction(0.995D, 0.015D), 1e-9);
+		assertEquals(1.0D, RaceScoring.crossFraction(0.99D, 0.99D), 1e-9);
+		// two birds over the line in one tick: the one nearer it at the start of the tick is first
+		assertTrue(RaceScoring.crossFraction(0.998D, 0.004D) < RaceScoring.crossFraction(0.995D, 0.004D));
+	}
+
+	@Test
+	void aFinishWaitsUntilNoLaterReportCanBeatIt() {
+		int wait = RaceScoring.MAX_LAG_CREDIT_TICKS;
+		assertFalse(RaceScoring.finishSettled(100.0D, 100 + wait));
+		assertTrue(RaceScoring.finishSettled(100.0D, 101 + wait));
+		// the earliest time a crossing reported next tick can carry is now - wait
+		int now = 200;
+		double earliestNext = (now + 1) - 1 + 0.0D - RaceScoring.lagCreditTicks(RaceScoring.MAX_LAG_CREDIT_MS);
+		assertTrue(RaceScoring.finishSettled(earliestNext - 1e-6, now));
+		assertFalse(RaceScoring.finishSettled(earliestNext, now));
+	}
 }

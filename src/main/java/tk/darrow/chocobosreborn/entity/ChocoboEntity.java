@@ -1163,6 +1163,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	/** Where the bird was at the end of the last tick: a ridden bird's server delta is ~0 and its
 	 *  xo is refreshed after the rider's move packet lands, so neither shows real movement. */
 	private double trackX = Double.NaN, trackZ;
+	/**
+	 * The driving client's own boost timer. A rider's bird moves where its client says,
+	 * so a pad found on the server's copy (one ping behind) and synced back (another)
+	 * would hand the host a boost on the pad and a guest one down the road. Every rider,
+	 * host or guest, times the boost from its own client instead; the server's copy
+	 * still drives the sparks, the whoosh and {@link #boosting()} for onlookers.
+	 */
+	private int localBoostTicks;
+	private double localX = Double.NaN, localZ;
 
 	/** Boosting from a pad right now (both sides). */
 	public boolean boosting() {
@@ -1219,6 +1228,30 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private boolean onCourseGround() {
 		return Square.isSquare(level()) || (tk.darrow.chocobosreborn.race.RaceManager.testLevel != null
 				&& level() == tk.darrow.chocobosreborn.race.RaceManager.testLevel);
+	}
+
+	/** {@link #localBoostTicks}: the same pad test and timing as {@link #tickCourseEffects}, on the driving client. */
+	private void tickLocalBoost() {
+		if (!onCourseGround()) {
+			localX = Double.NaN;
+			localBoostTicks = 0;
+			return;
+		}
+		double prevX = localX, prevZ = localZ;
+		double mx = Double.isNaN(prevX) ? 0.0D : getX() - prevX, mz = Double.isNaN(prevX) ? 0.0D : getZ() - prevZ;
+		localX = getX();
+		localZ = getZ();
+		if (mx * mx + mz * mz > 0.001D && crossedBoostPad(prevX, prevZ)) {
+			localBoostTicks = BOOST_TICKS;
+		}
+		if (localBoostTicks > 0) {
+			localBoostTicks--;
+		}
+	}
+
+	/** Boost for the rider's input: the driving client's own timer, the synced flag anywhere else. */
+	private boolean riderBoost() {
+		return level().isClientSide ? localBoostTicks > 0 : boosting();
 	}
 
 	/** Current block plus the path since last tick, so a dash cannot skip a 1-block strip. */
@@ -1371,7 +1404,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		} else if (stamina() <= 0) {
 			mul *= RaceScoring.emptyStaminaMul();
 		}
-		if (boosting()) {
+		if (riderBoost()) {
 			mul *= 1.0D + BOOST_POWER;   // boost pad: +55%, same as the AI attribute
 		}
 		if (onGround() && Square.isSquare(level()) && getBlockStateOn().is(Blocks.MUD)) {
@@ -1595,6 +1628,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public void tick() {
 		super.tick();
+		if (level().isClientSide) {
+			if (getControllingPassenger() instanceof Player && isControlledByLocalInstance()) {
+				tickLocalBoost();
+			} else {
+				localX = Double.NaN;
+				localBoostTicks = 0;
+			}
+		}
 		ChocoboColor c = color();
 		if (c.fireImmune() && isOnFire()) {
 			clearFire();

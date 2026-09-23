@@ -182,7 +182,8 @@ racing in armour.
 
 Duels: Sable (`TownRole.DUEL`, `DuelDesk`): a rider posts a challenge (course of their
 class + 0..32 GP stake, taken up front); the next rider on a saddled bird accepts;
-`RaceSession` with two humans + four pace birds, unranked; the winner takes the pot.
+`RaceSession` with the two riders alone on the centre stalls (no AI field), unranked;
+the winner takes the pot and no purse is paid (two riders would always place first and second).
 
 Trading: Pell (`TownRole.BROKER`, `TradeDesk`): ride an owned bird up and click to
 offer (sneak = gift); the next rider's offer swaps owners; a player on foot claims a

@@ -43,9 +43,9 @@ public final class SquareBuilder {
 	public static final int PADDOCK_VERSION = 12;
 	/**
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
-	 * relaid on their next use, in place, without touching the village.
+	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 7;
+	public static final int COURSE_VERSION = 8;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/** Birds that live in the village (untamable scenery). */
@@ -105,6 +105,7 @@ public final class SquareBuilder {
 		}
 		RaceCourseLayout layout = RaceCourseLayout.of(track);
 		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
+		int cleared = clearIsland(level, layout);
 		for (Map.Entry<RaceCourseLayout.Cell, String> e : plan.entrySet()) {
 			RaceCourseLayout.Cell c = e.getKey();
 			level.setBlock(new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()), 2);
@@ -116,8 +117,59 @@ public final class SquareBuilder {
 					"chocobosreborn.sign.course.go");
 		}
 		data.setBuilt(track);
-		ChocobosReborn.LOGGER.info("Whiskerwind: built {} ({} blocks, {} chunks)", track.id(), plan.size(),
-				RaceCourseLayout.of(track).chunks().size());
+		ChocobosReborn.LOGGER.info("Whiskerwind: built {} ({} blocks, {} chunks, {} leftovers cleared)", track.id(), plan.size(),
+				RaceCourseLayout.of(track).chunks().size(), cleared);
+	}
+
+	/**
+	 * Take everything off the island that the plan does not place: what an older course
+	 * version left behind ({@link RaceCourseLayout#clearChunks}). Chunks never generated
+	 * and empty sections are skipped, so on a sky island this is a scan of the few
+	 * sections the course sits in.
+	 */
+	private static int clearIsland(ServerLevel level, RaceCourseLayout layout) {
+		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
+		int lo = Math.max(level.getMinBuildHeight(), layout.minY() - 16);
+		int hi = Math.min(level.getMaxBuildHeight() - 1, layout.maxY() + 32);
+		BlockState air = Blocks.AIR.defaultBlockState();
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+		int cleared = 0;
+		for (long key : layout.clearChunks()) {
+			int cx = (int) (key >> 32), cz = (int) key;
+			// a chunk no plan ever reached was never generated and holds nothing; asking at
+			// EMPTY reads what is saved without generating it on the server thread
+			if (level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.EMPTY, true).getPersistedStatus()
+					!= net.minecraft.world.level.chunk.status.ChunkStatus.FULL) {
+				continue;
+			}
+			net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(cx, cz);
+			net.minecraft.world.level.chunk.LevelChunkSection[] sections = chunk.getSections();
+			for (int si = level.getSectionIndex(lo); si <= level.getSectionIndex(hi); si++) {
+				if (si < 0 || si >= sections.length || sections[si].hasOnlyAir()) {
+					continue;
+				}
+				int baseY = level.getSectionYFromSectionIndex(si) << 4;
+				for (int ly = 0; ly < 16; ly++) {
+					int y = baseY + ly;
+					if (y < lo || y > hi) {
+						continue;
+					}
+					for (int lz = 0; lz < 16; lz++) {
+						for (int lx = 0; lx < 16; lx++) {
+							if (sections[si].getBlockState(lx, ly, lz).isAir()) {
+								continue;
+							}
+							int x = (cx << 4) + lx, z = (cz << 4) + lz;
+							if (!plan.containsKey(new RaceCourseLayout.Cell(x, y, z))) {
+								level.setBlock(pos.set(x, y, z), air, 2);
+								cleared++;
+							}
+						}
+					}
+				}
+			}
+		}
+		return cleared;
 	}
 
 	/**

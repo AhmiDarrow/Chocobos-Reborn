@@ -91,6 +91,53 @@ class MeshSkinnerTest {
 		assertEquals(0, p.emissiveTri.length);
 	}
 
+	/** Each LOD is well under the one before, still skins cleanly, and keeps unit normals and the bird's extent. */
+	@Test
+	void lodsDecimateAndSkin() throws Exception {
+		WhiskerMesh m = load();
+		WhiskerMesh.Clip run = m.clipByName.get("run");
+		int nb = run.bones;
+		float[] bones = new float[nb * 12];
+		System.arraycopy(run.m, 5 * nb * 12, bones, 0, nb * 12);
+		boolean[] hidden = new boolean[m.boneNames.length];
+		hidden[6] = true;
+		int prev = m.parts[0].triCount;
+		float[] full = extent(m.parts[0]);
+		for (int level = 1; level <= WhiskerMesh.lodLevels(); level++) {
+			WhiskerMesh.Part p = m.parts(level)[0];
+			System.out.printf("LOD %d: %d tris (%.0f%% of full), %d skinned positions%n",
+					level, p.triCount, 100.0 * p.triCount / m.parts[0].triCount, p.uniqueCount);
+			assertTrue(p.triCount < prev * 0.7, "LOD " + level + " cuts triangles: " + p.triCount + " vs " + prev);
+			assertTrue(p.triCount > 1500, "LOD " + level + " keeps a bird: " + p.triCount);
+			float[] e = extent(p);
+			for (int k = 0; k < 3; k++) {
+				assertEquals(full[k], e[k], m.height * 0.08, "extent axis " + k);
+			}
+			MeshSkinner s = new MeshSkinner();
+			s.composeRows(bones, nb, pose(0.4F, 1.3F, 0, 0, 0), normal(0.4F));
+			s.skin(p, hidden, true);
+			for (int v = 0; v < p.vertexCount; v++) {
+				float nx = s.nrm[v * 3], ny = s.nrm[v * 3 + 1], nz = s.nrm[v * 3 + 2];
+				assertEquals(1.0, Math.sqrt(nx * nx + ny * ny + nz * nz), 1e-3, "unit normal " + v);
+				int u = p.posIndex[v] * 3;
+				assertTrue(Float.isFinite(s.pos[u]) && Float.isFinite(s.pos[u + 1]) && Float.isFinite(s.pos[u + 2]));
+			}
+			assertTrue(m.parts(level) == m.parts(level), "built once");
+			prev = p.triCount;
+		}
+	}
+
+	private static float[] extent(WhiskerMesh.Part p) {
+		float[] lo = {Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE}, hi = {-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE};
+		for (int v = 0; v < p.vertexCount; v++) {
+			for (int k = 0; k < 3; k++) {
+				lo[k] = Math.min(lo[k], p.pos[v * 3 + k]);
+				hi[k] = Math.max(hi[k], p.pos[v * 3 + k]);
+			}
+		}
+		return new float[]{hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]};
+	}
+
 	@Test
 	void fastPathMatchesHiddenPathWithNothingHidden() throws Exception {
 		WhiskerMesh m = load();

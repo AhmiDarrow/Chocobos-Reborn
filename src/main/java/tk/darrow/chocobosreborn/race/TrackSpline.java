@@ -253,6 +253,29 @@ public final class TrackSpline {
 		return best / (double) n;
 	}
 
+	/**
+	 * Like {@link #nearest}, refined onto the line between the nearest sample and its
+	 * better neighbour, so it moves smoothly instead of a block at a time (0..1).
+	 */
+	public double nearestFine(double x, double z) {
+		int i = (int) Math.round(nearest(x, z) * n) % n;
+		double best = i, bd = Double.MAX_VALUE;
+		for (int dir = -1; dir <= 1; dir += 2) {
+			int j = (i + dir + n) % n;
+			double sx = xs[j] - xs[i], sz = zs[j] - zs[i];
+			double len2 = sx * sx + sz * sz;
+			double s = len2 < 1.0E-12 ? 0.0 : Math.max(0.0, Math.min(1.0, ((x - xs[i]) * sx + (z - zs[i]) * sz) / len2));
+			double dx = xs[i] + sx * s - x, dz = zs[i] + sz * s - z;
+			double d = dx * dx + dz * dz;
+			if (d < bd) {
+				bd = d;
+				best = i + dir * s;
+			}
+		}
+		double t = best / n;
+		return t - Math.floor(t);
+	}
+
 	/** Shortest distance between two samples that are at least {@code minGap} blocks apart along the line. */
 	public double closestLegs(double minGap) {
 		return closestLegsAt(minGap)[0];

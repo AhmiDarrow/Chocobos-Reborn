@@ -392,6 +392,11 @@ public enum RaceTrack {
 		return spline.nearest(x - offsetX, z - offsetZ);
 	}
 
+	/** {@link #progressAt} between samples: for timing a line crossing inside a tick. */
+	public double progressFineAt(double x, double z) {
+		return spline.nearestFine(x - offsetX, z - offsetZ);
+	}
+
 	public static double stallOffset(int stall, int total) {
 		return (stall - (total - 1) / 2.0D) * STALL_SPACING;
 	}

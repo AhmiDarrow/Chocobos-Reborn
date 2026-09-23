@@ -75,8 +75,11 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 
 	@Override
 	public ResourceLocation getTextureLocation(ChocoboEntity e) {
+		return texture(e, meshId(e));
+	}
+
+	private static ResourceLocation texture(ChocoboEntity e, String mesh) {
 		int id = Math.min(e.color().getId(), SKINS.length - 1);
-		String mesh = meshId(e);
 		ResourceLocation[] set;
 		if (mesh.equals("chocobo_saddled")) {
 			set = SKINS_SADDLED;
@@ -99,7 +102,8 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 
 	@Override
 	public void render(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
-		WhiskerMesh m = WhiskerMesh.get(meshId(e));
+		String mesh = meshId(e);
+		WhiskerMesh m = WhiskerMesh.get(mesh);
 		if (m == null) {
 			m = WhiskerMesh.get("chocobo");
 		}
@@ -171,11 +175,11 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		boolean hurt = e.hurtTime > 0;
 		int overlay = OverlayTexture.pack(0, hurt);
 		int breed = Math.min(e.color().getId(), PLUMAGE.length - 1);
-		ResourceLocation tex = getTextureLocation(e);
+		ResourceLocation tex = texture(e, mesh);
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();
 		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
-		for (WhiskerMesh.Part part : m.parts) {
+		for (WhiskerMesh.Part part : m.parts(lodLevel(e))) {
 			skinner.skin(part, hidden, anyHidden);
 			emit(vc, part, colors(part, breed), light, overlay, quads);
 			if (part.emissiveTri.length > 0) {
@@ -184,6 +188,23 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		}
 		ps.popPose();
 		super.render(e, yaw, partial, ps, buf, light);
+	}
+
+	/**
+	 * Camera distance (blocks, per metre of bird) beyond which each coarser LOD takes over.
+	 * The LOD cells ({@link WhiskerMesh#LOD_CELL}) are sized so a facet stays under two
+	 * pixels at 1080p there: a full race field is ~750k vertices a frame without them.
+	 */
+	private static final double[] LOD_DISTANCE = {16.0D, 40.0D};
+
+	private int lodLevel(ChocoboEntity e) {
+		float age = e.getAgeScale();
+		double d2 = this.entityRenderDispatcher.distanceToSqr(e) / Math.max(0.09D, (double) age * age);
+		int level = 0;
+		while (level < LOD_DISTANCE.length && d2 > LOD_DISTANCE[level] * LOD_DISTANCE[level]) {
+			level++;
+		}
+		return level;
 	}
 
 	/** Copy {@code n} floats of {@code src} into {@code dst} (grown if needed) and return it. */

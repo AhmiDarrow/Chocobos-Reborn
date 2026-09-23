@@ -289,7 +289,7 @@ public final class RaceManager {
 		DuelDesk.withdraw(b);
 		TradeDesk.withdraw(a);
 		TradeDesk.withdraw(b);
-		RaceSession session = new RaceSession(level, track, false, java.util.List.of(a, b), java.util.List.of(birdA, birdB), stake);
+		RaceSession session = new RaceSession(level, track, false, java.util.List.of(a, b), java.util.List.of(birdA, birdB), true, stake);
 		SESSIONS.add(session);
 		return true;
 	}

@@ -15,6 +15,28 @@ class RaceTrackTest {
 	/** Blocks per second a class-appropriate bird averages; the length gates below assume it. */
 	private static final double PACE = 9.0D;
 
+	/** Fine progress agrees with sample progress and moves smoothly between samples. */
+	@Test
+	void fineProgressRefinesBetweenSamples() {
+		for (RaceTrack track : RaceTrack.values()) {
+			double lap = track.lapLength();
+			for (int i = 0; i < 200; i++) {
+				double t = (i + 0.37D) / 200.0D;
+				RacePoint p = track.pointAtLane(t, 1.5D);
+				double fine = track.progressFineAt(p.x(), p.z());
+				double coarse = track.progressAt(p.x(), p.z());
+				double gap = Math.abs(fine - coarse);
+				gap = Math.min(gap, 1.0D - gap);
+				assertTrue(gap * lap <= 1.01D, track.name() + " fine within a sample of coarse at " + t);
+				RacePoint c = track.pointAt(t);
+				double onLine = track.progressFineAt(c.x(), c.z());
+				double err = Math.abs(onLine - t);
+				err = Math.min(err, 1.0D - err);
+				assertTrue(err * lap < 0.6D, track.name() + " fine tracks t=" + t + ": " + onLine);
+			}
+		}
+	}
+
 	@Test
 	void progressFollowsTheCentreLine() {
 		for (RaceTrack track : RaceTrack.values()) {
@@ -307,11 +329,13 @@ class RaceTrackTest {
 	}
 
 	@Test
-	void courseVersionSevenRelaysTheIslands() {
+	void courseVersionEightRelaysTheIslands() {
 		// 6: the stamp gaps that dropped a racer through the island into the void are
 		// plugged; 7: the plan is stamped in layers, so scenery, rails and pools no
-		// longer land on the racing line. Older islands have to be re-laid either way.
-		assertEquals(7, SquareBuilder.COURSE_VERSION);
+		// longer land on the racing line; 8: the River cairn's spring sits in a basin, and
+		// a relay clears what older plans left (stray water washed the boost pads out).
+		// Older islands have to be re-laid either way.
+		assertEquals(8, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

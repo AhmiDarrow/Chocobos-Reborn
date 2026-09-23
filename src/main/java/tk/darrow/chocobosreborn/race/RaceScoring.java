@@ -395,6 +395,42 @@ public final class RaceScoring {
 	}
 
 	/** Still a live racer: not already DNF and not already placed. */
+	/**
+	 * Most ping a rider is credited at the line (ms). The server sees a guest's bird one
+	 * trip late and the guest heard GO one trip late, so without this a guest loses a
+	 * whole ping to the host (whose ping is ~0) and to the AI field in every close finish.
+	 */
+	public static final int MAX_LAG_CREDIT_MS = 300;
+	/** Ticks a finish waits before it is placed, so a later-reported but earlier crossing can still slot ahead. */
+	public static final int MAX_LAG_CREDIT_TICKS = MAX_LAG_CREDIT_MS / 50;
+
+	/** Ticks a rider with this round-trip ping is credited at the line (AI racers: 0). */
+	public static double lagCreditTicks(int latencyMs) {
+		return Math.max(0, Math.min(MAX_LAG_CREDIT_MS, latencyMs)) / 50.0D;
+	}
+
+	/**
+	 * Share of this tick's travel that came before the start line (0..1), from lap
+	 * progress before and after the tick: two birds crossing in the same tick are
+	 * ordered by where they were, not by who comes first in the field list.
+	 */
+	public static double crossFraction(double before, double after) {
+		double travelled = after - before;
+		if (travelled < 0.0D) {
+			travelled += 1.0D;
+		}
+		double toLine = 1.0D - before;
+		if (!(travelled > 1.0E-9D) || toLine > travelled) {
+			return 1.0D;
+		}
+		return Math.max(0.0D, Math.min(1.0D, toLine / travelled));
+	}
+
+	/** A finish crossing at {@code time} (ticks) is safe to place once no later report can beat it. */
+	public static boolean finishSettled(double time, int nowTick) {
+		return time < nowTick - MAX_LAG_CREDIT_TICKS;
+	}
+
 	public static boolean stillOnCourse(boolean forfeited, int finishIndex) {
 		return !forfeited && finishIndex < 0;
 	}

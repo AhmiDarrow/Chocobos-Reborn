@@ -19,6 +19,13 @@ public final class ChocobosRebornClient {
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
+		// parse the plain and saddled birds while the world loads, not as the first one (often a
+		// whole saddled race field) comes into view
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+				(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) -> {
+					WhiskerMesh.get("chocobo");
+					WhiskerMesh.get("chocobo_saddled");
+				});
 		tk.darrow.chocobosreborn.net.AlmanacPayload.CLIENT_OPENER = data -> {
 			var mc = net.minecraft.client.Minecraft.getInstance();
 			if (mc.screen instanceof AlmanacScreen open) {

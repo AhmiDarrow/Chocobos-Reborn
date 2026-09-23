@@ -75,9 +75,17 @@ public final class WhiskerMesh {
 		}
 	}
 
+	/**
+	 * Clustering cells for the distance LODs, as a fraction of the mesh height: LOD 1 is
+	 * about 3.5 cm on an adult bird, LOD 2 about 9 cm. See {@link #decimate}.
+	 */
+	static final float[] LOD_CELL = {1.0F / 64.0F, 1.0F / 26.0F};
+
 	public final String[] boneNames;
 	public final int[] boneParent;
 	public final Part[] parts;
+	/** {@code lods[level - 1]}: decimated copies of {@link #parts}, built on first use. */
+	private final Part[][] lods = new Part[LOD_CELL.length][];
 	public final Clip[] clips;
 	public final Map<String, Clip> clipByName = new HashMap<>();
 	public final float height, width;
@@ -100,6 +108,119 @@ public final class WhiskerMesh {
 		}
 	}
 
+	/** Parts for LOD {@code level}: 0 is the full mesh, higher is coarser (clamped to the coarsest). */
+	public Part[] parts(int level) {
+		if (level <= 0) {
+			return parts;
+		}
+		int i = Math.min(level, lods.length) - 1;
+		Part[] out = lods[i];
+		if (out == null) {
+			out = new Part[parts.length];
+			for (int k = 0; k < parts.length; k++) {
+				out[k] = decimate(parts[k], LOD_CELL[i] * Math.max(0.1F, height));
+			}
+			lods[i] = out;
+		}
+		return out;
+	}
+
+	public static int lodLevels() {
+		return LOD_CELL.length;
+	}
+
+	/**
+	 * Vertex clustering: rest-pose positions that share a {@code cell}-sized box and a
+	 * dominant bone collapse onto the first of them (whose skin weights they take), and
+	 * triangles left degenerate or duplicated are dropped. Keying on the bone keeps
+	 * parts that move apart (a leg against the belly) from being welded together. The
+	 * surviving faces keep their uvs and colours and get a normal from their new shape,
+	 * so the bird stays flat shaded, just in bigger facets.
+	 */
+	static Part decimate(Part p, float cell) {
+		int nu = p.uniqueCount;
+		int[] rep = new int[nu];
+		Map<Long, Integer> clusters = new HashMap<>(nu * 2);
+		float inv = 1.0F / cell;
+		for (int u = 0; u < nu; u++) {
+			long cx = (long) Math.floor(p.upos[u * 3] * inv) & 0xFFFF;
+			long cy = (long) Math.floor(p.upos[u * 3 + 1] * inv) & 0xFFFF;
+			long cz = (long) Math.floor(p.upos[u * 3 + 2] * inv) & 0xFFFF;
+			long bone = p.ubone[u * 4] & 0xFFFFL;
+			long key = cx | cy << 16 | cz << 32 | bone << 48;
+			Integer r = clusters.putIfAbsent(key, u);
+			rep[u] = r == null ? u : r;
+		}
+		int[] keep = new int[p.triCount];
+		int kept = 0;
+		java.util.Set<Long> seen = new java.util.HashSet<>(p.triCount * 2);
+		for (int t = 0; t < p.triCount; t++) {
+			int a = rep[p.posIndex[p.tri[t * 3]]], b = rep[p.posIndex[p.tri[t * 3 + 1]]], c = rep[p.posIndex[p.tri[t * 3 + 2]]];
+			if (a == b || b == c || a == c) {
+				continue;
+			}
+			// the same face twice (either winding: the birds draw without culling)
+			int lo = Math.min(a, Math.min(b, c)), hi = Math.max(a, Math.max(b, c)), mid = a + b + c - lo - hi;
+			if (!seen.add((long) lo << 42 | (long) mid << 21 | hi)) {
+				continue;
+			}
+			keep[kept++] = t;
+		}
+		Part out = new Part(p.name, p.textured, kept * 3, kept);
+		for (int k = 0; k < kept; k++) {
+			int t = keep[k];
+			float[] fp = new float[9];
+			for (int j = 0; j < 3; j++) {
+				int src = p.tri[t * 3 + j], dst = k * 3 + j, u = rep[p.posIndex[src]];
+				System.arraycopy(p.upos, u * 3, out.pos, dst * 3, 3);
+				System.arraycopy(p.upos, u * 3, fp, j * 3, 3);
+				System.arraycopy(p.uweight, u * 4, out.weight, dst * 4, 4);
+				System.arraycopy(p.ubone, u * 4, out.bone, dst * 4, 4);
+				System.arraycopy(p.uv, src * 2, out.uv, dst * 2, 2);
+				System.arraycopy(p.rgb, src * 3, out.rgb, dst * 3, 3);
+				System.arraycopy(p.emit, src * 3, out.emit, dst * 3, 3);
+				out.tri[dst] = dst;
+			}
+			faceNormal(p, t, fp, out.normal, k * 3);
+		}
+		finish(out);
+		return out;
+	}
+
+	/** Normal of the clustered face, turned to agree with the original; the original's if the face is a sliver. */
+	private static void faceNormal(Part p, int t, float[] f, float[] dst, int v0) {
+		float ex = f[3] - f[0], ey = f[4] - f[1], ez = f[5] - f[2];
+		float gx = f[6] - f[0], gy = f[7] - f[1], gz = f[8] - f[2];
+		float nx = ey * gz - ez * gy, ny = ez * gx - ex * gz, nz = ex * gy - ey * gx;
+		float ox = 0, oy = 0, oz = 0;
+		for (int j = 0; j < 3; j++) {
+			int v = p.tri[t * 3 + j];
+			ox += p.normal[v * 3];
+			oy += p.normal[v * 3 + 1];
+			oz += p.normal[v * 3 + 2];
+		}
+		float l = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+		if (l < 1e-9F) {
+			nx = ox;
+			ny = oy;
+			nz = oz;
+			l = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+			if (l < 1e-9F) {
+				nx = 0;
+				ny = 1;
+				nz = 0;
+				l = 1;
+			}
+		} else if (nx * ox + ny * oy + nz * oz < 0) {
+			l = -l;
+		}
+		for (int j = 0; j < 3; j++) {
+			dst[(v0 + j) * 3] = nx / l;
+			dst[(v0 + j) * 3 + 1] = ny / l;
+			dst[(v0 + j) * 3 + 2] = nz / l;
+		}
+	}
+
 	private static final Map<String, WhiskerMesh> CACHE = new HashMap<>();
 	private static final Map<String, Boolean> FAILED = new HashMap<>();
 
@@ -112,6 +233,9 @@ public final class WhiskerMesh {
 		ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "entity/" + id + ".ncgb");
 		try (InputStream in = Minecraft.getInstance().getResourceManager().getResourceOrThrow(loc).open()) {
 			m = parse(in.readAllBytes());
+			for (int level = 1; level <= lodLevels(); level++) {
+				m.parts(level);   // now, with the load, not as the first bird runs out of range mid-race
+			}
 			CACHE.put(id, m);
 			ChocobosReborn.LOGGER.info("Loaded mesh {}: {} parts, {} verts, {} bones", id, m.parts.length, m.totalVerts, m.boneNames.length);
 		} catch (Exception e) {

@@ -420,7 +420,7 @@ public final class HeatSchedule {
 		for (ServerPlayer p : players) {
 			Titles.show(p, Component.translatable("chocobosreborn.heat.transport"), course, 5, 40, 10);
 		}
-		RaceManager.addSession(new RaceSession(square, heat.track, true, players, birds, 0));
+		RaceManager.addSession(new RaceSession(square, heat.track, true, players, birds, false, 0));
 	}
 
 	/** Esther's voice to everyone in Whiskerwind (ServerLevel.players() is only that dimension's players). */

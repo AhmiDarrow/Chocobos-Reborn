@@ -27,6 +27,7 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
 import tk.darrow.chocobosreborn.item.ModItems;
 import tk.darrow.chocobosreborn.race.FollowAcross;
 import tk.darrow.chocobosreborn.race.RaceCourseLayout;
+import tk.darrow.chocobosreborn.race.RacePoint;
 import tk.darrow.chocobosreborn.race.RaceManager;
 import tk.darrow.chocobosreborn.race.RaceSession;
 import tk.darrow.chocobosreborn.race.RaceTrack;
@@ -133,12 +134,16 @@ public class ChocobosRebornGameTests {
 		net.minecraft.world.entity.Entity arrived = Square.teleport(player, there, new Vec3(0.5D, 80.0D, 0.5D), 0.0F);
 		helper.assertTrue(arrived instanceof ServerPlayer moved && moved.serverLevel() == there, "owner entered the nether");
 		ServerPlayer owner = (ServerPlayer) arrived;
-		// changeDimension queues the bird; a forced chunk lists it once it is ticking.
-		helper.runAtTickTime(20, () -> {
+		// changeDimension queues the bird; a forced chunk lists it once it is ticking. That
+		// takes a variable number of ticks (other tests laying whole courses at the same
+		// moment make the server catch up in a burst), so wait for it rather than a fixed tick.
+		helper.startSequence().thenWaitUntil(() -> {
 			Entity live = there.getEntity(follow.getUUID());
 			helper.assertTrue(live instanceof ChocoboEntity cb && cb.level() == there
 							&& cb.command() == ChocoboEntity.Command.FOLLOW,
 					"Follow crossed into the nether");
+		}).thenExecute(() -> {
+			Entity live = there.getEntity(follow.getUUID());
 			helper.assertTrue(!stay.isRemoved() && stay.level() == here && stay.command() == ChocoboEntity.Command.STAY,
 					"Stay stayed behind");
 			helper.assertTrue(!wander.isRemoved() && wander.level() == here && wander.command() == ChocoboEntity.Command.WANDER,
@@ -153,8 +158,7 @@ public class ChocobosRebornGameTests {
 				}
 			}
 			Square.teleport(owner, here, back, owner.getYRot());
-			helper.succeed();
-		});
+		}).thenSucceed();
 	}
 
 	@GameTest(template = EMPTY)
@@ -365,6 +369,71 @@ public class ChocobosRebornGameTests {
 		}
 	}
 
+	/** Water run up to a boost pad goes round it: the pad stays put and nothing drops. */
+	@GameTest(template = EMPTY, timeoutTicks = 200)
+	public static void boostPadIsWatertight(GameTestHelper helper) {
+		for (int x = 0; x < 5; x++) {
+			for (int z = 0; z < 5; z++) {
+				helper.setBlock(new BlockPos(x, 1, z), Blocks.STONE);
+			}
+		}
+		BlockPos pad = new BlockPos(2, 2, 2);
+		helper.setBlock(pad, tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get().defaultBlockState());
+		helper.setBlock(new BlockPos(1, 2, 2), Blocks.WATER);
+		helper.runAtTickTime(60, () -> {
+			helper.assertBlockPresent(tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get(), pad);
+			helper.assertBlockPresent(Blocks.WATER, new BlockPos(3, 2, 2));   // it flowed on round the pad
+			helper.assertItemEntityNotPresent(tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get().asItem());
+			helper.succeed();
+		});
+	}
+
+	/** A saddled, tamed bird for {@code owner} at the Square's arrival point. */
+	private static ChocoboEntity duelBird(ServerLevel level, ServerPlayer owner) {
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		bird.moveTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z, 0.0F, 0.0F);
+		bird.setColor(ChocoboColor.YELLOW);
+		bird.setAge(0);
+		level.addFreshEntity(bird);
+		bird.tame(owner);
+		bird.setOrderedToSit(false);
+		owner.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.SADDLE.get()));
+		bird.mobInteract(owner, InteractionHand.MAIN_HAND);
+		return bird;
+	}
+
+	/** A duel is the two riders alone: no AI field, no jockeys, the two centre stalls. */
+	@GameTest(template = EMPTY, timeoutTicks = 400)
+	public static void duelIsOneOnOne(GameTestHelper helper) {
+		ServerLevel level = helper.getLevel();
+		RaceManager.testLevel = level;
+		RaceTrack track = RaceTrack.C_SHORE;
+		forceTrack(level, track, true);
+		ServerPlayer a = helper.makeMockServerPlayerInLevel();
+		ServerPlayer b = helper.makeMockServerPlayerInLevel();
+		a.setGameMode(GameType.SURVIVAL);
+		b.setGameMode(GameType.SURVIVAL);
+		ChocoboEntity birdA = duelBird(level, a);
+		ChocoboEntity birdB = duelBird(level, b);
+		helper.runAtTickTime(5, () -> {
+			helper.assertTrue(birdA.saddled() && birdB.saddled(), "saddled");
+			helper.assertTrue(RaceManager.startDuel(a, birdA, b, birdB, track, 0), "duel starts");
+			RaceSession s = RaceManager.sessionOf(a.getUUID());
+			helper.assertTrue(s != null && s == RaceManager.sessionOf(b.getUUID()), "one session for both riders");
+			helper.assertTrue(s.fieldSize() == 2, "two birds on the grid, got " + s.fieldSize());
+			helper.assertTrue(s.aiRacers() == 0, "no AI racers or jockeys, got " + s.aiRacers());
+			RacePoint left = track.stallPos(0, 2), right = track.stallPos(1, 2);
+			helper.assertTrue(birdA.distanceToSqr(left.x(), left.y(), left.z()) < 1.0D, "rider A on a centre stall");
+			helper.assertTrue(birdB.distanceToSqr(right.x(), right.y(), right.z()) < 1.0D, "rider B on a centre stall");
+			helper.assertTrue(RaceCourseLayout.of(track).onCourse(left.x(), left.z())
+					&& RaceCourseLayout.of(track).onCourse(right.x(), right.z()), "centre stalls on the road");
+			s.abort();
+			helper.assertTrue(RaceManager.sessionOf(a.getUUID()) == null, "duel settled after abort");
+			forceTrack(level, track, false);
+			helper.succeed();
+		});
+	}
+
 	@GameTest(template = EMPTY, timeoutTicks = 4000)
 	public static void squareBuildsCourseAndRunsHeat(GameTestHelper helper) {
 		// The gametest server has no custom dimensions: build and race in this level.
@@ -379,7 +448,16 @@ public class ChocobosRebornGameTests {
 		// the verification world persists between runs: an older island with this
 		// ordinal would otherwise be taken as built and the new plan never placed
 		tk.darrow.chocobosreborn.race.SquareData.get(square).clearBuilt();
+		// a spring an older course version left on the island: the relay must take it away
+		RacePoint mid = RaceTrack.C_MEADOW.pointAt(0.5D);
+		BlockPos stale = new BlockPos((int) Math.floor(mid.x()), (int) mid.y() + 6, (int) Math.floor(mid.z()));
+		while (RaceCourseLayout.of(RaceTrack.C_MEADOW).blocks().containsKey(
+				new RaceCourseLayout.Cell(stale.getX(), stale.getY(), stale.getZ()))) {
+			stale = stale.above();
+		}
+		square.setBlock(stale, Blocks.WATER.defaultBlockState(), 2);
 		SquareBuilder.buildTrack(square, RaceTrack.C_MEADOW);
+		helper.assertTrue(square.getBlockState(stale).isAir(), "old water cleared off the island at " + stale);
 		// road surface at the start line, lamps, finish gate
 		RaceCourseLayout layout = RaceCourseLayout.of(RaceTrack.C_MEADOW);
 		int placed = 0;
