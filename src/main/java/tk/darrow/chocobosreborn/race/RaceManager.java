@@ -554,6 +554,27 @@ public final class RaceManager {
 		}
 	}
 
+	/**
+	 * Whiskerwind's dimension has {@code bed_works: false} (no respawning or sleeping the
+	 * night away out here), and vanilla answers that like the Nether: the bed explodes. The
+	 * village's beds are furniture, so a click on one (or on a respawn anchor) does nothing.
+	 */
+	@SubscribeEvent
+	public static void onUseBlock(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {
+		if (!Square.isSquare(event.getLevel()) && (testLevel == null || event.getLevel() != testLevel)) {
+			return;
+		}
+		var block = event.getLevel().getBlockState(event.getPos()).getBlock();
+		if (block instanceof net.minecraft.world.level.block.BedBlock
+				|| block instanceof net.minecraft.world.level.block.RespawnAnchorBlock) {
+			event.setCanceled(true);
+			event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
+			if (!event.getLevel().isClientSide) {
+				event.getEntity().displayClientMessage(Component.translatable("chocobosreborn.square.bed"), true);
+			}
+		}
+	}
+
 	private static boolean bypasses(net.minecraft.world.entity.player.Player player) {
 		return player.isCreative() && player.hasPermissions(2);
 	}

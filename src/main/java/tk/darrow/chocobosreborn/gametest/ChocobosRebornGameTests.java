@@ -454,6 +454,27 @@ public class ChocobosRebornGameTests {
 		});
 	}
 
+	/** A bed in Whiskerwind (bed_works false: vanilla would explode it) is furniture: the click is cancelled. */
+	@GameTest(template = EMPTY)
+	public static void squareBedsDoNotExplode(GameTestHelper helper) {
+		RaceManager.testLevel = helper.getLevel();
+		BlockPos foot = new BlockPos(2, 1, 2);
+		helper.setBlock(foot, Blocks.RED_BED.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BedBlock.FACING, net.minecraft.core.Direction.EAST));
+		helper.setBlock(foot.east(), Blocks.RED_BED.defaultBlockState()
+				.setValue(net.minecraft.world.level.block.BedBlock.FACING, net.minecraft.core.Direction.EAST)
+				.setValue(net.minecraft.world.level.block.BedBlock.PART, net.minecraft.world.level.block.state.properties.BedPart.HEAD));
+		ServerPlayer p = helper.makeMockServerPlayerInLevel();
+		BlockPos at = helper.absolutePos(foot);
+		var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(at),
+				net.minecraft.core.Direction.UP, at, false);
+		var event = net.neoforged.neoforge.common.CommonHooks.onRightClickBlock(p, InteractionHand.MAIN_HAND, at, hit);
+		helper.assertTrue(event.isCanceled(), "a bed click in the Square is cancelled before the bed can explode");
+		helper.assertBlockPresent(Blocks.RED_BED, foot);
+		helper.assertBlockPresent(Blocks.RED_BED, foot.east());
+		helper.succeed();
+	}
+
 	/** A saddled, tamed bird for {@code owner} at the Square's arrival point. */
 	private static ChocoboEntity duelBird(ServerLevel level, ServerPlayer owner) {
 		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
