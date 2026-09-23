@@ -204,6 +204,72 @@ public class ChocobosRebornGameTests {
 		helper.succeed();
 	}
 
+	/** A bird that cannot take a training green still eats one to heal, and only when hurt. */
+	@GameTest(template = EMPTY)
+	public static void fullBirdHealsFromGreens(GameTestHelper helper) {
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		Player p = owner(helper, bird);
+		p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(ModItems.KRAKKA_GREEN.get(), 64));
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);   // a training feed: now digesting
+		int trained = bird.trainedIntelligence();
+		helper.assertTrue(p.getMainHandItem().getCount() == 63, "first green trains");
+		// digesting and at full health: refused, nothing eaten
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		helper.assertTrue(p.getMainHandItem().getCount() == 63, "a full, healthy bird refuses");
+		// digesting and hurt: eats it and heals, learns nothing
+		bird.setHealth(bird.getMaxHealth() - 10.0F);
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		helper.assertTrue(p.getMainHandItem().getCount() == 62, "a hurt, full bird eats the green");
+		helper.assertTrue(bird.getHealth() > bird.getMaxHealth() - 10.0F, "and heals: " + bird.getHealth());
+		helper.assertTrue(bird.trainedIntelligence() == trained && fed(bird, ChocoboGreen.KRAKKA) == 1,
+				"but trains nothing");
+		// sated (creative skips the digest wait) and hurt: still heals
+		p.getAbilities().instabuild = true;
+		for (int i = 0; i < 45; i++) {
+			bird.setHealth(bird.getMaxHealth());
+			bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		}
+		helper.assertTrue(fed(bird, ChocoboGreen.KRAKKA) == 40, "sated");
+		bird.setHealth(5.0F);
+		bird.mobInteract(p, InteractionHand.MAIN_HAND);
+		helper.assertTrue(bird.getHealth() > 5.0F && fed(bird, ChocoboGreen.KRAKKA) == 40, "a sated bird heals from a green");
+		helper.succeed();
+	}
+
+	/** Tame adults shed feathers; wild birds and chicks do not. Brushing your bird frees one. */
+	@GameTest(template = EMPTY, timeoutTicks = 40)
+	public static void birdsShedAndBrushFeathers(GameTestHelper helper) {
+		for (int x = 0; x < 9; x++) {
+			for (int z = 0; z < 9; z++) {
+				helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+			}
+		}
+		ChocoboEntity tame = spawnAdult(helper, new BlockPos(1, 1, 1), true, ChocoboColor.YELLOW);
+		ChocoboEntity wild = spawnAdult(helper, new BlockPos(7, 1, 1), true, ChocoboColor.YELLOW);
+		ChocoboEntity chick = spawnAdult(helper, new BlockPos(7, 1, 7), true, ChocoboColor.YELLOW);
+		ChocoboEntity brushed = spawnAdult(helper, new BlockPos(1, 1, 7), true, ChocoboColor.YELLOW);
+		Player p = owner(helper, tame, chick, brushed);
+		chick.setAge(-24000);
+		for (ChocoboEntity b : new ChocoboEntity[]{tame, wild, chick, brushed}) {
+			b.setNoAi(true);
+		}
+		tame.featherDueNow();
+		wild.featherDueNow();
+		chick.featherDueNow();
+		helper.assertTrue(tame.shedsFeathers() && !wild.shedsFeathers() && !chick.shedsFeathers(), "only tame adults shed");
+		ItemStack brush = new ItemStack(net.minecraft.world.item.Items.BRUSH);
+		p.setItemInHand(InteractionHand.MAIN_HAND, brush);
+		brushed.mobInteract(p, InteractionHand.MAIN_HAND);
+		helper.assertTrue(brush.getDamageValue() == 16, "a brush stroke costs 16, got " + brush.getDamageValue());
+		helper.runAtTickTime(5, () -> {
+			helper.assertItemEntityCountIs(net.minecraft.world.item.Items.FEATHER, new BlockPos(1, 1, 1), 2.5D, 1);
+			helper.assertItemEntityCountIs(net.minecraft.world.item.Items.FEATHER, new BlockPos(1, 1, 7), 2.5D, 1);
+			helper.assertItemEntityCountIs(net.minecraft.world.item.Items.FEATHER, new BlockPos(7, 1, 1), 2.5D, 0);
+			helper.assertItemEntityCountIs(net.minecraft.world.item.Items.FEATHER, new BlockPos(7, 1, 7), 2.5D, 0);
+			helper.succeed();
+		});
+	}
+
 	@GameTest(template = EMPTY)
 	public static void nutMatesAndHatchesOwnedChick(GameTestHelper helper) {
 		ChocoboEntity a = spawnAdult(helper, new BlockPos(1, 1, 1), true, ChocoboColor.YELLOW);

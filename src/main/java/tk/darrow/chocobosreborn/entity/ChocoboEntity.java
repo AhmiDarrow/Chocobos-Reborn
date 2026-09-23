@@ -140,6 +140,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private long lastGreensDay = Long.MIN_VALUE;
 	/** Game time of the last training green. 0 = never trained. */
 	private long lastGreensFeed;
+	/** Ticks until a tame adult sheds its next feather; -1 until the first roll. */
+	private int featherTicks = -1;
 	/** Wander mode (kept under Stay, so standing up returns to wandering, not following). */
 	private boolean wander;
 	/** Centre of a wandering bird's range; null until it is first set down. */
@@ -712,6 +714,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (lastGreensFeed > 0L) {
 			tag.putLong("LastGreensFeed", lastGreensFeed);
 		}
+		if (featherTicks >= 0) {
+			tag.putInt("FeatherTicks", featherTicks);
+		}
 	}
 
 	@Override
@@ -761,6 +766,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (tag.contains("LastGreensFeed")) {
 			lastGreensFeed = tag.getLong("LastGreensFeed");
 		}
+		featherTicks = tag.contains("FeatherTicks") ? tag.getInt("FeatherTicks") : -1;
 		this.entityData.set(DATA_STAGE, computeStage());
 		// Attributes follow the plumage; health is whatever was saved.
 		applyColorStats(false);
@@ -820,6 +826,17 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				return InteractionResult.sidedSuccess(level().isClientSide);
 			}
 			// unowned, full health: consume the click so the edible green is not eaten
+			return InteractionResult.sidedSuccess(level().isClientSide);
+		}
+		if (stack.is(net.minecraft.world.item.Items.BRUSH) && isTame() && isOwnedBy(player) && !isBaby()) {
+			// brushing your bird is petting it: a feather comes loose, like an armadillo's scute
+			if (!level().isClientSide) {
+				spawnAtLocation(new ItemStack(net.minecraft.world.item.Items.FEATHER), getBbHeight() * 0.5F);
+				playSound(net.minecraft.sounds.SoundEvents.BRUSH_GENERIC, 1.0F, 1.0F);
+				level().broadcastEntityEvent(this, (byte) 7);   // hearts
+				gameEvent(net.minecraft.world.level.gameevent.GameEvent.ENTITY_INTERACT, player);
+				stack.hurtAndBreak(16, player, getSlotForHand(hand));
+			}
 			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
 		if (isTame() && isOwnedBy(player)) {
@@ -916,14 +933,29 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	/** FF7 training: each green adds its stat points until the bird is sated on it. */
 	private InteractionResult feedGreen(Player player, ItemStack stack, ChocoboGreen green) {
 		int idx = green.ordinal();
-		if (greensFed[idx] >= green.satiety()) {
+		boolean instabuild = player.getAbilities().instabuild;
+		boolean sated = greensFed[idx] >= green.satiety();
+		boolean digesting = !ChocoboGreen.trainReady(lastGreensFeed, level().getGameTime(), instabuild);
+		if ((sated || digesting) && getHealth() < getMaxHealth()) {
+			// too full to learn from it, but a hurt bird still eats a green to heal
+			if (!level().isClientSide) {
+				heal(3.0F);
+				level().broadcastEntityEvent(this, (byte) 18);
+				playSound(ModSounds.KWEH.get(), 0.6F, 1.2F);
+				player.displayClientMessage(Component.translatable("chocobosreborn.greens.heal_only"), true);
+				if (!instabuild) {
+					stack.shrink(1);
+				}
+			}
+			return InteractionResult.sidedSuccess(level().isClientSide);
+		}
+		if (sated) {
 			if (!level().isClientSide) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.greens.sated"), true);
 			}
 			return InteractionResult.sidedSuccess(level().isClientSide);
 		}
-		boolean instabuild = player.getAbilities().instabuild;
-		if (!ChocoboGreen.trainReady(lastGreensFeed, level().getGameTime(), instabuild)) {
+		if (digesting) {
 			if (!level().isClientSide) {
 				int wait = ChocoboGreen.trainWaitTicks(lastGreensFeed, level().getGameTime());
 				player.displayClientMessage(Component.translatable("chocobosreborn.greens.wait",
@@ -1592,6 +1624,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 					}
 				}
 			}
+			tickFeathers();
 			// Gold: a slow natural regen (FF7's golden bird never stays hurt)
 			if (color() == ChocoboColor.GOLD && tickCount % 40 == 0 && getHealth() < getMaxHealth()) {
 				heal(1.0F);
@@ -1623,6 +1656,35 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				}
 			}
 		}
+	}
+
+	/** Minimum and spread of the gap between shed feathers: one every 5 to 10 minutes. */
+	public static final int FEATHER_MIN_TICKS = 6000, FEATHER_SPREAD_TICKS = 6000;
+
+	/** Your own adult birds; not chicks, wild birds, the Square's town birds or anyone mid-heat. */
+	public boolean shedsFeathers() {
+		return isTame() && !isBaby() && !raceNpc() && !townBird() && !racing() && raceTrack() < 0;
+	}
+
+	/** A tame adult drops a feather now and then, the way a chicken lays. */
+	private void tickFeathers() {
+		if (!shedsFeathers()) {
+			return;
+		}
+		if (featherTicks < 0) {
+			featherTicks = FEATHER_MIN_TICKS + random.nextInt(FEATHER_SPREAD_TICKS + 1);
+		}
+		if (--featherTicks <= 0) {
+			spawnAtLocation(new ItemStack(net.minecraft.world.item.Items.FEATHER));
+			playSound(net.minecraft.sounds.SoundEvents.CHICKEN_EGG, 1.0F, (random.nextFloat() - random.nextFloat()) * 0.2F + 1.0F);
+			gameEvent(net.minecraft.world.level.gameevent.GameEvent.ENTITY_PLACE);
+			featherTicks = FEATHER_MIN_TICKS + random.nextInt(FEATHER_SPREAD_TICKS + 1);
+		}
+	}
+
+	/** Shed a feather on the next tick (GameTests). */
+	public void featherDueNow() {
+		featherTicks = 1;
 	}
 
 	@Override
