@@ -328,6 +328,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return Command.byId(this.entityData.get(DATA_COMMAND));
 	}
 
+	/** Gysahl succeeded. The bird is tame and its order is Follow. */
+	public void befriend(Player player) {
+		tame(player);
+		heal(5.0F);
+		ledgerUpdate();
+		giveCommand(Command.FOLLOW, player);
+		level().broadcastEntityEvent(this, (byte) 7);
+	}
+
 	/** Owner's order from the equipment screen or a plain right-click: say it, and kweh it. */
 	public void giveCommand(Command command, @Nullable Player player) {
 		if (command != Command.STAY) {
@@ -789,11 +798,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (stack.is(ModItems.GYSAHL.get())) {
 			if (!isTame()) {
 				if (!level().isClientSide && random.nextFloat() < 0.33F) {
-					tame(player);
-					heal(5.0F);
-					ledgerUpdate();
-					setOrderedToSit(true);
-					level().broadcastEntityEvent(this, (byte) 7);
+					befriend(player);
 				} else if (!level().isClientSide) {
 					level().broadcastEntityEvent(this, (byte) 6);
 				}
@@ -1522,6 +1527,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				setOrderedToSit(false);
 			}
 			tickWanderRange();
+			if (tickCount % 10 == 0) {
+				tk.darrow.chocobosreborn.race.FollowAcross.towardOwner(this);
+			}
 			// A nut stays until they hatch; keep the love window open so a missed path
 			// does not lock Carob/Zeio forever.
 			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove()) {

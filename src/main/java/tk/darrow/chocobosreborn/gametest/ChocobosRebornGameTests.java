@@ -8,10 +8,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import tk.darrow.chocobosreborn.ChocobosReborn;
@@ -22,6 +25,7 @@ import tk.darrow.chocobosreborn.breed.ChocoboNut;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.entity.ModEntities;
 import tk.darrow.chocobosreborn.item.ModItems;
+import tk.darrow.chocobosreborn.race.FollowAcross;
 import tk.darrow.chocobosreborn.race.RaceCourseLayout;
 import tk.darrow.chocobosreborn.race.RaceManager;
 import tk.darrow.chocobosreborn.race.RaceSession;
@@ -83,6 +87,72 @@ public class ChocobosRebornGameTests {
 			bird.giveCommand(ChocoboEntity.Command.FOLLOW, p);
 			helper.assertTrue(bird.command() == ChocoboEntity.Command.FOLLOW && !bird.hasRestriction(),
 					"Follow drops the wander range");
+			helper.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY, timeoutTicks = 200)
+	public static void tameFollowsAcrossDimensions(GameTestHelper helper) {
+		ServerLevel here = helper.getLevel();
+		ServerLevel there = here.getServer().getLevel(Level.NETHER);
+		helper.assertTrue(there != null && there != here, "the nether is a second dimension");
+		for (int cx = -1; cx <= 1; cx++) {
+			for (int cz = -1; cz <= 1; cz++) {
+				there.getChunk(cx, cz);
+				there.setChunkForced(cx, cz, true);
+			}
+		}
+		BlockPos pad = new BlockPos(0, 79, 0);
+		for (int x = -3; x <= 3; x++) {
+			for (int z = -3; z <= 3; z++) {
+				there.setBlockAndUpdate(pad.offset(x, 0, z), Blocks.STONE.defaultBlockState());
+				for (int y = 1; y <= 5; y++) {
+					there.setBlockAndUpdate(pad.offset(x, y, z), Blocks.AIR.defaultBlockState());
+				}
+			}
+		}
+		ChocoboEntity follow = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		ChocoboEntity stay = spawnAdult(helper, new BlockPos(4, 1, 2), false, ChocoboColor.YELLOW);
+		ChocoboEntity wander = spawnAdult(helper, new BlockPos(6, 1, 2), true, ChocoboColor.GREEN);
+		ChocoboEntity racer = spawnAdult(helper, new BlockPos(3, 1, 4), false, ChocoboColor.BLUE);
+		ServerPlayer player = helper.makeMockServerPlayerInLevel();
+		player.setGameMode(GameType.SURVIVAL);
+		Vec3 back = player.position();
+		follow.befriend(player);
+		stay.tame(player);
+		stay.giveCommand(ChocoboEntity.Command.STAY, player);
+		wander.tame(player);
+		wander.giveCommand(ChocoboEntity.Command.WANDER, player);
+		racer.tame(player);
+		racer.giveCommand(ChocoboEntity.Command.FOLLOW, player);
+		racer.setRacing(true);
+		helper.assertTrue(follow.command() == ChocoboEntity.Command.FOLLOW && !follow.isOrderedToSit(),
+				"a new tame stands and follows");
+		helper.assertTrue(FollowAcross.wants(follow) && !FollowAcross.wants(stay) && !FollowAcross.wants(wander)
+				&& !FollowAcross.wants(racer), "only Follow, and not a racer, crosses");
+		net.minecraft.world.entity.Entity arrived = Square.teleport(player, there, new Vec3(0.5D, 80.0D, 0.5D), 0.0F);
+		helper.assertTrue(arrived instanceof ServerPlayer moved && moved.serverLevel() == there, "owner entered the nether");
+		ServerPlayer owner = (ServerPlayer) arrived;
+		// changeDimension queues the bird; a forced chunk lists it once it is ticking.
+		helper.runAtTickTime(20, () -> {
+			Entity live = there.getEntity(follow.getUUID());
+			helper.assertTrue(live instanceof ChocoboEntity cb && cb.level() == there
+							&& cb.command() == ChocoboEntity.Command.FOLLOW,
+					"Follow crossed into the nether");
+			helper.assertTrue(!stay.isRemoved() && stay.level() == here && stay.command() == ChocoboEntity.Command.STAY,
+					"Stay stayed behind");
+			helper.assertTrue(!wander.isRemoved() && wander.level() == here && wander.command() == ChocoboEntity.Command.WANDER,
+					"Wander stayed behind");
+			helper.assertTrue(!racer.isRemoved() && racer.level() == here && racer.racing(), "a racing bird stays on the course");
+			if (live != null) {
+				live.discard();
+			}
+			for (int cx = -1; cx <= 1; cx++) {
+				for (int cz = -1; cz <= 1; cz++) {
+					there.setChunkForced(cx, cz, false);
+				}
+			}
+			Square.teleport(owner, here, back, owner.getYRot());
 			helper.succeed();
 		});
 	}

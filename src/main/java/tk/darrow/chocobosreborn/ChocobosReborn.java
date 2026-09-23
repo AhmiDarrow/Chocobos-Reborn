@@ -34,6 +34,7 @@ public final class ChocobosReborn {
 		modBus.addListener(this::gameTests);
 		modBus.addListener(this::payloads);
 		NeoForge.EVENT_BUS.register(RaceManager.class);
+		NeoForge.EVENT_BUS.addListener(tk.darrow.chocobosreborn.race.FollowAcross::onChanged);
 		NeoForge.EVENT_BUS.addListener(ChocobosRebornCommand::register);
 	}
 
