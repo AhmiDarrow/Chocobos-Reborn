@@ -19,6 +19,12 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.12 - Sound sleepers
+Uploaded 2026-09-23: `chocobosreborn-1.0.12.jar` as file **8957838** ("Chocobos Reborn 1.0.12 - Sound sleepers",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.12.md`) via
+`tools/upload_curseforge.py`. Whiskerwind's beds (bed_works false) no longer explode when clicked.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.12
+
 ## 1.0.11 - Fine feathers
 Uploaded 2026-09-23: `chocobosreborn-1.0.11.jar` as file **8957333** ("Chocobos Reborn 1.0.11 - Fine feathers",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.11.md`) via
