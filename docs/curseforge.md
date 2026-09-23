@@ -19,6 +19,13 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.9 - Follow me
+Uploaded 2026-09-23: `chocobosreborn-1.0.9.jar` as file **8954786** ("Chocobos Reborn 1.0.9 - Follow me",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.9.md`) via
+`tools/upload_curseforge.py`. A new tame follows, and Follow comes with you into the Nether, the End,
+Whiskerwind, and back. Stay, Wander, a lead, a race, and the Square's own birds stay put.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.9
+
 ## 1.0.8 - Solid ground
 Uploaded 2026-09-19: `chocobosreborn-1.0.8.jar` as file **8926685** ("Chocobos Reborn 1.0.8 - Solid ground",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.8.md`) via
