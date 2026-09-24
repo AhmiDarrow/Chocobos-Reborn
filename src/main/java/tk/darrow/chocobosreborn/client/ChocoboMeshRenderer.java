@@ -198,6 +198,11 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private static final double[] LOD_DISTANCE = {16.0D, 40.0D};
 
 	private int lodLevel(ChocoboEntity e) {
+		// a GUI preview (the almanac's breed row) is never in the level and sits at the origin,
+		// far from the camera, yet is drawn at full size on screen
+		if (!e.isAddedToLevel()) {
+			return 0;
+		}
 		float age = e.getAgeScale();
 		double d2 = this.entityRenderDispatcher.distanceToSqr(e) / Math.max(0.09D, (double) age * age);
 		int level = 0;
