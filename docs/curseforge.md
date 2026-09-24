@@ -19,6 +19,12 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.13 - Clear pages
+Uploaded 2026-09-23: `chocobosreborn-1.0.13.jar` as file **8960886** ("Chocobos Reborn 1.0.13 - Clear pages",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.13.md`) via
+`tools/upload_curseforge.py`. Almanac preview birds (not in the level) skip the distance LOD.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.13
+
 ## 1.0.12 - Sound sleepers
 Uploaded 2026-09-23: `chocobosreborn-1.0.12.jar` as file **8957838** ("Chocobos Reborn 1.0.12 - Sound sleepers",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.12.md`) via
