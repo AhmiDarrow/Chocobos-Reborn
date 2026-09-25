@@ -40,6 +40,8 @@ public class RacerGoal extends Goal {
 	private int stumble;
 	private int passTicks;
 	private boolean dashing;
+	/** Last progress on this lap, so the next tick searches that section. */
+	private double along = -1.0D;
 	private List<ChocoboEntity> nearby = List.of();
 
 	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane, RacerProfile profile) {
@@ -90,7 +92,8 @@ public class RacerGoal extends Goal {
 			bird.getMoveControl().setWantedPosition(bird.getX(), bird.getY(), bird.getZ(), 0.0D);
 			return;
 		}
-		double t = track.progressAt(bird.getX(), bird.getZ());
+		double t = track.progressAt(bird.getX(), bird.getZ(), along);
+		along = t;
 		boolean lastLap = lapsDone >= totalLaps - 1;
 		boolean straight = track.isStraight(t);
 
@@ -136,7 +139,7 @@ public class RacerGoal extends Goal {
 			passTicks--;
 		} else {
 			for (ChocoboEntity other : nearby) {
-				double dt = track.progressAt(other.getX(), other.getZ()) - t;
+				double dt = track.progressAt(other.getX(), other.getZ(), t) - t;
 				if (dt < 0.0D) {
 					dt += 1.0D;
 				}

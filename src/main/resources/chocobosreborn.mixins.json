@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "tk.darrow.chocobosreborn.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ChocoboVehicleMoveMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

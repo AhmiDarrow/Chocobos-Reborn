@@ -66,6 +66,10 @@ public final class ChocobosReborn {
 		reg.playToServer(tk.darrow.chocobosreborn.net.RacePayloads.RenameBird.TYPE,
 				tk.darrow.chocobosreborn.net.RacePayloads.RenameBird.CODEC,
 				tk.darrow.chocobosreborn.net.RacePayloads.RenameBird::handle);
+		// optional so a guest still on an older jar is not kicked at login
+		reg.optional().playToServer(tk.darrow.chocobosreborn.net.RacePayloads.RiderDash.TYPE,
+				tk.darrow.chocobosreborn.net.RacePayloads.RiderDash.CODEC,
+				tk.darrow.chocobosreborn.net.RacePayloads.RiderDash::handle);
 	}
 
 	private void setup(FMLCommonSetupEvent event) {

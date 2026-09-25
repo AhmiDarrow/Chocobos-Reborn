@@ -679,8 +679,9 @@ public class RaceSession {
 				}
 				continue;
 			}
-			double progress = track.progressAt(e.getX(), e.getZ());
-			double fine = track.progressFineAt(e.getX(), e.getZ());
+			double hint = r.progress.lastProgress();
+			double progress = track.progressAt(e.getX(), e.getZ(), hint);
+			double fine = track.progressFineAt(e.getX(), e.getZ(), progress);
 			double fineBefore = Double.isNaN(r.lastFine) ? fine : r.lastFine;
 			r.lastFine = fine;
 			boolean onCourse = layout.onCourse(e.getX(), e.getZ());
@@ -800,7 +801,7 @@ public class RaceSession {
 
 	private double currentProgress(Racer r) {
 		ChocoboEntity e = r.entity();
-		return e == null ? 0.0D : track.progressAt(e.getX(), e.getZ());
+		return e == null ? 0.0D : track.progressAt(e.getX(), e.getZ(), r.progress.lastProgress());
 	}
 
 	// ----------------------------------------------------------------- finish

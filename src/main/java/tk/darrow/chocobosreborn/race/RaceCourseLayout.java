@@ -1,6 +1,7 @@
 package tk.darrow.chocobosreborn.race;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -55,6 +56,8 @@ public final class RaceCourseLayout {
 	private final RaceTrack.Theme theme;
 	private final Map<Cell, String> blocks = new LinkedHashMap<>();
 	private final Set<Tile> road = new HashSet<>();
+	/** Sorted {@link #roadKey} values so {@link #onCourse} does not allocate a tile per probe. */
+	private long[] roadKeys = new long[0];
 	private final Set<Long> chunks = new HashSet<>();
 	private final List<FanPost> fans = new ArrayList<>();
 	private BoardPost board;
@@ -139,6 +142,21 @@ public final class RaceCourseLayout {
 		for (Cell c : blocks.keySet()) {
 			chunks.add(chunkKey(c.x() >> 4, c.z() >> 4));
 		}
+		indexRoad();
+	}
+
+	private void indexRoad() {
+		long[] keys = new long[road.size()];
+		int i = 0;
+		for (Tile t : road) {
+			keys[i++] = roadKey(t.x(), t.z());
+		}
+		Arrays.sort(keys);
+		this.roadKeys = keys;
+	}
+
+	static long roadKey(int x, int z) {
+		return ((long) x << 32) | (z & 0xFFFFFFFFL);
 	}
 
 	/**
@@ -1456,7 +1474,7 @@ public final class RaceCourseLayout {
 		int bx = (int) Math.floor(x), bz = (int) Math.floor(z);
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dz = -1; dz <= 1; dz++) {
-				if (road.contains(new Tile(bx + dx, bz + dz))) {
+				if (Arrays.binarySearch(roadKeys, roadKey(bx + dx, bz + dz)) >= 0) {
 					return true;
 				}
 			}

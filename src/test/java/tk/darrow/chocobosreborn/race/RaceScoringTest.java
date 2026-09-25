@@ -117,6 +117,23 @@ class RaceScoringTest {
 		assertFalse(RaceScoring.intelSkipsDashDrain(50, 8, 50));
 		assertFalse(RaceScoring.dashEnds(1), "an intel skip that keeps the last point must not kill the dash");
 		assertTrue(RaceScoring.dashEnds(0));
+		assertTrue(RaceScoring.riderWantsDash(true, 0.98F, false, true));
+		assertFalse(RaceScoring.riderWantsDash(true, 0.0F, false, true), "standing still does not spend stamina");
+		assertFalse(RaceScoring.riderWantsDash(false, 1.0F, false, true));
+		assertFalse(RaceScoring.riderWantsDash(true, 1.0F, true, false), "a flier in the air dives instead of dashing");
+		assertTrue(RaceScoring.riderWantsDash(true, 1.0F, true, true));
+	}
+
+	@Test
+	void guestBurstInsideFortyBlocksIsSlackAndATeleportIsNot() {
+		assertFalse(RaceScoring.vehicleMoveWithinSlack(0.0D, 0.0D, 0.0D));
+		assertFalse(RaceScoring.vehicleMoveWithinSlack(10.0D, 0.0D, 0.0D), "ten blocks is already inside the vanilla limit");
+		assertTrue(RaceScoring.vehicleMoveWithinSlack(12.0D, 0.0D, 0.0D));
+		assertTrue(RaceScoring.vehicleMoveWithinSlack(8.0D, 6.0D, 4.0D));
+		assertTrue(RaceScoring.vehicleMoveWithinSlack(RaceScoring.VEHICLE_SLACK_BLOCKS, 0.0D, 0.0D));
+		assertFalse(RaceScoring.vehicleMoveWithinSlack(RaceScoring.VEHICLE_SLACK_BLOCKS + 0.1D, 0.0D, 0.0D));
+		assertFalse(RaceScoring.vehicleMoveWithinSlack(2000.0D, 0.0D, -600.0D), "a course teleport stays rejected");
+		assertFalse(RaceScoring.vehicleMoveWithinSlack(Double.NaN, 0.0D, 0.0D));
 	}
 
 	@Test

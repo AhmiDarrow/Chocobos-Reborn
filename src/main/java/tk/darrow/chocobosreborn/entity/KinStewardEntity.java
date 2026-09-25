@@ -27,10 +27,16 @@ import net.minecraft.world.item.trading.Merchant;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jetbrains.annotations.Nullable;
 import tk.darrow.chocobosreborn.item.ModItems;
 import tk.darrow.chocobosreborn.race.DuelDesk;
 import tk.darrow.chocobosreborn.race.RaceManager;
+import tk.darrow.chocobosreborn.race.RaceTrack;
 import tk.darrow.chocobosreborn.race.TradeDesk;
 import tk.darrow.chocobosreborn.race.RaceScoring;
 import tk.darrow.chocobosreborn.race.RaceSession;
@@ -456,15 +462,51 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		return false;
 	}
 
-	private boolean cheering;
+	private static final double CHEER_RANGE_SQR = 48.0D * 48.0D;
+	private static long cheerBucket = Long.MIN_VALUE;
+	private static final List<Vec3> cheerBirds = new ArrayList<>();
+	private static AABB cheerBox;
 
-	/** Fans: is a heat running nearby? Client-side, refreshed every half second, not every frame. */
+	/**
+	 * Fans: is a heat running nearby? One search for the whole grandstand each half
+	 * second, then a distance check. The renderer is the only caller, on the client.
+	 */
 	public boolean cheering() {
-		if (role().fans() && tickCount % 10 == 0) {
-			cheering = !level().getEntitiesOfClass(ChocoboEntity.class, getBoundingBox().inflate(48.0D),
-					ChocoboEntity::racing).isEmpty();
+		if (!role().fans() || !level().isClientSide) {
+			return false;
 		}
-		return cheering;
+		long bucket = level().getGameTime() / 10L;
+		if (bucket != cheerBucket) {
+			cheerBucket = bucket;
+			cheerBirds.clear();
+			for (ChocoboEntity bird : level().getEntitiesOfClass(ChocoboEntity.class, cheerSearchBox(), ChocoboEntity::racing)) {
+				cheerBirds.add(new Vec3(bird.getX(), bird.getY(), bird.getZ()));
+			}
+		}
+		double x = getX(), y = getY(), z = getZ();
+		for (int i = 0; i < cheerBirds.size(); i++) {
+			Vec3 p = cheerBirds.get(i);
+			double dx = p.x - x, dy = p.y - y, dz = p.z - z;
+			if (dx * dx + dy * dy + dz * dz <= CHEER_RANGE_SQR) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static AABB cheerSearchBox() {
+		if (cheerBox == null) {
+			double minX = Double.POSITIVE_INFINITY, minZ = Double.POSITIVE_INFINITY;
+			double maxX = Double.NEGATIVE_INFINITY, maxZ = Double.NEGATIVE_INFINITY;
+			for (RaceTrack t : RaceTrack.values()) {
+				minX = Math.min(minX, t.centerX() - t.getRadiusX() - 64.0D);
+				maxX = Math.max(maxX, t.centerX() + t.getRadiusX() + 64.0D);
+				minZ = Math.min(minZ, t.centerZ() - t.getRadiusZ() - 64.0D);
+				maxZ = Math.max(maxZ, t.centerZ() + t.getRadiusZ() + 64.0D);
+			}
+			cheerBox = new AABB(minX, 0.0D, minZ, maxX, 256.0D, maxZ);
+		}
+		return cheerBox;
 	}
 
 	@Override

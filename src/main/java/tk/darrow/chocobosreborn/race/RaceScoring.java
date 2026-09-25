@@ -145,6 +145,29 @@ public final class RaceScoring {
 		return staminaNow <= 0;
 	}
 
+	/**
+	 * Sprint spends stamina only while the rider is actually driving forward.
+	 * Airborne sprint on a flier is the dive, same as {@code ChocoboEntity} riding.
+	 */
+	public static boolean riderWantsDash(boolean sprinting, float forward, boolean flies, boolean onGround) {
+		return sprinting && forward > 0.0F && !(flies && !onGround);
+	}
+
+	/**
+	 * Vanilla drops a vehicle packet when displacement² − velocity² exceeds 100.
+	 * A guest chocobo burst inside this many blocks is given a matching velocity
+	 * so the check passes; anything farther (a course teleport) is still rejected.
+	 */
+	public static final double VEHICLE_SLACK_BLOCKS = 40.0D;
+
+	public static boolean vehicleMoveWithinSlack(double dx, double dy, double dz) {
+		if (!Double.isFinite(dx) || !Double.isFinite(dy) || !Double.isFinite(dz)) {
+			return false;
+		}
+		double dist2 = dx * dx + dy * dy + dz * dz;
+		return dist2 > 100.0D && dist2 <= VEHICLE_SLACK_BLOCKS * VEHICLE_SLACK_BLOCKS;
+	}
+
 	/** Yaw catch-up 0..1. Zero coop is mushy; 100 is a snap to the rider. */
 	public static float turnCatchup(int cooperation) {
 		return 0.35F + 0.65F * Math.max(0, Math.min(100, cooperation)) / 100.0F;

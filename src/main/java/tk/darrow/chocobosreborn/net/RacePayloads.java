@@ -93,6 +93,36 @@ public final class RacePayloads {
 		}
 	}
 
+	/**
+	 * Client to server, every tick the local rider is dashing, and once when they stop.
+	 * Optional: a guest still on an older jar simply never sends it.
+	 * <p>
+	 * The vanilla sprint flag is a one-shot. Clearing it on the server (the bar hit
+	 * empty) syncs back over the guest's ping and her client keeps dashing locally
+	 * without sending START_SPRINTING again, so the bar refills and stays full.
+	 */
+	public record RiderDash(boolean dash) implements CustomPacketPayload {
+		public static final Type<RiderDash> TYPE = new Type<>(
+				ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rider_dash"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, RiderDash> CODEC = StreamCodec.composite(
+				ByteBufCodecs.BOOL, RiderDash::dash, RiderDash::new);
+
+		@Override
+		public Type<? extends CustomPacketPayload> type() {
+			return TYPE;
+		}
+
+		public static void handle(RiderDash p, IPayloadContext ctx) {
+			ctx.enqueueWork(() -> {
+				if (ctx.player() instanceof ServerPlayer sp
+						&& sp.getVehicle() instanceof tk.darrow.chocobosreborn.entity.ChocoboEntity bird
+						&& bird.getControllingPassenger() == sp) {
+					bird.noteRiderDash(p.dash());
+				}
+			});
+		}
+	}
+
 	public record RenameBird(UUID bird, String name) implements CustomPacketPayload {
 		public static final Type<RenameBird> TYPE = new Type<>(
 				ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rename_bird"));

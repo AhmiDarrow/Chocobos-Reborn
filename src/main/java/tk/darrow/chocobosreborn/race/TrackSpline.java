@@ -238,8 +238,55 @@ public final class TrackSpline {
 		return Math.copySign(turn(t, span), cross);
 	}
 
+	/** Samples either side of a hint. A fast bird stays inside this across a lagged tick. */
+	private static final int HINT_WINDOW = 48;
+	/**
+	 * A local sample farther than this is the wrong leg: courses keep other legs at
+	 * least 30 blocks apart, and a detour sits about 16 off the line.
+	 */
+	private static final double HINT_ACCEPT2 = 26.0D * 26.0D;
+
 	/** Parameter of the nearest sample to (x, z). */
 	public double nearest(double x, double z) {
+		return nearestFrom(x, z, -1.0D);
+	}
+
+	/**
+	 * Nearest sample, starting near {@code hint} (0..1) when that section is the one
+	 * under the point. A hint below 0 scans the lap. A bird on a hairpin stays on the
+	 * local leg; a hint from the far side of the course falls back to a full scan.
+	 */
+	public double nearestFrom(double x, double z, double hint) {
+		if (hint >= 0.0D && hint < 1.0D && n > 0) {
+			int center = Math.floorMod((int) Math.round(hint * n), n);
+			int best = bestWindow(x, z, center, HINT_WINDOW);
+			double dx = xs[best] - x, dz = zs[best] - z;
+			if (dx * dx + dz * dz <= HINT_ACCEPT2) {
+				return best / (double) n;
+			}
+		}
+		return bestFull(x, z) / (double) n;
+	}
+
+	/**
+	 * Like {@link #nearest}, refined onto the line between the nearest sample and its
+	 * better neighbour, so it moves smoothly instead of a block at a time (0..1).
+	 */
+	public double nearestFine(double x, double z) {
+		int i = (int) Math.round(nearest(x, z) * n) % n;
+		return refine(x, z, i);
+	}
+
+	/** {@link #nearestFine} around a coarse parameter already known, with no second scan. */
+	public double nearestFineFrom(double x, double z, double coarse) {
+		if (!(coarse >= 0.0D) || n <= 0) {
+			return nearestFine(x, z);
+		}
+		int i = Math.floorMod((int) Math.round(coarse * n), n);
+		return refine(x, z, i);
+	}
+
+	private int bestFull(double x, double z) {
 		int best = 0;
 		double bd = Double.MAX_VALUE;
 		for (int i = 0; i < n; i++) {
@@ -250,15 +297,26 @@ public final class TrackSpline {
 				best = i;
 			}
 		}
-		return best / (double) n;
+		return best;
 	}
 
-	/**
-	 * Like {@link #nearest}, refined onto the line between the nearest sample and its
-	 * better neighbour, so it moves smoothly instead of a block at a time (0..1).
-	 */
-	public double nearestFine(double x, double z) {
-		int i = (int) Math.round(nearest(x, z) * n) % n;
+	/** Lowest index wins a tie, the same rule as {@link #bestFull}. */
+	private int bestWindow(double x, double z, int center, int radius) {
+		int best = center;
+		double bd = Double.MAX_VALUE;
+		for (int k = -radius; k <= radius; k++) {
+			int i = Math.floorMod(center + k, n);
+			double dx = xs[i] - x, dz = zs[i] - z;
+			double d = dx * dx + dz * dz;
+			if (d < bd || (d == bd && i < best)) {
+				bd = d;
+				best = i;
+			}
+		}
+		return best;
+	}
+
+	private double refine(double x, double z, int i) {
 		double best = i, bd = Double.MAX_VALUE;
 		for (int dir = -1; dir <= 1; dir += 2) {
 			int j = (i + dir + n) % n;

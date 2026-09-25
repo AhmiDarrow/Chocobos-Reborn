@@ -392,9 +392,22 @@ public enum RaceTrack {
 		return spline.nearest(x - offsetX, z - offsetZ);
 	}
 
+	/**
+	 * {@link #progressAt} starting near {@code hint} (last progress, 0..1).
+	 * A hint below 0 scans the whole lap.
+	 */
+	public double progressAt(double x, double z, double hint) {
+		return spline.nearestFrom(x - offsetX, z - offsetZ, hint);
+	}
+
 	/** {@link #progressAt} between samples: for timing a line crossing inside a tick. */
 	public double progressFineAt(double x, double z) {
 		return spline.nearestFine(x - offsetX, z - offsetZ);
+	}
+
+	/** Fine progress beside {@code coarse}, which {@link #progressAt} already resolved. */
+	public double progressFineAt(double x, double z, double coarse) {
+		return spline.nearestFineFrom(x - offsetX, z - offsetZ, coarse);
 	}
 
 	public static double stallOffset(int stall, int total) {

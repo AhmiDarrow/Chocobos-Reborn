@@ -134,8 +134,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private int gateCooldown;
 	/** Rider is holding sneak: dive (fliers) / submerge (water birds). Set in travel(). */
 	private boolean descending;
-	/** Server-side gate so a sprint dash stops the moment stamina hits zero. */
-	private boolean dashing;
+	/**
+	 * The driving client reports its dash every tick ({@code RiderDash}). The vanilla
+	 * sprint flag is not re-sent once the server has cleared it, which left a guest
+	 * dashing for free after the bar first hit empty. {@code 0} means no fresh report.
+	 */
+	private boolean riderDashLinked;
+	private int riderDashFresh;
+	/** Client: the last dash bit sent, so a release is reported once. */
+	private boolean clientDashSent;
 	/** Game-day greens satiety last recovered, so unloaded birds still catch up. */
 	private long lastGreensDay = Long.MIN_VALUE;
 	/** Game time of the last training green. 0 = never trained. */
@@ -477,6 +484,23 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	public void setStamina(int value) {
 		this.entityData.set(DATA_STAMINA, Mth.clamp(value, 0, maxStamina()));
+	}
+
+	/** Driving client says it is or isn't dashing. A release clears immediately; a hold stays fresh for a few ticks. */
+	public void noteRiderDash(boolean dash) {
+		this.riderDashLinked = true;
+		this.riderDashFresh = dash ? 10 : 0;
+	}
+
+	/**
+	 * Prefer the rider's own dash report. An older client never sends one, and then
+	 * the sprint flag plus forward input still decide, the way they always have.
+	 */
+	private boolean riderWantsDash(Player player) {
+		if (riderDashLinked) {
+			return riderDashFresh > 0;
+		}
+		return RaceScoring.riderWantsDash(player.isSprinting(), player.zza, color().fly(), onGround());
 	}
 
 	public void fillStamina() {
@@ -1215,16 +1239,24 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 * (with a whoosh and a spark trail); standing on mud bogs the bird down. Both
 	 * are movement-speed modifiers, so they work for riders and race AI alike.
 	 */
+	/** Pads and bogs matter for a heat, a field bird, or someone in the saddle. Parked Square birds do not probe. */
+	private boolean courseEffectsActive() {
+		return racing() || raceNpc() || getControllingPassenger() instanceof Player;
+	}
+
 	private void tickCourseEffects() {
-		if (!onCourseGround()) {
-			// a mangrove swamp's mud is not a course bog, and nothing here needs a block probe every tick
-			trackX = Double.NaN;
-			boostTicks = 0;
-			if (boosting()) {
-				this.entityData.set(DATA_BOOST, false);
+		if (!onCourseGround() || !courseEffectsActive()) {
+			// a mangrove swamp's mud is not a course bog, and a bird standing in the Square
+			// does not need a block probe every tick
+			if (!Double.isNaN(trackX) || boostTicks > 0 || boosting()) {
+				trackX = Double.NaN;
+				boostTicks = 0;
+				if (boosting()) {
+					this.entityData.set(DATA_BOOST, false);
+				}
+				speedMod(BOOST_ID, false, BOOST_POWER);
+				speedMod(BOG_ID, false, BOG_DRAG);
 			}
-			speedMod(BOOST_ID, false, BOOST_POWER);
-			speedMod(BOG_ID, false, BOG_DRAG);
 			return;
 		}
 		double prevX = trackX, prevZ = trackZ;
@@ -1399,23 +1431,22 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (!level().isClientSide) {
 			int st = stamina();
 			int max = maxStamina();
-			// in the air on a flier, sprint means "down", not dash
-			boolean wantsDash = player.isSprinting() && player.zza > 0.0F && !(color().fly() && !onGround());
+			// in the air on a flier, sprint means "down", not dash (the client report already says so)
+			boolean wantsDash = riderWantsDash(player);
+			if (riderDashFresh > 0) {
+				riderDashFresh--;
+			}
 			if (wantsDash && st > 0) {
-				dashing = true;
 				boolean skip = RaceScoring.intelSkipsDashDrain(trainedIntelligence(), tickCount, random.nextInt(100));
 				setStamina(skip ? st : st - 1);
 			} else {
-				dashing = false;
-				// Recover: quick when standing, slow while cruising.
+				// Recover: quick when standing, slow while cruising. Do not clear the
+				// rider's sprint flag here: that syncs to a guest a ping later and her
+				// client keeps the dash without ever sending START_SPRINTING again.
 				int gain = player.zza == 0.0F && player.xxa == 0.0F ? 2 : (tickCount % 3 == 0 ? 1 : 0);
 				if (st < max && gain > 0) {
 					setStamina(st + gain);
 				}
-			}
-			if (dashing && RaceScoring.dashEnds(stamina())) {
-				dashing = false;
-				player.setSprinting(false);
 			}
 		}
 		super.tickRidden(player, travel);
@@ -1605,6 +1636,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				this.entityData.set(DATA_STAGE, stage);
 				refreshDimensions();
 			}
+			if (!(getControllingPassenger() instanceof Player)) {
+				riderDashLinked = false;
+				riderDashFresh = 0;
+			}
 			if (!isVehicle() && stamina() < maxStamina() && tickCount % 4 == 0) {
 				setStamina(stamina() + 1);
 			}
@@ -1691,11 +1726,22 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public void tick() {
 		super.tick();
 		if (level().isClientSide) {
-			if (getControllingPassenger() instanceof Player && isControlledByLocalInstance()) {
+			if (getControllingPassenger() instanceof Player rider && isControlledByLocalInstance()) {
 				tickLocalBoost();
+				boolean dash = RaceScoring.riderWantsDash(rider.isSprinting(), rider.zza, color().fly(), onGround());
+				if (dash || clientDashSent) {
+					net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(dash));
+					clientDashSent = dash;
+				}
 			} else {
 				localX = Double.NaN;
 				localBoostTicks = 0;
+				if (clientDashSent) {
+					net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(false));
+					clientDashSent = false;
+				}
 			}
 		}
 		ChocoboColor c = color();

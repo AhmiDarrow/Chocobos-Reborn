@@ -58,6 +58,61 @@ class RaceTrackTest {
 		}
 	}
 
+	/**
+	 * On the centre line a hint matches a full scan. Off the line it matches too
+	 * whenever the full answer still sits in the hint's window; a nearer fold
+	 * outside that window keeps the local leg.
+	 */
+	@Test
+	void hintedProgressMatchesTheLocalSection() {
+		for (RaceTrack track : RaceTrack.values()) {
+			double lap = track.lapLength();
+			double window = 48.0D / lap;
+			for (int i = 0; i < 40; i++) {
+				double t = i / 40.0D;
+				RacePoint on = track.pointAt(t);
+				double full = track.progressAt(on.x(), on.z());
+				double hinted = track.progressAt(on.x(), on.z(), t);
+				assertEquals(full, track.progressAt(on.x(), on.z(), -1.0D), 0.0D, track.name() + " an absent hint scans");
+				double err = Math.abs(hinted - t);
+				err = Math.min(err, 1.0D - err);
+				assertTrue(err * lap < 1.5D, track.name() + " on the line at " + t + ": " + hinted);
+				assertEquals(full, hinted, 1.0E-9, track.name() + " line " + t);
+				assertEquals(track.progressFineAt(on.x(), on.z()),
+						track.progressFineAt(on.x(), on.z(), hinted), 1.0E-9, track.name() + " fine " + t);
+
+				RacePoint lane = track.pointAtLane(t, -14.0D);
+				double laneFull = track.progressAt(lane.x(), lane.z());
+				double laneHint = track.progressAt(lane.x(), lane.z(), t);
+				double along = Math.abs(laneFull - t);
+				along = Math.min(along, 1.0D - along);
+				if (along <= window) {
+					assertEquals(laneFull, laneHint, 1.0E-9, track.name() + " lane " + t);
+				} else {
+					double stay = Math.abs(laneHint - t);
+					stay = Math.min(stay, 1.0D - stay);
+					assertTrue(stay <= window || laneHint == laneFull,
+							track.name() + " lane " + t + " hint " + laneHint + " full " + laneFull);
+				}
+			}
+		}
+	}
+
+	/** A hint from the other side of the lap must not stick when that side is far away. */
+	@Test
+	void staleHintOnTheFarSideFallsBack() {
+		for (RaceTrack track : RaceTrack.values()) {
+			RacePoint start = track.pointAt(0.0D);
+			RacePoint far = track.pointAt(0.5D);
+			double dist = Math.hypot(far.x() - start.x(), far.z() - start.z());
+			double full = track.progressAt(far.x(), far.z());
+			double hinted = track.progressAt(far.x(), far.z(), 0.0D);
+			if (dist > 26.0D) {
+				assertEquals(full, hinted, 1.0E-9, track.name() + " legs " + dist + " apart");
+			}
+		}
+	}
+
 	@Test
 	void gridSitsOnAStraightAcrossTheRoad() {
 		for (RaceTrack track : RaceTrack.values()) {
@@ -280,6 +335,17 @@ class RaceTrackTest {
 		assertFalse(l.onCourse(inside.x(), inside.z()), "infield is not road");
 		var plain = t.pointAtLane(t.terrainFeatures().get(0).end() + 0.15D, 0.0D);
 		assertTrue(l.onCourse(plain.x(), plain.z()));
+		for (RaceTrack track : RaceTrack.values()) {
+			RaceCourseLayout lay = RaceCourseLayout.of(track);
+			int seen = 0;
+			for (RaceCourseLayout.Tile tile : lay.road()) {
+				if ((seen++ % 64) != 0) {
+					continue;
+				}
+				assertTrue(lay.onCourse(tile.x() + 0.5D, tile.z() + 0.5D), track.name() + " road " + tile);
+				assertFalse(lay.onCourse(tile.x() + 100000.5D, tile.z()), track.name() + " off the island");
+			}
+		}
 		assertTrue(l.chunks().size() > 50, "chunk set for force-loading");
 		// ridge wall
 		RaceCourseLayout r = RaceCourseLayout.of(RaceTrack.B_CANYON);
