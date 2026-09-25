@@ -19,6 +19,13 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.14 - Steady dash
+Uploaded 2026-09-25: `chocobosreborn-1.0.14.jar` as file **8973427** ("Chocobos Reborn 1.0.14 - Steady dash",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.14.md`) via
+`tools/upload_curseforge.py`. A guest's dash spends stamina again, and a short lag spike
+no longer yanks the bird back. The host jar is enough for the stamina fix.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.14
+
 ## 1.0.13 - Clear pages
 Uploaded 2026-09-23: `chocobosreborn-1.0.13.jar` as file **8960886** ("Chocobos Reborn 1.0.13 - Clear pages",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.13.md`) via
