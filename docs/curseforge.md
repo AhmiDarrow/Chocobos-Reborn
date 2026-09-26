@@ -19,6 +19,13 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.15 - Long bloodlines
+Uploaded 2026-09-25: `chocobosreborn-1.0.15.jar` as file **8977931** ("Chocobos Reborn 1.0.15 - Long bloodlines",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.15.md`) via
+`tools/upload_curseforge.py`. An empty dash stays locked until stamina is back to 50,
+and a perfect bird is a long bloodline. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.15
+
 ## 1.0.14 - Steady dash
 Uploaded 2026-09-25: `chocobosreborn-1.0.14.jar` as file **8973427** ("Chocobos Reborn 1.0.14 - Steady dash",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.14.md`) via
