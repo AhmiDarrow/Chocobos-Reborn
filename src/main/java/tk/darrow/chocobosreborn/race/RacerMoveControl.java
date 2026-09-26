@@ -36,7 +36,7 @@ public class RacerMoveControl extends MoveControl {
 			return;
 		}
 		float yaw = (float) (Mth.atan2(dz, dx) * (180.0F / (float) Math.PI)) - 90.0F;
-		int coop = mob instanceof ChocoboEntity bird ? bird.trainedCooperation() : 100;
+		int coop = mob instanceof ChocoboEntity bird ? bird.cooperationStat() : 100;
 		mob.setYRot(rotlerp(mob.getYRot(), yaw, RaceScoring.turnMaxDegrees(coop)));
 		mob.yBodyRot = mob.getYRot();
 		float speed = (float) (speedModifier * mob.getAttributeValue(Attributes.MOVEMENT_SPEED));

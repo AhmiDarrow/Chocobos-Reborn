@@ -134,10 +134,32 @@ public final class RaceScoring {
 		return 1.0D + SPEED_PER_POINT * Math.max(0, Math.min(100, trainedSpeed));
 	}
 
-	/** Intelligence: a smart bird skips a dash-drain tick (same roll for rider and AI). */
+	/**
+	 * Intelligence stretches a dash: on every other tick a smart bird may keep the
+	 * point. At 0 nothing is skipped. At 100 half of the drain ticks are free.
+	 * The same roll is used for a rider and for the race AI.
+	 */
 	public static boolean intelSkipsDashDrain(int intelligence, int tickCount, int roll0to99) {
 		int intel = Math.max(0, Math.min(100, intelligence));
-		return intel > 0 && tickCount % 4 == 0 && roll0to99 < intel;
+		return intel > 0 && tickCount % 2 == 0 && roll0to99 < intel;
+	}
+
+	/** After a dash empties the bar, another dash waits until stamina is back here. */
+	public static final int DASH_READY = 50;
+
+	/** The lock stays on until the bar has climbed back to {@link #DASH_READY}. */
+	public static boolean stillDashLocked(boolean locked, int staminaNow) {
+		return locked && staminaNow < DASH_READY;
+	}
+
+	/** Boost-pad length. 50 ticks with no intelligence, 70 at 100. */
+	public static int boostTicks(int intelligence) {
+		return 50 + Math.max(0, Math.min(100, intelligence)) / 5;
+	}
+
+	/** Boost-pad strength. +55% with no intelligence, +75% at 100. */
+	public static double boostPower(int intelligence) {
+		return 0.55D + 0.002D * Math.max(0, Math.min(100, intelligence));
 	}
 
 	/** Dash ends only when the bar is actually empty (an intel skip can keep the last point). */
@@ -146,8 +168,10 @@ public final class RaceScoring {
 	}
 
 	/**
-	 * Sprint spends stamina only while the rider is actually driving forward.
-	 * Airborne sprint on a flier is the dive, same as {@code ChocoboEntity} riding.
+	 * The dash key spends stamina only while the rider is driving forward.
+	 * {@code sprinting} is that key held this tick, not {@code LivingEntity#isSprinting}:
+	 * the vanilla flag stays latched for as long as W is held. Airborne on a flier
+	 * the same key is the dive, same as {@code ChocoboEntity} riding.
 	 */
 	public static boolean riderWantsDash(boolean sprinting, float forward, boolean flies, boolean onGround) {
 		return sprinting && forward > 0.0F && !(flies && !onGround);

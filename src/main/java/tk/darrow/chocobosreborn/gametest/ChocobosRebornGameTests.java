@@ -287,7 +287,7 @@ public class ChocobosRebornGameTests {
 		helper.assertTrue(c.isBaby(), "chick is baby");
 		helper.assertTrue(c.color() == ChocoboColor.YELLOW, "plain nut keeps yellow");
 		helper.assertTrue(c.isTame() && p.getUUID().equals(c.getOwnerUUID()), "chick owned");
-		helper.assertTrue(c.trainedSpeed() >= 4, "pepio talent");
+		helper.assertTrue(c.geneSpeed() >= 1, "pepio talent is a born stat");
 		helper.assertTrue(a.fedNut() == ChocoboNut.NONE, "nut consumed");
 		helper.succeed();
 	}

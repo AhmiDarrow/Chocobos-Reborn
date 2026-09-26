@@ -34,7 +34,7 @@ public enum ChocoboNut {
 		return strength;
 	}
 
-	/** Chick talent: better nuts hatch better-trained chicks (1 Pepio .. 8 Zeio). */
+	/** Chick talent: a small born gift, 1 Pepio through 8 Zeio. */
 	public int getTier() {
 		return tier;
 	}

@@ -112,11 +112,20 @@ class RaceScoringTest {
 	void intelligenceSkipsTheSameDashDrainForRiderAndAi() {
 		assertFalse(RaceScoring.intelSkipsDashDrain(0, 4, 0));
 		assertFalse(RaceScoring.intelSkipsDashDrain(100, 5, 0));
+		assertTrue(RaceScoring.intelSkipsDashDrain(100, 2, 0), "a full intelligence bar skips every other drain tick");
 		assertTrue(RaceScoring.intelSkipsDashDrain(100, 4, 0));
 		assertTrue(RaceScoring.intelSkipsDashDrain(50, 8, 49));
 		assertFalse(RaceScoring.intelSkipsDashDrain(50, 8, 50));
 		assertFalse(RaceScoring.dashEnds(1), "an intel skip that keeps the last point must not kill the dash");
 		assertTrue(RaceScoring.dashEnds(0));
+		assertTrue(RaceScoring.stillDashLocked(true, 0));
+		assertTrue(RaceScoring.stillDashLocked(true, 49), "a held dash stays shut under 50");
+		assertFalse(RaceScoring.stillDashLocked(true, 50));
+		assertFalse(RaceScoring.stillDashLocked(false, 10), "letting go before empty does not lock the bar");
+		assertEquals(50, RaceScoring.boostTicks(0));
+		assertEquals(70, RaceScoring.boostTicks(100));
+		assertEquals(0.55D, RaceScoring.boostPower(0), 1.0E-9);
+		assertEquals(0.75D, RaceScoring.boostPower(100), 1.0E-9);
 		assertTrue(RaceScoring.riderWantsDash(true, 0.98F, false, true));
 		assertFalse(RaceScoring.riderWantsDash(true, 0.0F, false, true), "standing still does not spend stamina");
 		assertFalse(RaceScoring.riderWantsDash(false, 1.0F, false, true));

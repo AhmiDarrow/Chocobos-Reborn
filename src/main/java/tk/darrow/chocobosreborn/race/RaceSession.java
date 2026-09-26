@@ -727,7 +727,9 @@ public class RaceSession {
 					continue;
 				}
 				ChocoboEntity mine = me.entity();
-				player.displayClientMessage(Component.translatable("chocobosreborn.race.hud",
+				boolean locked = mine != null && mine.dashLocked();
+				player.displayClientMessage(Component.translatable(locked
+								? "chocobosreborn.race.hud_locked" : "chocobosreborn.race.hud",
 						RaceScoring.displayLap(me.laps, track.getLaps()), track.getLaps(), placeNow(me), racers.size(),
 						mine == null ? 0 : mine.stamina(), mine == null ? 0 : mine.maxStamina()), true);
 			}

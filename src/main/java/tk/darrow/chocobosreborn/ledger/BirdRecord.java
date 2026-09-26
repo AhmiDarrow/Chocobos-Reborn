@@ -9,6 +9,7 @@ import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 /** One tamed chocobo as the almanac remembers it (works while the bird's chunk is unloaded). */
 public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGrade, int grade, boolean male,
                          int raceClass, int wins, int classWins, int trSpeed, int trStamina, int trIntel, int trCoop,
+                         int geneSpeed, int geneStamina, int geneIntel, int geneCoop, int spark,
                          @Nullable UUID parentA, @Nullable UUID parentB, int parentColorA, int parentColorB,
                          int nut, long bornDay, boolean alive, String pendingName) {
 
@@ -18,7 +19,8 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		String name = b.hasCustomName() ? b.getCustomName().getString() : "";
 		return new BirdRecord(b.getUUID(), owner, name, b.color().getId(), b.bornGrade().getRank(), b.grade().getRank(),
 				b.male(), b.raceClass().getId(), b.raceWins(), b.classWins(), b.trainedSpeed(), b.trainedStamina(),
-				b.trainedIntelligence(), b.trainedCooperation(), parentA, parentB, parentColorA, parentColorB, nut,
+				b.trainedIntelligence(), b.trainedCooperation(), b.geneSpeed(), b.geneStamina(),
+				b.geneIntelligence(), b.geneCooperation(), b.spark(), parentA, parentB, parentColorA, parentColorB, nut,
 				bornDay, alive, "");
 	}
 
@@ -46,8 +48,8 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 
 	public BirdRecord dead() {
 		return new BirdRecord(id, owner, name, color, bornGrade, grade, male, raceClass, wins, classWins, trSpeed,
-				trStamina, trIntel, trCoop, parentA, parentB, parentColorA, parentColorB, nut, bornDay, false,
-				pendingName);
+				trStamina, trIntel, trCoop, geneSpeed, geneStamina, geneIntel, geneCoop, spark, parentA, parentB,
+				parentColorA, parentColorB, nut, bornDay, false, pendingName);
 	}
 
 	public CompoundTag save() {
@@ -66,6 +68,11 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		t.putInt("TrStamina", trStamina);
 		t.putInt("TrIntel", trIntel);
 		t.putInt("TrCoop", trCoop);
+		t.putInt("GeneSpeed", geneSpeed);
+		t.putInt("GeneStamina", geneStamina);
+		t.putInt("GeneIntel", geneIntel);
+		t.putInt("GeneCoop", geneCoop);
+		t.putInt("Spark", spark);
 		if (parentA != null) {
 			t.putUUID("ParentA", parentA);
 		}
@@ -85,6 +92,8 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		return new BirdRecord(t.getUUID("Id"), t.getUUID("Owner"), t.getString("Name"), t.getInt("Color"),
 				t.getInt("BornGrade"), t.getInt("Grade"), t.getBoolean("Male"), t.getInt("Class"), t.getInt("Wins"),
 				t.getInt("ClassWins"), t.getInt("TrSpeed"), t.getInt("TrStamina"), t.getInt("TrIntel"), t.getInt("TrCoop"),
+				t.getInt("GeneSpeed"), t.getInt("GeneStamina"), t.getInt("GeneIntel"), t.getInt("GeneCoop"),
+				t.contains("Spark") ? t.getInt("Spark") : -1,
 				t.hasUUID("ParentA") ? t.getUUID("ParentA") : null, t.hasUUID("ParentB") ? t.getUUID("ParentB") : null,
 				t.getInt("ParentColorA"), t.getInt("ParentColorB"), t.getInt("Nut"), t.getLong("BornDay"),
 				!t.contains("Alive") || t.getBoolean("Alive"), t.getString("Pending"));

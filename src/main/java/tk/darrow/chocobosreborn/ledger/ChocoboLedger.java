@@ -111,7 +111,8 @@ public final class ChocoboLedger extends SavedData {
 		}
 		String pending = found ? "" : (clean.isEmpty() ? BirdRecord.PENDING_CLEAR : clean);
 		birds.put(id, new BirdRecord(r.id(), r.owner(), clean, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),
-				r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(),
+				r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(),
+				r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop(), r.spark(), r.parentA(), r.parentB(),
 				r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), pending));
 		setDirty();
 	}

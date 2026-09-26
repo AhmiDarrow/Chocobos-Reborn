@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import tk.darrow.chocobosreborn.ChocobosReborn;
+import tk.darrow.chocobosreborn.breed.BreedGenes;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.breed.ChocoboGrade;
 import tk.darrow.chocobosreborn.breed.ChocoboNut;
@@ -434,7 +435,14 @@ public class AlmanacScreen extends Screen {
 				: tr("chocobosreborn.almanac.d.racing",
 				Component.translatable("chocobosreborn.class." + rc.id()), r.classWins(), more));
 		Component born = Component.literal(tr("chocobosreborn.almanac.d.born", r.bornDay()));
-		int headerH = birdHeaderHeight(genes, racing, born);
+		Component bornStats = Component.translatable("chocobosreborn.almanac.d.born_stats");
+		Component offers = Component.translatable("chocobosreborn.almanac.d.offers",
+				BreedGenes.blood(r.geneSpeed(), r.trSpeed()), BreedGenes.blood(r.geneStamina(), r.trStamina()),
+				BreedGenes.blood(r.geneIntel(), r.trIntel()), BreedGenes.blood(r.geneCoop(), r.trCoop()));
+		Component sparkLine = r.spark() >= 0 && r.spark() < STAT_KEYS.length
+				? Component.translatable("chocobosreborn.almanac.d.spark", Component.translatable(STAT_KEYS[r.spark()]))
+				: Component.empty();
+		int headerH = birdHeaderHeight(genes, racing, born, bornStats, offers, sparkLine);
 		blocks.add(new Block() {
 			public int height() {
 				return headerH;
@@ -451,19 +459,35 @@ public class AlmanacScreen extends Screen {
 				yy = drawWrapped(g, genes, tx, yy, tw, 0xFFE0E0E0);
 				yy = drawWrapped(g, racing, tx, yy, tw, 0xFFE0E0E0);
 				yy = drawWrapped(g, born, tx, yy, tw, 0xFFAAAAAA);
-				String[] names = {"chocobosreborn.tip.speed", "chocobosreborn.tip.stamina", "chocobosreborn.tip.intelligence", "chocobosreborn.tip.cooperation"};
-				int[] vals = {r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop()};
+				String[] names = STAT_KEYS;
+				int[] bornStat = {r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop()};
+				int[] fed = {r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop()};
 				int[] cols = {0xFFE8A416, 0xFF4CB05A, 0xFF3A8FD0, 0xFFE078A8};
 				int labelW = 72;
-				int numW = 16;
+				int numW = 36;
 				int barX = tx + labelW;
 				int barW = Math.max(24, tw - labelW - numW);
 				for (int i = 0; i < 4; i++) {
 					int by = yy + 4 + i * 11;
+					int bornN = Math.max(0, Math.min(100, bornStat[i]));
+					int total = Math.min(100, bornN + Math.max(0, fed[i]));
+					int fedN = total - bornN;
 					g.drawString(font, Component.translatable(names[i]), tx, by, 0xFFBBBBBB, false);
 					g.fill(barX, by + 1, barX + barW, by + 8, 0xFF303030);
-					g.fill(barX, by + 1, barX + barW * vals[i] / 100, by + 8, cols[i]);
-					g.drawString(font, String.valueOf(vals[i]), barX + barW + 2, by, 0xFFFFFFFF, false);
+					if (bornN > 0) {
+						g.fill(barX, by + 1, barX + barW * bornN / 100, by + 8, cols[i]);
+					}
+					if (fedN > 0) {
+						g.fill(barX + barW * bornN / 100, by + 1, barX + barW * total / 100, by + 8, (cols[i] & 0x00FFFFFF) | 0x88000000);
+					}
+					String num = bornN > 0 && fedN > 0 ? bornN + "+" + fedN : String.valueOf(total);
+					g.drawString(font, num, barX + barW + 2, by, 0xFFFFFFFF, false);
+				}
+				int noteY = yy + 4 + 4 * 11;
+				noteY = drawWrapped(g, bornStats, tx, noteY, tw, 0xFFAAAAAA);
+				noteY = drawWrapped(g, offers, tx, noteY, tw, 0xFFE7D7A8);
+				if (!sparkLine.getString().isEmpty()) {
+					drawWrapped(g, sparkLine, tx, noteY, tw, 0xFFF5B812);
 				}
 			}
 		});
@@ -476,6 +500,38 @@ public class AlmanacScreen extends Screen {
 			blocks.add(text(tr("chocobosreborn.almanac.d.parents", parentName(r.parentA(), r.parentColorA()),
 					parentName(r.parentB(), r.parentColorB()),
 					Component.translatable("chocobosreborn.nut." + ChocoboNut.byId(r.nut()).id())), 0));
+			BirdRecord dam = findRecord(r.parentA());
+			BirdRecord sire = findRecord(r.parentB());
+			if (dam != null && sire != null) {
+				int[] chick = {r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop()};
+				int[] fromDam = {BreedGenes.blood(dam.geneSpeed(), dam.trSpeed()),
+						BreedGenes.blood(dam.geneStamina(), dam.trStamina()),
+						BreedGenes.blood(dam.geneIntel(), dam.trIntel()),
+						BreedGenes.blood(dam.geneCoop(), dam.trCoop())};
+				int[] fromSire = {BreedGenes.blood(sire.geneSpeed(), sire.trSpeed()),
+						BreedGenes.blood(sire.geneStamina(), sire.trStamina()),
+						BreedGenes.blood(sire.geneIntel(), sire.trIntel()),
+						BreedGenes.blood(sire.geneCoop(), sire.trCoop())};
+				StringBuilder ahead = new StringBuilder();
+				int ups = 0;
+				int under = 0;
+				for (int i = 0; i < 4; i++) {
+					if (BreedGenes.stepsUp(chick[i], fromDam[i], fromSire[i])) {
+						if (ups > 0) {
+							ahead.append(", ");
+						}
+						ahead.append(Component.translatable(STAT_KEYS[i]).getString());
+						ups++;
+					} else if (chick[i] < Math.min(fromDam[i], fromSire[i])) {
+						under++;
+					}
+				}
+				if (ups > 0) {
+					blocks.add(text(tr("chocobosreborn.almanac.d.ahead", ahead.toString()), 0));
+				} else if (under == 4) {
+					blocks.add(text(tr("chocobosreborn.almanac.d.throwback"), 0));
+				}
+			}
 		}
 		List<BirdRecord> kids = birds.stream().filter(k -> r.id().equals(k.parentA()) || r.id().equals(k.parentB())).toList();
 		if (!kids.isEmpty()) {
@@ -490,10 +546,20 @@ public class AlmanacScreen extends Screen {
 		layoutWidgets(r, headerH);
 	}
 
-	private int birdHeaderHeight(Component genes, Component racing, Component born) {
+	private static final String[] STAT_KEYS = {
+			"chocobosreborn.tip.speed", "chocobosreborn.tip.stamina",
+			"chocobosreborn.tip.intelligence", "chocobosreborn.tip.cooperation"
+	};
+
+	private int birdHeaderHeight(Component genes, Component racing, Component born, Component bornStats,
+	                             Component offers, Component sparkLine) {
 		int tw = Math.max(40, pageW() - 104);
 		int lines = 1 + font.split(genes, tw).size() + font.split(racing, tw).size()
-				+ font.split(born, tw).size();
+				+ font.split(born, tw).size() + font.split(bornStats, tw).size()
+				+ font.split(offers, tw).size();
+		if (!sparkLine.getString().isEmpty()) {
+			lines += font.split(sparkLine, tw).size();
+		}
 		return Math.max(100, 8 + lines * LINE + 4 * 11);
 	}
 
@@ -512,7 +578,8 @@ public class AlmanacScreen extends Screen {
 			PacketDistributor.sendToServer(new RacePayloads.RenameBird(r.id(), n));
 			int i = birds.indexOf(r);
 			BirdRecord updated = new BirdRecord(r.id(), r.owner(), n, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),
-					r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(), r.parentA(), r.parentB(),
+					r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(),
+					r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop(), r.spark(), r.parentA(), r.parentB(),
 					r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), n);
 			if (i >= 0) {
 				birds.set(i, updated);
@@ -647,6 +714,18 @@ public class AlmanacScreen extends Screen {
 			case FLAME -> "chocobosreborn.almanac.h.flame";
 		};
 		return tr(key, r.wins());
+	}
+
+	private BirdRecord findRecord(java.util.UUID id) {
+		if (id == null) {
+			return null;
+		}
+		for (BirdRecord b : birds) {
+			if (id.equals(b.id())) {
+				return b;
+			}
+		}
+		return null;
 	}
 
 	private static String tr(String key, Object... args) {

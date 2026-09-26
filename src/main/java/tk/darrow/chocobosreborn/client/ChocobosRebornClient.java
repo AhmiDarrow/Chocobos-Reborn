@@ -39,6 +39,8 @@ public final class ChocobosRebornClient {
 			var p = net.minecraft.client.Minecraft.getInstance().player;
 			return p != null && bird.getControllingPassenger() == p && !p.isShiftKeyDown();
 		};
+		tk.darrow.chocobosreborn.entity.ChocoboEntity.SPRINT_KEY =
+				() -> net.minecraft.client.Minecraft.getInstance().options.keySprint.isDown();
 	}
 
 	private void layers(EntityRenderersEvent.RegisterLayerDefinitions event) {

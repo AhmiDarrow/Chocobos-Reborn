@@ -97,16 +97,23 @@ public class RacerGoal extends Goal {
 		boolean lastLap = lapsDone >= totalLaps - 1;
 		boolean straight = track.isStraight(t);
 
-		// --- stamina and dashing (same pool and intel skip as a rider)
+		// --- stamina and dashing (same pool, lockout and intel skip as a rider)
 		int maxSt = Math.max(1, bird.maxStamina());
 		int st = bird.stamina();
 		energy = st / (double) maxSt;
-		dashing = profile.wantsDash(energy, straight, lastLap, playerGap) && st > 0;
+		boolean locked = RaceScoring.stillDashLocked(bird.dashLocked(), st);
+		if (bird.dashLocked() && !locked) {
+			bird.setDashLocked(false);
+		}
+		dashing = profile.wantsDash(energy, straight, lastLap, playerGap) && st > 0 && !locked;
 		if (dashing) {
-			boolean skip = RaceScoring.intelSkipsDashDrain(bird.trainedIntelligence(), bird.tickCount,
+			boolean skip = RaceScoring.intelSkipsDashDrain(bird.intelligenceStat(), bird.tickCount,
 					bird.getRandom().nextInt(100));
 			if (!skip) {
 				bird.setStamina(st - 1);
+				if (st - 1 <= 0) {
+					bird.setDashLocked(true);
+				}
 			}
 		} else if (st < maxSt && bird.tickCount % 3 == 0) {
 			bird.setStamina(st + 1);
@@ -114,7 +121,7 @@ public class RacerGoal extends Goal {
 		energy = bird.stamina() / (double) maxSt;
 
 		// --- racing line: start lane blends into the inside line over the first stretch
-		int coop = bird.trainedCooperation();
+		int coop = bird.cooperationStat();
 		double blend = Math.min(1.0D, ticks / 140.0D) * profile.lineHold() * RaceScoring.handlingLineMul(coop);
 		double wobble = profile.wobble() * RaceScoring.handlingWobbleMul(coop)
 				* Math.sin(bird.tickCount * 0.05D + noiseSeed);
@@ -164,7 +171,7 @@ public class RacerGoal extends Goal {
 		RacePoint target = track.pointAtLane((t + ahead) % 1.0D, lane);
 		// terrain is physical now (water slows swimmers, ridges block non-climbers); no attribute fudge
 		double mul = speed * profile.cruise() * profile.bandFactor(playerGap)
-				* RaceScoring.speedTrainingMul(bird.trainedSpeed());
+				* RaceScoring.speedTrainingMul(bird.speedStat());
 		if (dashing) {
 			mul *= profile.dash();
 		} else if (bird.stamina() <= 0) {

@@ -47,6 +47,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
+import tk.darrow.chocobosreborn.breed.BreedGenes;
 import tk.darrow.chocobosreborn.breed.BreedingOdds;
 import tk.darrow.chocobosreborn.breed.BreedRules;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
@@ -86,6 +87,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private static final EntityDataAccessor<Integer> DATA_TR_STAMINA = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_TR_INTEL = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_TR_COOP = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	/** Born stats passed by breeding. Greens add on top. Older birds have none. */
+	private static final EntityDataAccessor<Integer> DATA_GENE_SPEED = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Integer> DATA_GENE_STAMINA = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Integer> DATA_GENE_INTEL = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Integer> DATA_GENE_COOP = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	/** Which born stat sparked, 0..3. -1 when this chick did not spark. */
+	private static final EntityDataAccessor<Integer> DATA_SPARK = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	/** Set when a dash spends the last point. Cleared once stamina reaches {@link tk.darrow.chocobosreborn.race.RaceScoring#DASH_READY}. */
+	private static final EntityDataAccessor<Boolean> DATA_DASH_LOCKED = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Racing flag for the Square (music + dismount lock). */
 	private static final EntityDataAccessor<Boolean> DATA_RACING = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Ordinal of the course being raced (-1 off the course); the client picks the music loop from it. */
@@ -188,6 +198,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		builder.define(DATA_TR_STAMINA, 0);
 		builder.define(DATA_TR_INTEL, 0);
 		builder.define(DATA_TR_COOP, 0);
+		builder.define(DATA_GENE_SPEED, 0);
+		builder.define(DATA_GENE_STAMINA, 0);
+		builder.define(DATA_GENE_INTEL, 0);
+		builder.define(DATA_GENE_COOP, 0);
+		builder.define(DATA_SPARK, -1);
+		builder.define(DATA_DASH_LOCKED, false);
 		builder.define(DATA_RACING, false);
 		builder.define(DATA_RACE_TRACK, -1);
 		builder.define(DATA_STAGE, 3);
@@ -329,6 +345,89 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.entityData.set(DATA_TR_COOP, Math.min(ChocoboGreen.MAX_POINTS, trainedCooperation() + cooperation));
 	}
 
+	public int geneSpeed() {
+		return this.entityData.get(DATA_GENE_SPEED);
+	}
+
+	public int geneStamina() {
+		return this.entityData.get(DATA_GENE_STAMINA);
+	}
+
+	public int geneIntelligence() {
+		return this.entityData.get(DATA_GENE_INTEL);
+	}
+
+	public int geneCooperation() {
+		return this.entityData.get(DATA_GENE_COOP);
+	}
+
+	/** Born plus greens, capped at 100. This is what the bird races with. Blood is what a foal inherits. */
+	public int speedStat() {
+		return tk.darrow.chocobosreborn.breed.BreedGenes.passed(geneSpeed(), trainedSpeed());
+	}
+
+	public int staminaStat() {
+		return tk.darrow.chocobosreborn.breed.BreedGenes.passed(geneStamina(), trainedStamina());
+	}
+
+	public int intelligenceStat() {
+		return tk.darrow.chocobosreborn.breed.BreedGenes.passed(geneIntelligence(), trainedIntelligence());
+	}
+
+	public int cooperationStat() {
+		return tk.darrow.chocobosreborn.breed.BreedGenes.passed(geneCooperation(), trainedCooperation());
+	}
+
+	public int spark() {
+		return this.entityData.get(DATA_SPARK);
+	}
+
+	public void setSpark(int stat) {
+		this.entityData.set(DATA_SPARK, stat);
+	}
+
+	public int bloodSpeed() {
+		return BreedGenes.blood(geneSpeed(), trainedSpeed());
+	}
+
+	public int bloodStamina() {
+		return BreedGenes.blood(geneStamina(), trainedStamina());
+	}
+
+	public int bloodIntelligence() {
+		return BreedGenes.blood(geneIntelligence(), trainedIntelligence());
+	}
+
+	public int bloodCooperation() {
+		return BreedGenes.blood(geneCooperation(), trainedCooperation());
+	}
+
+	public void setGenes(int speed, int stamina, int intelligence, int cooperation) {
+		this.entityData.set(DATA_GENE_SPEED, Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, speed)));
+		this.entityData.set(DATA_GENE_STAMINA, Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, stamina)));
+		this.entityData.set(DATA_GENE_INTEL, Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, intelligence)));
+		this.entityData.set(DATA_GENE_COOP, Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, cooperation)));
+	}
+
+	/** A wild bird's bloodline, rolled from its grade so a wonderful stray starts ahead of a poor one. */
+	private void rollWildBlood() {
+		int floor = BreedGenes.gradeFloor(bornGrade().getRank());
+		setGenes(
+				BreedGenes.wildGene(floor, random.nextInt(9)),
+				BreedGenes.wildGene(floor, random.nextInt(9)),
+				BreedGenes.wildGene(floor, random.nextInt(9)),
+				BreedGenes.wildGene(floor, random.nextInt(9)));
+		setSpark(-1);
+	}
+
+	public boolean dashLocked() {
+		return this.entityData.get(DATA_DASH_LOCKED);
+	}
+
+	public void setDashLocked(boolean locked) {
+		this.entityData.set(DATA_DASH_LOCKED, locked);
+	}
+
 	public boolean racing() {
 		return this.entityData.get(DATA_RACING);
 	}
@@ -463,7 +562,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public static final double SPEED_PER_POINT = RaceScoring.SPEED_PER_POINT;
 
 	public double speedMul() {
-		return RaceScoring.gradeSpeedMul(grade().getRank()) * RaceScoring.speedTrainingMul(trainedSpeed());
+		return RaceScoring.gradeSpeedMul(grade().getRank()) * RaceScoring.speedTrainingMul(speedStat());
 	}
 
 	public boolean male() {
@@ -479,14 +578,17 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	public int maxStamina() {
-		return RaceScoring.maxStamina(grade().getRank(), raceClass().getId(), false) + trainedStamina();
+		return RaceScoring.maxStamina(grade().getRank(), raceClass().getId(), false) + staminaStat();
 	}
 
 	public void setStamina(int value) {
 		this.entityData.set(DATA_STAMINA, Mth.clamp(value, 0, maxStamina()));
 	}
 
-	/** Driving client says it is or isn't dashing. A release clears immediately; a hold stays fresh for a few ticks. */
+	/**
+	 * The driving client reports the dash key, not the latched sprint flag.
+	 * A release clears immediately; a hold stays fresh for a few ticks of lag.
+	 */
 	public void noteRiderDash(boolean dash) {
 		this.riderDashLinked = true;
 		this.riderDashFresh = dash ? 10 : 0;
@@ -503,8 +605,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return RaceScoring.riderWantsDash(player.isSprinting(), player.zza, color().fly(), onGround());
 	}
 
+	/** Driving client: dash key held, moving forward, and not an airborne dive. */
+	private boolean clientWantsDash(Player player) {
+		boolean key = SPRINT_KEY != null ? SPRINT_KEY.getAsBoolean() : player.isSprinting();
+		return RaceScoring.riderWantsDash(key, player.zza, color().fly(), onGround());
+	}
+
 	public void fillStamina() {
 		setStamina(maxStamina());
+		setDashLocked(false);
 	}
 
 	public void setRaceClass(RaceClass raceClass) {
@@ -626,6 +735,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			boolean cold = biome.coldEnoughToSnow(blockPosition())
 					&& (pad.is(Blocks.SNOW) || pad.is(Blocks.SNOW_BLOCK) || pad.is(Blocks.ICE) || pad.is(Blocks.PACKED_ICE));
 			setGrade(WildGrade.roll(cold, random.nextInt(100)));
+			rollWildBlood();
 		}
 		setMale(random.nextBoolean());
 		this.entityData.set(DATA_STAGE, computeStage());
@@ -725,6 +835,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putInt("TrStamina", trainedStamina());
 		tag.putInt("TrIntel", trainedIntelligence());
 		tag.putInt("TrCoop", trainedCooperation());
+		tag.putInt("GeneSpeed", geneSpeed());
+		tag.putInt("GeneStamina", geneStamina());
+		tag.putInt("GeneIntel", geneIntelligence());
+		tag.putInt("GeneCoop", geneCooperation());
+		tag.putInt("Spark", spark());
+		tag.putBoolean("DashLocked", dashLocked());
 		tag.putIntArray("GreensFed", greensFed.clone());
 		tag.putBoolean("RaceNpc", raceNpc());
 		tag.putBoolean("TownBird", townBird());
@@ -774,6 +890,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.entityData.set(DATA_TR_STAMINA, tag.getInt("TrStamina"));
 		this.entityData.set(DATA_TR_INTEL, tag.getInt("TrIntel"));
 		this.entityData.set(DATA_TR_COOP, tag.getInt("TrCoop"));
+		this.entityData.set(DATA_GENE_SPEED, tag.getInt("GeneSpeed"));
+		this.entityData.set(DATA_GENE_STAMINA, tag.getInt("GeneStamina"));
+		this.entityData.set(DATA_GENE_INTEL, tag.getInt("GeneIntel"));
+		this.entityData.set(DATA_GENE_COOP, tag.getInt("GeneCoop"));
+		this.entityData.set(DATA_SPARK, tag.contains("Spark") ? tag.getInt("Spark") : -1);
+		this.entityData.set(DATA_DASH_LOCKED, tag.getBoolean("DashLocked"));
 		int[] fed = tag.getIntArray("GreensFed");
 		for (int i = 0; i < Math.min(fed.length, greensFed.length); i++) {
 			greensFed[i] = fed[i];
@@ -1130,13 +1252,25 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			rank += 1;
 		}
 		chick.setGrade(ChocoboGrade.byRank(rank));
-		// Nut talent: the chick starts with training points from the nut tier and
-		// a share of what its parents were fed.
-		int talent = nut.getTier() * 4;
-		chick.addTraining(talent + (trainedSpeed() + mate.trainedSpeed()) / 6,
-				talent + (trainedStamina() + mate.trainedStamina()) / 6,
-				talent / 2 + (trainedIntelligence() + mate.trainedIntelligence()) / 6,
-				talent / 2 + (trainedCooperation() + mate.trainedCooperation()) / 6);
+		// Most chicks sit a little under the blood. One in eight sparks one stat
+		// toward the stronger parent. A born 97 or better still needs that spark
+		// on a pair whose blood is already elite.
+		boolean spark = random.nextInt(BreedGenes.SPARK_ODDS) == 0;
+		int favor = spark ? random.nextInt(4) : -1;
+		int floor = BreedGenes.gradeFloor(chick.bornGrade().getRank());
+		int tier = nut.getTier();
+		int[] mine = {bloodSpeed(), bloodStamina(), bloodIntelligence(), bloodCooperation()};
+		int[] theirs = {mate.bloodSpeed(), mate.bloodStamina(), mate.bloodIntelligence(), mate.bloodCooperation()};
+		boolean[] primary = {true, true, false, false};
+		int[] born = new int[4];
+		for (int i = 0; i < 4; i++) {
+			boolean favored = spark && i == favor;
+			born[i] = BreedGenes.childGene(mine[i], theirs[i], BreedGenes.nutGift(tier, primary[i]),
+					BreedGenes.favorLean(favored, random.nextInt(101)), random.nextInt(21) - 12, floor,
+					favored ? BreedGenes.SPARK : 0);
+		}
+		chick.setGenes(born[0], born[1], born[2], born[3]);
+		chick.setSpark(favor);
 		chick.setMale(random.nextBoolean());
 		chick.setAge(CHICK_AGE);
 		chick.entityData.set(DATA_STAGE, 0);
@@ -1173,6 +1307,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 */
 	@Nullable
 	public static java.util.function.Predicate<ChocoboEntity> LOCAL_RIDER;
+
+	/**
+	 * Installed by the client mod: the dash key is physically down. Minecraft's
+	 * sprint flag stays latched while W is held, so using that flag spends the
+	 * bar on the first press and never opens regen until the rider lets go of
+	 * forward. Null on a dedicated server.
+	 */
+	@Nullable
+	public static java.util.function.BooleanSupplier SPRINT_KEY;
 
 	@Override
 	public boolean isPickable() {
@@ -1212,9 +1355,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	private static final net.minecraft.resources.ResourceLocation BOOST_ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("chocobosreborn", "boost");
 	private static final net.minecraft.resources.ResourceLocation BOG_ID = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("chocobosreborn", "bog");
-	private static final int BOOST_TICKS = 50;
-	/** Speed added while boosting (+55%) and taken while bogged (-55%). */
-	private static final double BOOST_POWER = 0.55D, BOG_DRAG = -0.55D;
+	/** Speed taken while bogged (-55%). Boost strength comes from intelligence. */
+	private static final double BOG_DRAG = -0.55D;
 	private int boostTicks;
 	/** Where the bird was at the end of the last tick: a ridden bird's server delta is ~0 and its
 	 *  xo is refreshed after the rider's move packet lands, so neither shows real movement. */
@@ -1254,7 +1396,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				if (boosting()) {
 					this.entityData.set(DATA_BOOST, false);
 				}
-				speedMod(BOOST_ID, false, BOOST_POWER);
+				speedMod(BOOST_ID, false, 0.0D);
 				speedMod(BOG_ID, false, BOG_DRAG);
 			}
 			return;
@@ -1269,7 +1411,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				level().playSound(null, this, net.minecraft.sounds.SoundEvents.FIREWORK_ROCKET_LAUNCH,
 						net.minecraft.sounds.SoundSource.NEUTRAL, 0.7F, 1.5F);
 			}
-			boostTicks = BOOST_TICKS;
+			boostTicks = RaceScoring.boostTicks(intelligenceStat());
 		}
 		if (boostTicks > 0) {
 			boostTicks--;
@@ -1284,7 +1426,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		// AI birds take the boost as an attribute; a rider's client applies it to its input (getRiddenInput)
 		boolean ridden = getControllingPassenger() instanceof Player;
-		speedMod(BOOST_ID, boostTicks > 0 && !ridden, BOOST_POWER);
+		speedMod(BOOST_ID, boostTicks > 0 && !ridden, RaceScoring.boostPower(intelligenceStat()));
 		speedMod(BOG_ID, bog && !ridden, BOG_DRAG);
 	}
 
@@ -1306,7 +1448,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		localX = getX();
 		localZ = getZ();
 		if (mx * mx + mz * mz > 0.001D && crossedBoostPad(prevX, prevZ)) {
-			localBoostTicks = BOOST_TICKS;
+			localBoostTicks = RaceScoring.boostTicks(intelligenceStat());
 		}
 		if (localBoostTicks > 0) {
 			localBoostTicks--;
@@ -1424,7 +1566,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected void tickRidden(Player player, Vec3 travel) {
-		float catchup = RaceScoring.turnCatchup(trainedCooperation());
+		float catchup = RaceScoring.turnCatchup(cooperationStat());
 		this.setYRot(Mth.rotLerp(catchup, this.getYRot(), player.getYRot()));
 		this.setXRot(Mth.rotLerp(catchup, this.getXRot(), player.getXRot() * 0.5F));
 		this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
@@ -1436,9 +1578,19 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (riderDashFresh > 0) {
 				riderDashFresh--;
 			}
-			if (wantsDash && st > 0) {
-				boolean skip = RaceScoring.intelSkipsDashDrain(trainedIntelligence(), tickCount, random.nextInt(100));
-				setStamina(skip ? st : st - 1);
+			// Emptying the bar locks dash until it climbs back to 50. Holding the
+			// key through that climb does not spend the points as they return.
+			boolean locked = RaceScoring.stillDashLocked(dashLocked(), st);
+			if (dashLocked() && !locked) {
+				setDashLocked(false);
+			}
+			if (wantsDash && !locked && st > 0) {
+				boolean skip = RaceScoring.intelSkipsDashDrain(intelligenceStat(), tickCount, random.nextInt(100));
+				int next = skip ? st : st - 1;
+				setStamina(next);
+				if (next <= 0) {
+					setDashLocked(true);
+				}
 			} else {
 				// Recover: quick when standing, slow while cruising. Do not clear the
 				// rider's sprint flag here: that syncs to a guest a ping later and her
@@ -1454,21 +1606,23 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected Vec3 getRiddenInput(Player player, Vec3 travel) {
-		float strafe = player.xxa * RaceScoring.strafeMul(trainedCooperation());
+		float strafe = player.xxa * RaceScoring.strafeMul(cooperationStat());
 		float forward = player.zza;
 		if (forward <= 0.0F) {
 			forward *= 0.25F;
 		}
 		double mul = speedMul();
-		// Airborne sprint is "dive" on a flier, not a stamina dash (tickRidden matches).
-		boolean airDive = color().fly() && !onGround();
-		if (player.isSprinting() && stamina() > 0 && !airDive) {
+		// Same signal as the drain: the dash key on the driving client, the
+		// RiderDash report on the server. The latched sprint flag stays true
+		// while W is held, which left the bar empty and pulsed dash speed.
+		boolean wantsDash = level().isClientSide ? clientWantsDash(player) : riderWantsDash(player);
+		if (wantsDash && !dashLocked() && stamina() > 0) {
 			mul *= RaceScoring.dashMul();
 		} else if (stamina() <= 0) {
 			mul *= RaceScoring.emptyStaminaMul();
 		}
 		if (riderBoost()) {
-			mul *= 1.0D + BOOST_POWER;   // boost pad: +55%, same as the AI attribute
+			mul *= 1.0D + RaceScoring.boostPower(intelligenceStat());
 		}
 		if (onGround() && Square.isSquare(level()) && getBlockStateOn().is(Blocks.MUD)) {
 			mul *= 1.0D + BOG_DRAG;   // a course bog: same x0.45 the AI gets (not the Overworld's mud)
@@ -1478,7 +1632,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				|| (c.lavaWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.LAVA));
 		// mountedCruise carries grade; divide speedMul back out so training is not applied twice.
 		double cruise = RaceScoring.mountedCruise(c.landSpeed(), c.waterSpeed(), water, racing(), grade().getRank());
-		double training = RaceScoring.speedTrainingMul(trainedSpeed());
+		double training = RaceScoring.speedTrainingMul(speedStat());
 		return new Vec3(strafe, 0.0D, forward).scale(mul / speedMul() * training * cruise / Math.max(0.05D, c.landSpeed()));
 	}
 
@@ -1728,7 +1882,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (level().isClientSide) {
 			if (getControllingPassenger() instanceof Player rider && isControlledByLocalInstance()) {
 				tickLocalBoost();
-				boolean dash = RaceScoring.riderWantsDash(rider.isSprinting(), rider.zza, color().fly(), onGround());
+				boolean dash = clientWantsDash(rider);
 				if (dash || clientDashSent) {
 					net.neoforged.neoforge.network.PacketDistributor.sendToServer(
 							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(dash));
