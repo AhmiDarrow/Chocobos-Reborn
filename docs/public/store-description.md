@@ -10,13 +10,15 @@ Original work. Original birds, original calls, original art, original music. A f
 ![image](https://media.forgecdn.net/attachments/description/1699008/description_d32bc0ec-2a8f-42e7-a4b0-624e0dc268cc.png)
 Adults stand about twice a player's height, crest to claw. Chicobos hatch small and grow through three stages. Eight plumages: Yellow, Green, Blue, White, Black, Gold, the End bird in purple with end-stone feathers, and the Nether bird in red with lava feathers. Females wear a shorter crest.
 
-Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you (and come along to Whiskerwind and back), **Stay** put, or **Wander** within 24 blocks of where you left them. A plain right-click still sits a bird down or stands it back up.
+A freshly tamed bird stands up and follows you. Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you, **Stay** put, or **Wander** within 24 blocks of where you left them. A bird on Follow comes with you into the Nether, the End, Whiskerwind and back, and lands a couple of blocks behind you. A plain right-click still sits a bird down or stands it back up.
+
+Your adult birds shed a **feather** every few minutes, and a **brush** loosens one on the spot, with hearts.
 
 Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice. Nether birds are born in the Nether, End birds on the End's outer islands. Hold a **Chocobo Lure** and wild birds come to you and glow.
 
 ## Greens (training)
 
-Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a wild bird (about one try in three) and heals a hurt one. Every green trains speed, stamina, intelligence or cooperation; a bird takes one training green every five minutes, and gets sated on each kind, so move up the ladder. Speed training makes a real difference: a fully trained bird runs a third faster. Gysahl grows from seeds found in grass and is the only green found in the wild; Krakka and Tantal can be crafted from it, and every other green comes from Sage Wynn in Whiskerwind or race prizes.
+Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a wild bird (about one try in three) and heals a hurt one. Every green trains speed, stamina, intelligence or cooperation; a bird takes one training green every five minutes, and gets sated on each kind, so move up the ladder. A sated bird still eats a green to heal when it is hurt. Speed training makes a real difference: a fully trained bird runs a third faster. Gysahl grows from seeds found in grass and is the only green found in the wild; Krakka and Tantal can be crafted from it, and every other green comes from Sage Wynn in Whiskerwind or race prizes.
 
 ## Nuts (mating)
 
@@ -26,11 +28,13 @@ Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of t
 2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
 3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
+**Bloodlines.** Every bird is born with stats of its own, and about a tenth of the training its parents were fed carries into the chick. A perfect bird is a long line: breed the blood down the middle and feed each chick full, and the line climbs clutch after clutch. The Almanac shows what a bird was born with and what you fed it. One chick in eight sparks a stat toward its stronger parent, and only a line that is already strong can reach the legendary top of a stat. Each nut adds a small gift to the chick, the rarer the nut the bigger.
+
 As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class A up pay out Carob, with a rare Zeio at Class S.
 
 ## Riding and fighting
 
-Craft a **Chocobo Saddle**, put it on an owned adult and right-click to ride. Sprint to dash on stamina; ease off to recover. You can fight from the saddle: your swings and arrows never touch your own bird. Terrain follows FF7:
+Craft a **Chocobo Saddle**, put it on an owned adult and right-click to ride. Hold sprint to dash on stamina; let go to recover. A dash that runs the bar dry stays off until stamina climbs back to 50, so pace it. A smart bird spends stamina more slowly and gets more out of boost pads. You can fight from the saddle: your swings and arrows never touch your own bird. Terrain follows FF7:
 
 - **Green** climbs mountains
 - **Blue** walks on shallow rivers; the rider breathes underwater
@@ -48,7 +52,7 @@ An illustrated guide to everything here, with a live "My Chocobos" section: ever
 
 ## Whiskerwind
 
-A race town on a sky island in the void, with its own day and night sky and its own music. Reach it with a **Chocobo Pocketwatch** or through the **Farmhand** at any Chocobo Farm, on foot or in the saddle; your birds nearby come along. Nothing spawns there and nothing there can be dug up.
+A race town on a sky island in the void, with its own day and night sky and its own music. Reach it with a **Chocobo Pocketwatch** or through the **Farmhand** at any Chocobo Farm, on foot or in the saddle; your birds nearby come along. Nothing spawns there, nothing there can be dug up, and nobody sleeps there: its beds are furniture.
 
 The town: a plaza round the arrival medallion, the chocobo fountain, awninged market stalls, timber cottages, an inn with a copper-capped bell tower, the Race Hall, a stable yard, a windmill, the gatehouse and its overlook, a shrine islet, and the town's own birds wandering the streets.
 
@@ -56,8 +60,10 @@ The town: a plaza round the arrival medallion, the chocobo fountain, awninged ma
 
 **Twenty-four courses**, six per class, every one a different circuit: sprints of one lap and grands prix of three, with straights, sweepers, hairpins, chicanes and hills, striped kerbs, a grandstand full of fans in the infield, themed from meadow and shore through canyon, snow, cavern, jungle and the Nether to a rainbow skyway, an obsidian keep and the End. **Boost strips** cover one lane of the road, three on a sprint and five on a grand prix, each on a corner exit; water, ridges, lava and bogs cross the direct line with a slower road round, laid on a bend so the way round really costs you and the bird that suits the terrain takes the short way. Every course has its own landmark, from a windmill and a beached shipwreck to a bone arch, a ring hung over the road and a caged crystal. Nothing in Whiskerwind can hurt a rider or a bird: a bad line costs a place, not a life. Six racers, every AI bird with a kin jockey up; from Class B on, Jolo and Teiyo are in the field, and every racer runs its own form each heat.
 
+**Race with friends on equal terms.** The host gets no edge: each rider's ping is credited at the finish, photo finishes are timed inside the tick, boost pads fire on the pad for every rider, and the countdown holds every bird still, so racing a friend across the internet is fair and smooth. Distant birds draw lighter, so a full field runs well on slower machines.
+
 - **Rook the Bookie** takes one bet per heat.
-- **Sable the Duel Master** runs two-rider races outside the ladder with an optional GP side bet.
+- **Sable the Duel Master** runs one-on-one races outside the ladder: just the two of you on the track, for the pot you both put up.
 - **Pell the Broker** swaps birds between players or hands over a gift.
 - Stalls, all priced in **GP**: Sage Wynn (greens), Bilo the Nutkeeper (nuts), Tack (saddles, lures), the Fair (the Almanac, pocketwatches, fireworks, leads) and **Marl's GP Exchange**.
 
@@ -97,4 +103,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.0.6. Created by Ahmi Darrow.
+Version 1.0.16. Created by Ahmi Darrow.
