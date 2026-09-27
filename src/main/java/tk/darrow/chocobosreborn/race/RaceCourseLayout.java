@@ -45,7 +45,7 @@ public final class RaceCourseLayout {
 	}
 
 	private static final Map<RaceTrack, RaceCourseLayout> CACHE = new EnumMap<>(RaceTrack.class);
-	private static final double CONNECT = 0.012D;      // t-length of a detour connector
+	private static final double CONNECT = RaceTrack.DETOUR_CONNECT;
 	private static final double MARGIN = 10.0D;        // ground either side of the kerbs
 	/** Lane step of the ground stamp: finer than a block so the island has no gaps. */
 	private static final double LANE_STEP = 0.25D;

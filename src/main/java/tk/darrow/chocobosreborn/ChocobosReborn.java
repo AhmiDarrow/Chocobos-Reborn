@@ -66,10 +66,22 @@ public final class ChocobosReborn {
 		reg.playToServer(tk.darrow.chocobosreborn.net.RacePayloads.RenameBird.TYPE,
 				tk.darrow.chocobosreborn.net.RacePayloads.RenameBird.CODEC,
 				tk.darrow.chocobosreborn.net.RacePayloads.RenameBird::handle);
-		// optional so a guest still on an older jar is not kicked at login
-		reg.optional().playToServer(tk.darrow.chocobosreborn.net.RacePayloads.RiderDash.TYPE,
+		// Mount-bound input changes the wire format; require matching rider support.
+		event.registrar("2").playToServer(tk.darrow.chocobosreborn.net.RacePayloads.RiderDash.TYPE,
 				tk.darrow.chocobosreborn.net.RacePayloads.RiderDash.CODEC,
 				tk.darrow.chocobosreborn.net.RacePayloads.RiderDash::handle);
+        var riding = event.registrar("3");
+        riding.playToClient(tk.darrow.chocobosreborn.net.RiderPayloads.Hud.TYPE,
+                tk.darrow.chocobosreborn.net.RiderPayloads.Hud.CODEC, tk.darrow.chocobosreborn.net.RiderPayloads.Hud::handle);
+        riding.playToServer(tk.darrow.chocobosreborn.net.RiderPayloads.Input.TYPE,
+                tk.darrow.chocobosreborn.net.RiderPayloads.Input.CODEC, tk.darrow.chocobosreborn.net.RiderPayloads.Input::handle);
+        riding.playToClient(tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot.TYPE,
+                tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot.CODEC, tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot::handle);
+		var probes = event.registrar("2").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK);
+		probes.playToClient(tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe.TYPE,
+				tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe.CODEC, tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe::handle);
+		probes.playToServer(tk.darrow.chocobosreborn.net.RacePayloads.LatencyReply.TYPE,
+				tk.darrow.chocobosreborn.net.RacePayloads.LatencyReply.CODEC, tk.darrow.chocobosreborn.net.RacePayloads.LatencyReply::handle);
 	}
 
 	private void setup(FMLCommonSetupEvent event) {

@@ -1,0 +1,124 @@
+{
+  "config": {
+    "track": "C_MEADOW",
+    "profiles": [
+      "baseline",
+      "120ms",
+      "300ms",
+      "jitter",
+      "burst"
+    ],
+    "strict_corrections": true,
+    "host": "dedicated",
+    "humans": 1,
+    "ai": 5,
+    "started_utc": "2026-09-27T01:30:57.282445+00:00",
+    "production_source_sha256": "77f2b5ee312d1c7c4683584f027c5a771c055d67a47509c39c4dfd92db40c62b",
+    "bird": {
+      "color": "GOLD",
+      "grade": "WONDERFUL",
+      "class": "S",
+      "speed": 50,
+      "stamina": 100,
+      "intelligence": 0,
+      "cooperation": 100
+    }
+  },
+  "races": [
+    {
+      "profile": "baseline",
+      "finished": true,
+      "telemetry_complete": true,
+      "session_ticks": 520,
+      "vehicle_corrections": 0,
+      "first_placed_sample_tick": 470,
+      "client_last_running_sample_tick": 190,
+      "observed_rtt_ms_min_max": [
+        0,
+        0
+      ],
+      "race_probe_rtt_ms_min_max": [
+        1,
+        1
+      ],
+      "stamina_min": 103,
+      "dash_locked_samples": 0
+    },
+    {
+      "profile": "120ms",
+      "finished": true,
+      "telemetry_complete": true,
+      "session_ticks": 522,
+      "vehicle_corrections": 0,
+      "first_placed_sample_tick": 470,
+      "client_last_running_sample_tick": 190,
+      "observed_rtt_ms_min_max": [
+        57,
+        76
+      ],
+      "race_probe_rtt_ms_min_max": [
+        126,
+        138
+      ],
+      "stamina_min": 105,
+      "dash_locked_samples": 0
+    },
+    {
+      "profile": "300ms",
+      "finished": true,
+      "telemetry_complete": true,
+      "session_ticks": 526,
+      "vehicle_corrections": 0,
+      "first_placed_sample_tick": 470,
+      "client_last_running_sample_tick": 200,
+      "observed_rtt_ms_min_max": [
+        180,
+        212
+      ],
+      "race_probe_rtt_ms_min_max": [
+        310,
+        317
+      ],
+      "stamina_min": 99,
+      "dash_locked_samples": 0
+    },
+    {
+      "profile": "jitter",
+      "finished": true,
+      "telemetry_complete": true,
+      "session_ticks": 523,
+      "vehicle_corrections": 0,
+      "first_placed_sample_tick": 470,
+      "client_last_running_sample_tick": 200,
+      "observed_rtt_ms_min_max": [
+        170,
+        185
+      ],
+      "race_probe_rtt_ms_min_max": [
+        124,
+        177
+      ],
+      "stamina_min": 106,
+      "dash_locked_samples": 0
+    },
+    {
+      "profile": "burst",
+      "finished": true,
+      "telemetry_complete": true,
+      "session_ticks": 523,
+      "vehicle_corrections": 0,
+      "first_placed_sample_tick": 470,
+      "client_last_running_sample_tick": 190,
+      "observed_rtt_ms_min_max": [
+        145,
+        150
+      ],
+      "race_probe_rtt_ms_min_max": [
+        130,
+        136
+      ],
+      "stamina_min": 106,
+      "dash_locked_samples": 0
+    }
+  ]
+}

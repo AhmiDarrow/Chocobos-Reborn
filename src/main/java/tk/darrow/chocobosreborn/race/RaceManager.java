@@ -453,6 +453,7 @@ public final class RaceManager {
 
 	@SubscribeEvent
 	public static void onServerTick(ServerTickEvent.Post event) {
+		tk.darrow.chocobosreborn.net.RaceLatency.tick(event.getServer());
 		ServerLevel square = testLevel != null ? testLevel : Square.level(event.getServer());
 		if (square != null) {
 			SquareBuilder.tickKeeperSync(square);

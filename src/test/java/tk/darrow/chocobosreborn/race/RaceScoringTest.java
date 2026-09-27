@@ -90,14 +90,6 @@ class RaceScoringTest {
 	}
 
 	@Test
-	void aFastDashSamplesTheBoostStripItWouldSkip() {
-		assertEquals(1, RaceScoring.boostPadSamples(0.0D, 0.0D));
-		assertEquals(1, RaceScoring.boostPadSamples(0.1D, 0.0D));
-		assertTrue(RaceScoring.boostPadSamples(1.3D, 0.0D) >= 3);
-		assertTrue(RaceScoring.boostPadSamples(1.3D, 0.0D) <= 8);
-	}
-
-	@Test
 	void wonderfulBirdsOutrunPoorOnes() {
 		assertTrue(RaceScoring.gradeSpeedMul(4) > RaceScoring.gradeSpeedMul(0));
 		assertEquals(1.00D, RaceScoring.gradeSpeedMul(2), 1.0E-9);
@@ -134,15 +126,18 @@ class RaceScoringTest {
 	}
 
 	@Test
-	void guestBurstInsideFortyBlocksIsSlackAndATeleportIsNot() {
-		assertFalse(RaceScoring.vehicleMoveWithinSlack(0.0D, 0.0D, 0.0D));
-		assertFalse(RaceScoring.vehicleMoveWithinSlack(10.0D, 0.0D, 0.0D), "ten blocks is already inside the vanilla limit");
-		assertTrue(RaceScoring.vehicleMoveWithinSlack(12.0D, 0.0D, 0.0D));
-		assertTrue(RaceScoring.vehicleMoveWithinSlack(8.0D, 6.0D, 4.0D));
-		assertTrue(RaceScoring.vehicleMoveWithinSlack(RaceScoring.VEHICLE_SLACK_BLOCKS, 0.0D, 0.0D));
-		assertFalse(RaceScoring.vehicleMoveWithinSlack(RaceScoring.VEHICLE_SLACK_BLOCKS + 0.1D, 0.0D, 0.0D));
-		assertFalse(RaceScoring.vehicleMoveWithinSlack(2000.0D, 0.0D, -600.0D), "a course teleport stays rejected");
-		assertFalse(RaceScoring.vehicleMoveWithinSlack(Double.NaN, 0.0D, 0.0D));
+	void orderedBacklogUsesPerPacketMovementWithoutIncreasingItsLimit() {
+		for (int packets = 1; packets <= 40; packets++) {
+			double cumulative = packets * 3.6;
+			double allowance = RaceScoring.vehiclePacketAllowance(0, cumulative * cumulative, 3.6 * 3.6);
+			assertTrue(cumulative * cumulative - allowance <= 100, "valid step in backlog " + packets);
+		}
+		for (double firstDistance : new double[]{0, 5, 40, 2000}) {
+			assertTrue(firstDistance * firstDistance - RaceScoring.vehiclePacketAllowance(0, firstDistance * firstDistance, 10 * 10) <= 100);
+			assertTrue(firstDistance * firstDistance - RaceScoring.vehiclePacketAllowance(0, firstDistance * firstDistance, 10.1 * 10.1) > 100,
+					"large single steps still fail, including a packet doubling back toward the tick's start");
+		}
+		assertTrue(4_000_000 - RaceScoring.vehiclePacketAllowance(0, 4_000_000, 4_000_000) > 100, "course teleport rejected");
 	}
 
 	@Test
@@ -540,4 +535,22 @@ class RaceScoringTest {
 		assertTrue(RaceScoring.finishSettled(earliestNext - 1e-6, now));
 		assertFalse(RaceScoring.finishSettled(earliestNext, now));
 	}
+	@Test
+	void changingPingCreditsOnlyTheTripsActuallyTaken() {
+		// 200 ms RTT at GO (100 ms outbound), 100 ms at finish (50 ms inbound).
+		assertEquals(3.0D, RaceScoring.lagCreditTicks(200, 100), 1e-9);
+		assertEquals(3.0D, RaceScoring.lagCreditTicks(100, 200), 1e-9);
+		assertEquals(2.4D, RaceScoring.lagCreditTicks(120, 120), 1e-9);
+		assertEquals(0.0D, RaceScoring.lagCreditTicks(-10, -20), 1e-9);
+		assertEquals(3.0D, RaceScoring.lagCreditTicks(0, 5000), 1e-9);
+		assertEquals(6.0D, RaceScoring.lagCreditTicks(5000, 5000), 1e-9);
+		for (int start : new int[] {0, 50, 120, 300, 1000}) {
+			for (int finish : new int[] {0, 50, 120, 300, 1000}) {
+				double credit = RaceScoring.lagCreditTicks(start, finish);
+				assertTrue(credit <= RaceScoring.MAX_LAG_CREDIT_TICKS);
+				assertEquals(100.5D, 100.5D + credit - RaceScoring.lagCreditTicks(start, finish), 1e-9);
+			}
+		}
+	}
+
 }

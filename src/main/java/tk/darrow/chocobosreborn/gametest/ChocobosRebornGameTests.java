@@ -30,6 +30,7 @@ import tk.darrow.chocobosreborn.race.RaceCourseLayout;
 import tk.darrow.chocobosreborn.race.RacePoint;
 import tk.darrow.chocobosreborn.race.RaceManager;
 import tk.darrow.chocobosreborn.race.RaceSession;
+import tk.darrow.chocobosreborn.race.RaceScoring;
 import tk.darrow.chocobosreborn.race.RaceTrack;
 import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.race.SquareBuilder;
@@ -337,6 +338,275 @@ public class ChocobosRebornGameTests {
 			helper.assertTrue(p.getVehicle() == bird, "player mounted");
 			helper.assertTrue(bird.getControllingPassenger() == p, "player controls the bird");
 			helper.assertTrue(bird.canSprint(), "sprint dash allowed");
+			helper.succeed();
+		});
+	}
+
+	@GameTest(template = EMPTY)
+	public static void vehicleReplayCanLandOnStepWithoutIgnoringWalls(GameTestHelper helper) {
+		// The client falls, touches the lower floor and steps up in one tick.
+		// Its resulting packet is upward even though the server still sees it airborne.
+		helper.setBlock(new BlockPos(3, 1, 2), Blocks.STONE);
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(1, 1, 2), true, ChocoboColor.GOLD);
+		Vec3 start = helper.absoluteVec(new Vec3(1.5, 1.5424, 2.5));
+		bird.setPos(start);
+		bird.setOnGround(false);
+		Vec3 replay = new Vec3(2.0, 2.0 - 1.5424 - 1.0E-6, 0);
+		bird.move(net.minecraft.world.entity.MoverType.PLAYER, replay);
+		helper.assertTrue(bird.getX() < start.x + 1.75, "native epsilon reproduces the landing rejection");
+		bird.setPos(start);
+		bird.setOnGround(false);
+		Vec3 corrected = new Vec3(replay.x, RaceScoring.vehicleValidationY(replay.y), replay.z);
+		bird.move(net.minecraft.world.entity.MoverType.PLAYER, corrected);
+		helper.assertTrue(Math.abs(bird.getX() - (start.x + 2)) < 0.0001, "upward replay reaches the valid landing");
+		for (int y = 2; y <= 6; y++) helper.setBlock(new BlockPos(3, y, 2), Blocks.STONE);
+		bird.setPos(start);
+		bird.setOnGround(false);
+		bird.move(net.minecraft.world.entity.MoverType.PLAYER, corrected);
+		helper.assertTrue(bird.getX() < start.x + 1.75, "solid walls still block the move");
+		helper.succeed();
+	}
+
+	@GameTest(template = EMPTY)
+	public static void boostSweepFindsPadAboveMud(GameTestHelper helper) {
+		helper.setBlock(new BlockPos(3, 1, 2), Blocks.MUD);
+		helper.setBlock(new BlockPos(3, 2, 2), tk.darrow.chocobosreborn.block.ModBlocks.BOOST_PAD.get());
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(1, 2, 2), true, ChocoboColor.GOLD);
+		Vec3 from = helper.absoluteVec(new Vec3(1.5, 1.9375, 2.5));
+		Vec3 to = helper.absoluteVec(new Vec3(5.5, 1.9375, 2.5));
+		bird.setPos(to);
+		try {
+			var sweep = ChocoboEntity.class.getDeclaredMethod("crossedBoostPad", double.class, double.class, double.class);
+			sweep.setAccessible(true);
+			helper.assertTrue((boolean) sweep.invoke(bird, from.x, from.y, from.z), "fast rider detects a pad even with feet sunk into mud");
+			helper.setBlock(new BlockPos(3, 1, 2), Blocks.OAK_SLAB);
+			bird.setPos(to.add(0, -0.4375, 0));
+			helper.assertTrue((boolean) sweep.invoke(bird, from.x, from.y - 0.4375, from.z), "pad above a half slab is detected too");
+			bird.setPos(to.add(0, 2, 0));
+			helper.assertFalse((boolean) sweep.invoke(bird, from.x, from.y + 2, from.z), "flying above the pad does not trigger it");
+			Vec3 cornerFrom = helper.absoluteVec(new Vec3(1.5, 2, 1.751));
+			Vec3 cornerTo = helper.absoluteVec(new Vec3(5.5, 2, 2.151));
+			bird.setPos(cornerTo);
+			helper.assertTrue((boolean) sweep.invoke(bird, cornerFrom.x, cornerFrom.y, cornerFrom.z), "a thin diagonal pad crossing cannot fall between samples");
+			helper.assertFalse((boolean) sweep.invoke(bird, cornerFrom.x - 1000, cornerFrom.y, cornerFrom.z), "course transfers do not probe a thousand-block path");
+			double radius = bird.getBbWidth() / 2.0;
+			Vec3 edgeFrom = helper.absoluteVec(new Vec3(1.5, 2, 2 - radius + 0.02));
+			Vec3 edgeTo = helper.absoluteVec(new Vec3(5.5, 2, 2 - radius + 0.02));
+			bird.setPos(edgeTo);
+			helper.assertTrue((boolean) sweep.invoke(bird, edgeFrom.x, edgeFrom.y, edgeFrom.z), "the edge of the physical footprint crossing a strip triggers it");
+			edgeFrom = edgeFrom.add(0, 0, -0.04);
+			edgeTo = edgeTo.add(0, 0, -0.04);
+			bird.setPos(edgeTo);
+			helper.assertFalse((boolean) sweep.invoke(bird, edgeFrom.x, edgeFrom.y, edgeFrom.z), "nearby pads outside the actual footprint do not trigger");
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+		helper.succeed();
+	}
+
+	@GameTest(template = EMPTY, batch = "vehicle_packets")
+	public static void queuedVehicleStepsKeepCollisionAndTeleportChecks(GameTestHelper helper) {
+		for (int x = 0; x <= 80; x++) for (int z = 0; z <= 4; z++) {
+			helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+			for (int y = 1; y <= 5; y++) helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+		}
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		ServerPlayer rider = (ServerPlayer) owner(helper, bird);
+		bird.setSaddledForPreview(true);
+		rider.startRiding(bird, true);
+		// Mounting also sends a teleport; a real client acknowledges it before moving.
+		try {
+			var teleport = net.minecraft.server.network.ServerGamePacketListenerImpl.class.getDeclaredField("awaitingTeleport");
+			teleport.setAccessible(true);
+			rider.connection.handleAcceptTeleportPacket(new net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket(teleport.getInt(rider.connection)));
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+		helper.assertTrue(bird.getControllingPassenger() == rider, "fixture rider controls the bird");
+		// Establish the same baselines as connection.tick without doTick moving the
+		// just-created mock player back to its distant login coordinates.
+		try {
+			var type = net.minecraft.server.network.ServerGamePacketListenerImpl.class;
+			var lastVehicle = type.getDeclaredField("lastVehicle");
+			lastVehicle.setAccessible(true);
+			lastVehicle.set(rider.connection, bird);
+			for (String prefix : new String[]{"vehicleFirstGood", "vehicleLastGood"}) {
+				for (String axis : new String[]{"X", "Y", "Z"}) {
+					var field = type.getDeclaredField(prefix + axis);
+					field.setAccessible(true);
+					field.setDouble(rider.connection, axis.equals("X") ? bird.getX() : axis.equals("Y") ? bird.getY() : bird.getZ());
+				}
+			}
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+		double start = bird.getX();
+		for (int i = 1; i <= 30; i++) {
+			vehiclePacket(rider, bird, start + i * 2);
+			helper.assertTrue(Math.abs(bird.getX() - (start + i * 2)) < 1e-5, "queued step " + i + " accepted without a server tick between packets; x=" + bird.getX() + " start=" + start);
+		}
+		double accepted = bird.getX();
+		vehiclePacket(rider, bird, accepted + 12);
+		helper.assertTrue(Math.abs(bird.getX() - accepted) < 1e-5, "one oversized movement is still rejected");
+		for (int y = 1; y <= 5; y++) for (int z = 0; z <= 4; z++) {
+			helper.setBlock(new BlockPos(65, y, z), Blocks.STONE);
+		}
+		vehiclePacket(rider, bird, accepted + 4);
+		helper.assertTrue(Math.abs(bird.getX() - accepted) < 1e-5, "a small movement cannot pass through a solid wall");
+		bird.discard();
+		helper.succeed();
+	}
+
+	private static void vehiclePacket(ServerPlayer rider, ChocoboEntity bird, double x) {
+		var before = bird.position();
+		bird.setPos(x, before.y, before.z);
+		var packet = new net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket(bird);
+		bird.setPos(before);
+		rider.connection.handleMoveVehicle(packet);
+	}
+
+	/** The Glacier yellow racer must enter the opening, not jump against the preceding fence forever. */
+    @GameTest(template = EMPTY, timeoutTicks = 1200, batch = "ai_detours")
+    public static void glacierAiUsesTheDetourOpening(GameTestHelper helper) {
+        aiUsesDetourOpening(helper, RaceTrack.B_GLACIER, RaceTrack.Feature.Type.WATER);
+    }
+
+    @GameTest(template = EMPTY, timeoutTicks = 1200, batch = "ai_detours")
+    public static void deepsAiUsesTheRidgeDetour(GameTestHelper helper) {
+        aiUsesDetourOpening(helper, RaceTrack.A_DEEPS, RaceTrack.Feature.Type.RIDGE);
+    }
+
+    @GameTest(template = EMPTY, timeoutTicks = 1200, batch = "ai_detours")
+    public static void templeAiUsesTheBogDetour(GameTestHelper helper) {
+        aiUsesDetourOpening(helper, RaceTrack.A_TEMPLE, RaceTrack.Feature.Type.MUD);
+    }
+
+    @GameTest(template = EMPTY, timeoutTicks = 1200, batch = "ai_detours")
+    public static void starfallBlueAiClearsSecondRidge(GameTestHelper helper) {
+        aiUsesDetourOpening(helper, RaceTrack.S_STARFALL, RaceTrack.Feature.Type.RIDGE, ChocoboColor.BLUE, 1);
+    }
+
+    @GameTest(template = EMPTY, timeoutTicks = 3500, batch = "ai_full_lap")
+    public static void templeBlackAiKeepsItsLapValid(GameTestHelper helper) {
+        aiUsesDetourOpening(helper, RaceTrack.A_TEMPLE, RaceTrack.Feature.Type.MUD, ChocoboColor.BLACK, 0, true);
+    }
+
+    private static void aiUsesDetourOpening(GameTestHelper helper, RaceTrack track, RaceTrack.Feature.Type type) {
+        aiUsesDetourOpening(helper, track, type, ChocoboColor.YELLOW, 0);
+    }
+
+    // Isolated from town cleanup, which deliberately removes unregistered race NPCs.
+    private static void aiUsesDetourOpening(GameTestHelper helper, RaceTrack track, RaceTrack.Feature.Type type, ChocoboColor color, int index) {
+        aiUsesDetourOpening(helper, track, type, color, index, false);
+    }
+
+    private static void aiUsesDetourOpening(GameTestHelper helper, RaceTrack track, RaceTrack.Feature.Type type, ChocoboColor color, int index, boolean fullLap) {
+        var feature = track.terrainFeatures().stream().filter(f -> f.type() == type).skip(index).findFirst().orElseThrow();
+		ServerLevel level = helper.getLevel();
+		RaceManager.testLevel = level;
+		forceTrack(level, track, true);
+		SquareBuilder.buildTrack(level, track);
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		bird.setColor(color);
+		bird.setAge(0);
+		bird.setPersistenceRequired();
+		bird.setRaceClass(track.getRaceClass());
+        bird.setGrade(ChocoboGrade.byRank(track.getRaceClass().getId() + 1));
+		bird.setGenes(40, 40, 40, 40);
+        int training = RaceScoring.fieldTraining(track.getRaceClass().getId(), false);
+		bird.addTraining(training, training, training, training);
+		bird.setRaceNpc(true);
+		bird.setRacing(true);
+		bird.fillStamina();
+		bird.getRandom().setSeed(1234L);
+		double startProgress = fullLap ? .02 : feature.start() - .045;
+		double lane = fullLap ? RaceTrack.stallOffset(4, 6) : 1;
+		RacePoint start = track.pointAtLane(startProgress, lane);
+		RacePoint toward = track.pointAt(startProgress + .01);
+		bird.moveTo(start.x(), start.y(), start.z(),
+				(float) Math.toDegrees(Math.atan2(-(toward.x() - start.x()), toward.z() - start.z())), 0);
+		level.addFreshEntity(bird);
+		var goal = new tk.darrow.chocobosreborn.race.RacerGoal(bird, track, lane,
+				tk.darrow.chocobosreborn.race.RacerProfile.of(track.getRaceClass(),
+						tk.darrow.chocobosreborn.race.RacerProfile.Role.FIELD));
+		goal.running = true;
+		bird.installRacer(goal);
+		bird.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
+		var jockey = ModEntities.KIN_STEWARD.get().create(level);
+		jockey.setRole(tk.darrow.chocobosreborn.race.TownRole.JOCKEY_JOLO);
+		jockey.moveTo(start.x(), start.y() + 1, start.z(), 0, 0);
+		jockey.installJockey();
+		level.addFreshEntity(jockey);
+		jockey.startRiding(bird, true);
+		boolean[] detour = {false};
+		var lap = new tk.darrow.chocobosreborn.race.RaceLapProgress(startProgress);
+		if (fullLap) helper.onEachTick(() -> helper.assertTrue(RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()),
+				"AI leaves the legal course at " + track.progressAt(bird.getX(), bird.getZ()) + " position=" + bird.position()));
+		helper.startSequence().thenWaitUntil(() -> {
+			double progress = track.progressAt(bird.getX(), bird.getZ(), lap.lastProgress());
+			boolean credited = lap.update(progress, RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()));
+			if (progress > feature.start() + .01 && progress < feature.end() - .01) {
+				RacePoint center = track.pointAt(progress);
+				detour[0] |= Math.hypot(bird.getX() - center.x(), bird.getZ() - center.z()) > 8;
+			}
+			helper.assertTrue(fullLap ? credited : progress > feature.end() + .04 && progress < feature.end() + .3, track.name() + " " + color + " racer clears route; progress=" + progress
+					+ " position=" + bird.position() + " ticks=" + bird.tickCount + " noAI=" + bird.isNoAi() + " forward=" + bird.zza);
+		}).thenExecute(() -> {
+			helper.assertTrue(fullLap || detour[0], "the racer actually used the dry detour");
+			jockey.discard();
+			bird.discard();
+			forceTrack(level, track, false);
+		}).thenSucceed();
+	}
+
+	/** Exercise Minecraft's normalization too, not only our multiplier arithmetic. */
+	private static double riddenAcceleration(ChocoboEntity bird, Player rider) {
+		try {
+			var input = ChocoboEntity.class.getDeclaredMethod("getRiddenInput", Player.class, net.minecraft.world.phys.Vec3.class);
+			var speed = ChocoboEntity.class.getDeclaredMethod("getRiddenSpeed", Player.class);
+			input.setAccessible(true);
+			speed.setAccessible(true);
+			bird.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+			bird.moveRelative((float) speed.invoke(bird, rider), (net.minecraft.world.phys.Vec3) input.invoke(bird, rider, net.minecraft.world.phys.Vec3.ZERO));
+			return bird.getDeltaMovement().horizontalDistance();
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+	}
+
+	@GameTest(template = EMPTY)
+	public static void riddenBonusesSurviveInputNormalization(GameTestHelper helper) {
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.GOLD);
+		Player rider = owner(helper, bird);
+		bird.setSaddledForPreview(true);
+		rider.startRiding(bird, true);
+		bird.setRacing(true);
+		bird.fillStamina();
+		rider.zza = 1;
+		bird.setGenes(0, 100, 0, 100);
+		bird.noteRiderDash(false);
+		double cruise = riddenAcceleration(bird, rider);
+		bird.noteRiderDash(true);
+		double dash = riddenAcceleration(bird, rider);
+		helper.assertTrue(Math.abs(dash / cruise - RaceScoring.dashMul()) < 0.0001, "dash increases actual acceleration by 62 percent");
+		bird.noteRiderDash(false);
+		bird.setGenes(100, 100, 0, 100);
+		helper.assertTrue(Math.abs(riddenAcceleration(bird, rider) / cruise - 1.35) < 0.0001, "training survives native input normalization");
+		bird.setRaceHeld(true);
+		helper.assertTrue(riddenAcceleration(bird, rider) == 0, "grid hold has no acceleration");
+		helper.succeed();
+	}
+
+	@GameTest(template = EMPTY)
+	public static void gridHoldPreservesStaminaAndClearsOnExit(GameTestHelper helper) {
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.GOLD);
+		Player rider = owner(helper, bird);
+		bird.setSaddledForPreview(true);
+		rider.startRiding(bird, true);
+		bird.setRacing(true);
+		bird.setRaceHeld(true);
+		bird.fillStamina();
+		int stamina = bird.stamina();
+		rider.zza = 1;
+		rider.setSprinting(true);
+		bird.noteRiderDash(true);
+		helper.runAtTickTime(8, () -> {
+			helper.assertTrue(bird.stamina() == stamina, "holding dash on the grid cannot drain stamina");
+			helper.assertTrue(bird.raceHeld(), "grid hold remains synchronized");
+			bird.setRacing(false);
+			helper.assertTrue(!bird.raceHeld(), "forfeit or finish releases the grid hold");
 			helper.succeed();
 		});
 	}

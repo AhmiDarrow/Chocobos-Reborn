@@ -126,17 +126,6 @@ public class RacerGoal extends Goal {
 		double wobble = profile.wobble() * RaceScoring.handlingWobbleMul(coop)
 				* Math.sin(bird.tickCount * 0.05D + noiseSeed);
 		double lane = startLane + (INSIDE_LINE + lineSpread - startLane) * blend + wobble;
-		// --- features: birds that excel take the direct line, the rest swing out onto the detour early
-		RaceTrack.Feature feature = track.terrainAt(t + 0.03D);
-		if (feature == null) {
-			feature = track.terrainAt(t);
-		}
-		if (feature != null && !feature.suits(bird.color())
-				&& (feature.type() != RaceTrack.Feature.Type.MUD || bogSavvy)) {
-			lane = -(RaceTrack.DETOUR_INNER + RaceTrack.DETOUR_OUTER) / 2.0D + wobble * 0.5D;
-			passTicks = 0;
-		}
-
 		// --- overtaking: a slower bird just ahead in our lane -> swing outward
 		if (ticks % 5 == 0) {
 			nearby = bird.level().getEntitiesOfClass(ChocoboEntity.class, bird.getBoundingBox().inflate(3.5D, 1.0D, 3.5D),
@@ -167,7 +156,19 @@ public class RacerGoal extends Goal {
 			stumble = STUMBLE_TICKS;
 		}
 
-		double ahead = 0.012D + 0.006D * Math.max(0.0D, speed - 1.0D);
+		// A fraction of a long lap can span an entire bend, cutting its inside
+		// rail and invalidating the lap even when the bird never stops moving.
+		double ahead = Math.min(0.012D + 0.006D * Math.max(0.0D, speed - 1.0D), 8.0D / track.lapLength());
+		double directLane = lane;
+		if (Math.abs(track.detourLaneAt(t, lane, bird.color(), bogSavvy) - lane) > 1e-6
+				|| Math.abs(track.detourLaneAt(t + ahead, lane, bird.color(), bogSavvy) - lane) > 1e-6) {
+			// A whole connector of lookahead cuts the diagonal's corner into the
+			// rail/ridge, especially at S-class pace. Follow its local tangent.
+			ahead = Math.min(ahead, 4.0D / track.lapLength());
+		}
+		// The old fixed early swerve aimed through the rail before the detour
+		// entrance existed. Follow the same connector ramp the builder lays down.
+		lane = track.detourLaneAt(t + ahead, lane, bird.color(), bogSavvy);
 		RacePoint target = track.pointAtLane((t + ahead) % 1.0D, lane);
 		// terrain is physical now (water slows swimmers, ridges block non-climbers); no attribute fudge
 		double mul = speed * profile.cruise() * profile.bandFactor(playerGap)
@@ -200,7 +201,7 @@ public class RacerGoal extends Goal {
 		}
 		if (!layout.onCourse(bird.getX(), bird.getZ()) && bird.tickCount % 10 == 0) {
 			// Drifted off the road: nudge back onto the line (or the detour).
-			RacePoint back = track.pointAtLane(t, lane);
+			RacePoint back = track.pointAtLane(t, track.detourLaneAt(t, directLane, bird.color(), bogSavvy));
 			bird.getMoveControl().setWantedPosition(back.x(), back.y(), back.z(), mul);
 		}
 	}

@@ -115,18 +115,6 @@ public final class RaceScoring {
 		return 0.62D;
 	}
 
-	/**
-	 * How many in-between samples a boost-pad sweep needs. Fast dashes cover more
-	 * than one block per tick and would skip a 1-block strip if we only tested feet.
-	 */
-	public static int boostPadSamples(double dx, double dz) {
-		double dist = Math.sqrt(dx * dx + dz * dz);
-		if (dist < 0.25D) {
-			return 1;
-		}
-		return Math.min(8, (int) Math.ceil(dist * 2.0D));
-	}
-
 	/** Speed training: +0.35% per point, +35% at 100. Same multiplier for riders and AI. */
 	public static final double SPEED_PER_POINT = 0.0035D;
 
@@ -177,19 +165,21 @@ public final class RaceScoring {
 		return sprinting && forward > 0.0F && !(flies && !onGround);
 	}
 
-	/**
-	 * Vanilla drops a vehicle packet when displacement² − velocity² exceeds 100.
-	 * A guest chocobo burst inside this many blocks is given a matching velocity
-	 * so the check passes; anything farther (a course teleport) is still rejected.
-	 */
-	public static final double VEHICLE_SLACK_BLOCKS = 40.0D;
+	/** Vanilla's downward contact epsilon must not put an ascending landing below its step. */
+	public static double vehicleValidationY(double replayDeltaY) {
+		return replayDeltaY > 0.0D ? replayDeltaY + 1.0E-6D : replayDeltaY;
+	}
 
-	public static boolean vehicleMoveWithinSlack(double dx, double dy, double dz) {
-		if (!Double.isFinite(dx) || !Double.isFinite(dy) || !Double.isFinite(dz)) {
-			return false;
-		}
-		double dist2 = dx * dx + dy * dy + dz * dz;
-		return dist2 > 100.0D && dist2 <= VEHICLE_SLACK_BLOCKS * VEHICLE_SLACK_BLOCKS;
+	/**
+	 * Vanilla compares displacement from the server tick's first position with this
+	 * allowance. Replace only that comparison with displacement from the last accepted
+	 * packet: an ordered backlog is many small steps, not one huge movement. This can
+	 * be negative when a packet doubles back; it is NOT a physical velocity squared.
+	 * The unchanged comparison still rejects a single step beyond vanilla's limit.
+	 */
+	public static double vehiclePacketAllowance(double velocitySquared, double tickDistanceSquared, double stepDistanceSquared) {
+		if (!Double.isFinite(tickDistanceSquared) || !Double.isFinite(stepDistanceSquared)) return velocitySquared;
+		return velocitySquared + tickDistanceSquared - stepDistanceSquared;
 	}
 
 	/** Yaw catch-up 0..1. Zero coop is mushy; 100 is a snap to the rider. */
@@ -454,6 +444,11 @@ public final class RaceScoring {
 	/** Ticks a rider with this round-trip ping is credited at the line (AI racers: 0). */
 	public static double lagCreditTicks(int latencyMs) {
 		return Math.max(0, Math.min(MAX_LAG_CREDIT_MS, latencyMs)) / 50.0D;
+	}
+
+	/** One outbound trip at GO and one inbound trip at the finish, each bounded independently. */
+	public static double lagCreditTicks(int startLatencyMs, int finishLatencyMs) {
+		return (lagCreditTicks(startLatencyMs) + lagCreditTicks(finishLatencyMs)) * 0.5D;
 	}
 
 	/**

@@ -63,6 +63,21 @@ neoForge {
             gameDirectory = project.file('build/verification')
             systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
         }
+        latencyServer {
+            server()
+            programArgument '--nogui'
+            systemProperty 'chocobosreborn.harness', 'server'
+        }
+        latencyClient {
+            client()
+            programArguments.addAll '--quickPlayMultiplayer', '127.0.0.1:25579', '--username', 'LatencyRider', '--width', '1024', '--height', '600'
+            systemProperty 'chocobosreborn.harness', 'client'
+        }
+    }
+    runs.latencyServer.gameDirectory = project.file('build/latency/server')
+    runs.latencyClient.gameDirectory = project.file('build/latency/client')
+    [runs.latencyServer, runs.latencyClient].each {
+        it.systemProperty 'chocobosreborn.harness.output', project.file('build/latency/results').absolutePath
     }
 
     mods {
@@ -116,6 +131,7 @@ tasks.withType(AbstractArchiveTask).configureEach {
 
 tasks.named('jar', Jar).configure {
     exclude 'tk/darrow/chocobosreborn/gametest/**'
+    exclude 'tk/darrow/chocobosreborn/harness/**'
     duplicatesStrategy = DuplicatesStrategy.FAIL
 }
 
@@ -129,4 +145,22 @@ idea {
 // The gametest world persists between runs and would keep old course blocks; start clean.
 tasks.named('runVerification') {
     doFirst { delete(file('build/verification/world')) }
+}
+
+// Let the Python harness own the game processes directly (and shut them down reliably).
+tasks.register('prepareLatencyHarness') {
+    dependsOn 'classes', 'prepareLatencyServerRun', 'prepareLatencyClientRun'
+    doLast {
+        ['Server', 'Client'].each { side ->
+            def run = tasks.named("runLatency${side}").get()
+            def destination = file("build/latency/${side.toLowerCase()}/launch.json")
+            destination.parentFile.mkdirs()
+            def command = [run.javaLauncher.get().executablePath.asFile.absolutePath]
+            command.addAll(run.allJvmArgs)
+            command.addAll(['-cp', run.classpathProvider.asPath, run.mainClass.get()])
+            command.addAll(run.args)
+            run.argumentProviders.each { command.addAll(it.asArguments()) }
+            destination.text = groovy.json.JsonOutput.toJson(command)
+        }
+    }
 }

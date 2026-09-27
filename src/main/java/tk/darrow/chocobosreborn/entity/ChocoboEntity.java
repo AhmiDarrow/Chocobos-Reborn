@@ -1,5 +1,12 @@
 package tk.darrow.chocobosreborn.entity;
 
+import tk.darrow.chocobosreborn.net.RiderPrediction;
+import tk.darrow.chocobosreborn.net.RiderPayloads;
+import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.server.level.ServerPlayer;
+
+import java.util.UUID;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -96,6 +103,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private static final EntityDataAccessor<Integer> DATA_SPARK = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	/** Set when a dash spends the last point. Cleared once stamina reaches {@link tk.darrow.chocobosreborn.race.RaceScoring#DASH_READY}. */
 	private static final EntityDataAccessor<Boolean> DATA_DASH_LOCKED = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
+	/** Synchronized countdown lock; never persisted beyond the live session. */
+	private static final EntityDataAccessor<Boolean> DATA_RACE_HELD = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Racing flag for the Square (music + dismount lock). */
 	private static final EntityDataAccessor<Boolean> DATA_RACING = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Ordinal of the course being raced (-1 off the course); the client picks the music loop from it. */
@@ -145,7 +154,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	/** Rider is holding sneak: dive (fliers) / submerge (water birds). Set in travel(). */
 	private boolean descending;
 	/**
-	 * The driving client reports its dash every tick ({@code RiderDash}). The vanilla
+	 * The driving client reports dash changes immediately and refreshes every five ticks. The vanilla
 	 * sprint flag is not re-sent once the server has cleared it, which left a guest
 	 * dashing for free after the bar first hit empty. {@code 0} means no fresh report.
 	 */
@@ -153,6 +162,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private int riderDashFresh;
 	/** Client: the last dash bit sent, so a release is reported once. */
 	private boolean clientDashSent;
+	private boolean clientDashLinked;
+	@Nullable private UUID dashRider;
 	/** Game-day greens satiety last recovered, so unloaded birds still catch up. */
 	private long lastGreensDay = Long.MIN_VALUE;
 	/** Game time of the last training green. 0 = never trained. */
@@ -205,6 +216,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		builder.define(DATA_SPARK, -1);
 		builder.define(DATA_DASH_LOCKED, false);
 		builder.define(DATA_RACING, false);
+		builder.define(DATA_RACE_HELD, false);
 		builder.define(DATA_RACE_TRACK, -1);
 		builder.define(DATA_STAGE, 3);
 		builder.define(DATA_RACE_NPC, false);
@@ -420,8 +432,96 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		setSpark(-1);
 	}
 
+    private RiderPrediction.Server raceInputs;
+    private RiderPrediction.Client racePrediction;
+    private int raceInputEpoch, clientInputEpoch, lastInputAck, lastInputSnapshotTick;
+    private long raceInputSeed;
+    private UUID raceInputRider;
+    private boolean frameDash, frameEmpty, frameReady;
+
+    private boolean predictingRace() {
+        return level().isClientSide && racing() && isControlledByLocalInstance() && racePrediction != null;
+    }
+
+    /** Called only at GO, after the normal full-stamina reset. */
+    public void beginRaceInputs(ServerPlayer player) {
+        // GameTest mock connections do not negotiate custom channels. Real clients require this channel.
+        if (!player.connection.hasChannel(RiderPayloads.Snapshot.TYPE)) return;
+        raceInputEpoch++;
+        raceInputSeed = random.nextLong();
+        raceInputRider = player.getUUID();
+        raceInputs = new RiderPrediction.Server(System.nanoTime());
+        lastInputAck = 0;
+        sendRaceSnapshot(player, false);
+    }
+
+    private void sendRaceSnapshot(ServerPlayer player, boolean resend) {
+        if (raceInputs == null) return;
+        lastInputSnapshotTick = tickCount;
+        lastInputAck = raceInputs.processed();
+        PacketDistributor.sendToPlayer(player, new RiderPayloads.Snapshot(getId(), raceInputEpoch,
+                lastInputAck, stamina(), dashLocked(), maxStamina(), intelligenceStat(), raceInputSeed, resend));
+    }
+
+    public void receiveRaceInput(ServerPlayer player, RiderPayloads.Input input) {
+        if (!racing() || raceHeld() || raceInputs == null || !player.getUUID().equals(raceInputRider)) return;
+        if (input.sequence() == 0) {
+            if (tickCount - lastInputSnapshotTick >= 5) sendRaceSnapshot(player, true);
+            return;
+        }
+        if (input.epoch() != raceInputEpoch || input.sequence() < 0) return;
+        if (!raceInputs.offer(new RiderPrediction.Frame(input.sequence(), input.dash(), input.moving()))
+                && tickCount - lastInputSnapshotTick >= 5) sendRaceSnapshot(player, true);
+        drainRaceInputs(player);
+    }
+
+    private void drainRaceInputs(ServerPlayer player) {
+        if (raceInputs == null || !player.getUUID().equals(raceInputRider)) return;
+        RiderPrediction.Frame frame;
+        var rules = new RiderPrediction.Rules(maxStamina(), intelligenceStat(), raceInputSeed);
+        while ((frame = raceInputs.poll(System.nanoTime())) != null) {
+            var after = RiderPrediction.step(new RiderPrediction.State(stamina(), dashLocked()), frame, rules);
+            setStamina(after.stamina());
+            setDashLocked(after.locked());
+        }
+        if (raceInputs.processed() - lastInputAck >= 5 || tickCount - lastInputSnapshotTick >= 20)
+            sendRaceSnapshot(player, false);
+    }
+
+    public void receiveRaceSnapshot(RiderPayloads.Snapshot snapshot) {
+        if (!level().isClientSide || !racing() || !isControlledByLocalInstance() || snapshot.epoch() < clientInputEpoch) return;
+        var state = new RiderPrediction.State(snapshot.stamina(), snapshot.locked());
+        var rules = new RiderPrediction.Rules(snapshot.maximum(), snapshot.intelligence(), snapshot.seed());
+        if (racePrediction == null || snapshot.epoch() != clientInputEpoch) {
+            clientInputEpoch = snapshot.epoch();
+            racePrediction = new RiderPrediction.Client(snapshot.acknowledged(), state, rules);
+        } else {
+            racePrediction.acknowledge(snapshot.acknowledged(), state, rules);
+        }
+        if (snapshot.resend()) for (var frame : racePrediction.pending()) sendRaceFrame(frame);
+    }
+
+    private void sendRaceFrame(RiderPrediction.Frame frame) {
+        PacketDistributor.sendToServer(new RiderPayloads.Input(getId(), clientInputEpoch,
+                frame.sequence(), frame.dash(), frame.moving()));
+    }
+
+    private void predictRaceFrame(Player player) {
+        frameReady = false;
+        if (racePrediction == null || !racePrediction.canAdvance()) {
+            if (tickCount % 20 == 0) PacketDistributor.sendToServer(new RiderPayloads.Input(getId(), 0, 0, false, false));
+            return;
+        }
+        var before = racePrediction.state();
+        var frame = racePrediction.advance(clientWantsDash(player), player.zza != 0 || player.xxa != 0);
+        frameDash = RiderPrediction.dashing(before, frame);
+        frameEmpty = before.stamina() <= 0;
+        frameReady = true;
+        sendRaceFrame(frame);
+    }
+
 	public boolean dashLocked() {
-		return this.entityData.get(DATA_DASH_LOCKED);
+		return predictingRace() ? racePrediction.state().locked() : this.entityData.get(DATA_DASH_LOCKED);
 	}
 
 	public void setDashLocked(boolean locked) {
@@ -527,8 +627,22 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.entityData.set(DATA_RACE_TRACK, ordinal);
 	}
 
+	public boolean raceHeld() {
+		return this.entityData.get(DATA_RACE_HELD);
+	}
+
+	public void setRaceHeld(boolean held) {
+		this.entityData.set(DATA_RACE_HELD, held);
+	}
+
 	public void setRacing(boolean racing) {
 		this.entityData.set(DATA_RACING, racing);
+		if (!racing) {
+            raceInputs = null;
+            racePrediction = null;
+            frameReady = false;
+			setRaceHeld(false);
+		}
 		if (racing) {
 			dropSquareLeash();
 		}
@@ -574,7 +688,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	public int stamina() {
-		return this.entityData.get(DATA_STAMINA);
+		return predictingRace() ? racePrediction.state().stamina() : this.entityData.get(DATA_STAMINA);
 	}
 
 	public int maxStamina() {
@@ -590,25 +704,26 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 * A release clears immediately; a hold stays fresh for a few ticks of lag.
 	 */
 	public void noteRiderDash(boolean dash) {
+		this.dashRider = getControllingPassenger() == null ? null : getControllingPassenger().getUUID();
 		this.riderDashLinked = true;
-		this.riderDashFresh = dash ? 10 : 0;
+		this.riderDashFresh = dash ? 20 : 0;
 	}
 
 	/**
-	 * Prefer the rider's own dash report. An older client never sends one, and then
-	 * the sprint flag plus forward input still decide, the way they always have.
+	 * Prefer the controlling rider's own dash report. Before the first report arrives,
+	 * vanilla sprint input is a fallback; a previous rider's report never carries over.
 	 */
 	private boolean riderWantsDash(Player player) {
-		if (riderDashLinked) {
+		if (riderDashLinked && player.getUUID().equals(dashRider)) {
 			return riderDashFresh > 0;
 		}
-		return RaceScoring.riderWantsDash(player.isSprinting(), player.zza, color().fly(), onGround());
+		return RaceScoring.riderWantsDash(player.isSprinting(), player.zza, color().fly() && !racing(), onGround());
 	}
 
 	/** Driving client: dash key held, moving forward, and not an airborne dive. */
 	private boolean clientWantsDash(Player player) {
-		boolean key = SPRINT_KEY != null ? SPRINT_KEY.getAsBoolean() : player.isSprinting();
-		return RaceScoring.riderWantsDash(key, player.zza, color().fly(), onGround());
+		boolean key = !raceHeld() && (SPRINT_KEY != null ? SPRINT_KEY.getAsBoolean() : player.isSprinting());
+		return RaceScoring.riderWantsDash(key, player.zza, color().fly() && !racing(), onGround());
 	}
 
 	public void fillStamina() {
@@ -1360,7 +1475,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private int boostTicks;
 	/** Where the bird was at the end of the last tick: a ridden bird's server delta is ~0 and its
 	 *  xo is refreshed after the rider's move packet lands, so neither shows real movement. */
-	private double trackX = Double.NaN, trackZ;
+	private double trackX = Double.NaN, trackY, trackZ;
 	/**
 	 * The driving client's own boost timer. A rider's bird moves where its client says,
 	 * so a pad found on the server's copy (one ping behind) and synced back (another)
@@ -1369,7 +1484,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 * still drives the sparks, the whoosh and {@link #boosting()} for onlookers.
 	 */
 	private int localBoostTicks;
-	private double localX = Double.NaN, localZ;
+	private double localX = Double.NaN, localY, localZ;
 
 	/** Boosting from a pad right now (both sides). */
 	public boolean boosting() {
@@ -1401,12 +1516,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			}
 			return;
 		}
-		double prevX = trackX, prevZ = trackZ;
+		double prevX = trackX, prevY = trackY, prevZ = trackZ;
 		double mx = Double.isNaN(prevX) ? 0.0D : getX() - prevX, mz = Double.isNaN(prevX) ? 0.0D : getZ() - prevZ;
 		trackX = getX();
+		trackY = getY();
 		trackZ = getZ();
 		boolean moving = mx * mx + mz * mz > 0.001D;
-		if (moving && crossedBoostPad(prevX, prevZ)) {
+		if (moving && crossedBoostPad(prevX, prevY, prevZ)) {
 			if (boostTicks <= 0) {
 				level().playSound(null, this, net.minecraft.sounds.SoundEvents.FIREWORK_ROCKET_LAUNCH,
 						net.minecraft.sounds.SoundSource.NEUTRAL, 0.7F, 1.5F);
@@ -1424,7 +1540,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (boosting() != (boostTicks > 0)) {
 			this.entityData.set(DATA_BOOST, boostTicks > 0);
 		}
-		// AI birds take the boost as an attribute; a rider's client applies it to its input (getRiddenInput)
+		// AI birds take the boost as an attribute; a rider's client applies it in getRiddenSpeed.
 		boolean ridden = getControllingPassenger() instanceof Player;
 		speedMod(BOOST_ID, boostTicks > 0 && !ridden, RaceScoring.boostPower(intelligenceStat()));
 		speedMod(BOG_ID, bog && !ridden, BOG_DRAG);
@@ -1443,11 +1559,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			localBoostTicks = 0;
 			return;
 		}
-		double prevX = localX, prevZ = localZ;
+		double prevX = localX, prevY = localY, prevZ = localZ;
 		double mx = Double.isNaN(prevX) ? 0.0D : getX() - prevX, mz = Double.isNaN(prevX) ? 0.0D : getZ() - prevZ;
 		localX = getX();
+		localY = getY();
 		localZ = getZ();
-		if (mx * mx + mz * mz > 0.001D && crossedBoostPad(prevX, prevZ)) {
+		if (mx * mx + mz * mz > 0.001D && crossedBoostPad(prevX, prevY, prevZ)) {
 			localBoostTicks = RaceScoring.boostTicks(intelligenceStat());
 		}
 		if (localBoostTicks > 0) {
@@ -1460,22 +1577,42 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return level().isClientSide ? localBoostTicks > 0 : boosting();
 	}
 
-	/** Current block plus the path since last tick, so a dash cannot skip a 1-block strip. */
-	private boolean crossedBoostPad(double prevX, double prevZ) {
-		if (isBoostPad(blockPosition())) {
+	/** Sweep all three axes; half-block surfaces (and mud) put feet below the pad's block. */
+	private boolean crossedBoostPad(double prevX, double prevY, double prevZ) {
+		if (isBoostPadAt(getX(), getY(), getZ())) {
 			return true;
 		}
 		if (Double.isNaN(prevX)) {
 			return false;
 		}
-		int n = RaceScoring.boostPadSamples(getX() - prevX, getZ() - prevZ);
-		for (int i = 0; i <= n; i++) {
-			double f = i / (double) n;
-			if (isBoostPad(BlockPos.containing(prevX + (getX() - prevX) * f, getY(), prevZ + (getZ() - prevZ) * f))) {
-				return true;
-			}
-		}
-		return false;
+		Vec3 from = new Vec3(prevX, prevY, prevZ);
+		Vec3 to = position();
+		// A course transfer is not a drive across every block between the courses.
+		if (from.distanceToSqr(to) > 40.0D * 40.0D) return false;
+		return boostAlong(from, to) || boostAlong(from.add(0, 0.5D, 0), to.add(0, 0.5D, 0));
+	}
+
+	private boolean boostAlong(Vec3 from, Vec3 to) {
+		// Sweep the actual footprint, not just its centre. A bird can touch a
+		// diagonal strip with its feet while its centre narrowly misses the voxel.
+		double radius = Math.max(0, getBbWidth() * 0.5D - 1.0E-7D);
+		int reach = (int) Math.ceil(radius);
+		return net.minecraft.world.level.BlockGetter.traverseBlocks(from, to, this,
+				(bird, pos) -> {
+					for (int x = -reach; x <= reach; x++) {
+						for (int z = -reach; z <= reach; z++) {
+							BlockPos pad = pos.offset(x, 0, z);
+							if (!bird.isBoostPad(pad)) continue;
+							var contact = new net.minecraft.world.phys.AABB(pad).inflate(radius, 0, radius);
+							if (contact.contains(from) || contact.contains(to) || contact.clip(from, to).isPresent()) return Boolean.TRUE;
+						}
+					}
+					return null;
+				}, bird -> Boolean.FALSE);
+	}
+
+	private boolean isBoostPadAt(double x, double y, double z) {
+		return isBoostPad(BlockPos.containing(x, y, z)) || isBoostPad(BlockPos.containing(x, y + 0.5D, z));
 	}
 
 	private boolean isBoostPad(BlockPos pos) {
@@ -1570,7 +1707,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.setYRot(Mth.rotLerp(catchup, this.getYRot(), player.getYRot()));
 		this.setXRot(Mth.rotLerp(catchup, this.getXRot(), player.getXRot() * 0.5F));
 		this.yRotO = this.yBodyRot = this.yHeadRot = this.getYRot();
-		if (!level().isClientSide) {
+        if (racing() && !raceHeld()) {
+            if (level().isClientSide && isControlledByLocalInstance()) predictRaceFrame(player);
+            else if (player instanceof ServerPlayer serverPlayer) drainRaceInputs(serverPlayer);
+        }
+		if (!level().isClientSide && !raceHeld() && raceInputs == null) {
 			int st = stamina();
 			int max = maxStamina();
 			// in the air on a flier, sprint means "down", not dash (the client report already says so)
@@ -1606,19 +1747,30 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	protected Vec3 getRiddenInput(Player player, Vec3 travel) {
+		if (raceHeld() || (level().isClientSide && racing() && (racePrediction == null || !racePrediction.canAdvance()))) {
+			return Vec3.ZERO;
+		}
 		float strafe = player.xxa * RaceScoring.strafeMul(cooperationStat());
 		float forward = player.zza;
 		if (forward <= 0.0F) {
 			forward *= 0.25F;
 		}
-		double mul = speedMul();
+		return new Vec3(strafe, 0.0D, forward);
+	}
+
+	@Override
+	protected float getRiddenSpeed(Player player) {
+		if (raceHeld() || (level().isClientSide && racing() && !frameReady)) return 0.0F;
+		// Minecraft normalizes input vectors longer than one: speed bonuses must
+		// scale acceleration here, not the directional input above.
+		double mul = 1.0D;
 		// Same signal as the drain: the dash key on the driving client, the
 		// RiderDash report on the server. The latched sprint flag stays true
 		// while W is held, which left the bar empty and pulsed dash speed.
 		boolean wantsDash = level().isClientSide ? clientWantsDash(player) : riderWantsDash(player);
-		if (wantsDash && !dashLocked() && stamina() > 0) {
+		if (predictingRace() ? frameDash : wantsDash && !dashLocked() && stamina() > 0) {
 			mul *= RaceScoring.dashMul();
-		} else if (stamina() <= 0) {
+		} else if (predictingRace() ? frameEmpty : stamina() <= 0) {
 			mul *= RaceScoring.emptyStaminaMul();
 		}
 		if (riderBoost()) {
@@ -1630,19 +1782,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		ChocoboColor c = color();
 		boolean water = isInWater() || (c.waterWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.WATER))
 				|| (c.lavaWalk() && level().getFluidState(blockPosition().below()).is(FluidTags.LAVA));
-		// mountedCruise carries grade; divide speedMul back out so training is not applied twice.
+		// mountedCruise carries grade; training is applied exactly once.
 		double cruise = RaceScoring.mountedCruise(c.landSpeed(), c.waterSpeed(), water, racing(), grade().getRank());
 		double training = RaceScoring.speedTrainingMul(speedStat());
-		return new Vec3(strafe, 0.0D, forward).scale(mul / speedMul() * training * cruise / Math.max(0.05D, c.landSpeed()));
-	}
-
-	@Override
-	protected float getRiddenSpeed(Player player) {
-		return (float) this.getAttributeValue(Attributes.MOVEMENT_SPEED);
+		return (float) (getAttributeValue(Attributes.MOVEMENT_SPEED) * mul * training * cruise / Math.max(0.05D, c.landSpeed()));
 	}
 
 	@Override
 	public void travel(Vec3 travel) {
+		if (raceHeld()) {
+			pendingJump = -1;
+			flapTicks = 0;
+			setDeltaMovement(Vec3.ZERO);
+			super.travel(Vec3.ZERO);
+			return;
+		}
 		ChocoboColor c = color();
 		Player player = getControllingPassenger() instanceof Player p ? p : null;
 		// Down: sneak for water birds; for a flier in the air it is the sprint key (left
@@ -1736,12 +1890,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public void onPlayerJump(int power) {
 		// Runs on the client that drives the bird (LocalPlayer) and is echoed to the
 		// server via handleStartJump; the impulse must be applied where travel() runs.
-		pendingJump = Math.max(0, power);
+		pendingJump = Mth.clamp(power, 0, 100);
 	}
 
 	@Override
 	public void handleStartJump(int power) {
-		pendingJump = Math.max(0, power);
+		pendingJump = Mth.clamp(power, 0, 100);
 	}
 
 	private void applyPendingJump() {
@@ -1793,6 +1947,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (!(getControllingPassenger() instanceof Player)) {
 				riderDashLinked = false;
 				riderDashFresh = 0;
+				dashRider = null;
 			}
 			if (!isVehicle() && stamina() < maxStamina() && tickCount % 4 == 0) {
 				setStamina(stamina() + 1);
@@ -1880,22 +2035,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public void tick() {
 		super.tick();
 		if (level().isClientSide) {
+            if (!racing()) { racePrediction = null; frameReady = false; }
 			if (getControllingPassenger() instanceof Player rider && isControlledByLocalInstance()) {
 				tickLocalBoost();
 				boolean dash = clientWantsDash(rider);
-				if (dash || clientDashSent) {
+				if (!racing() && (!clientDashLinked || dash != clientDashSent || (dash && tickCount % 5 == 0))) {
 					net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(dash));
+							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(getId(), dash));
 					clientDashSent = dash;
+					clientDashLinked = true;
 				}
 			} else {
 				localX = Double.NaN;
 				localBoostTicks = 0;
-				if (clientDashSent) {
-					net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-							new tk.darrow.chocobosreborn.net.RacePayloads.RiderDash(false));
-					clientDashSent = false;
-				}
+				clientDashSent = false;
+				clientDashLinked = false;
 			}
 		}
 		ChocoboColor c = color();

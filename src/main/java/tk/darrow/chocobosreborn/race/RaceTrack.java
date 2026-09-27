@@ -218,6 +218,8 @@ public enum RaceTrack {
 	public static final double ROAD_HALF = 5.5D;
 	public static final double DETOUR_INNER = 9.0D;
 	public static final double DETOUR_OUTER = 16.0D;
+	/** Shared by the built openings, detour cost model, and AI steering. */
+	public static final double DETOUR_CONNECT = 0.012D;
 	/** Course islands: one per class row (z), one per course column (x); the village sits near the origin. */
 	private static final double ROW_Z0 = 700.0D;
 	private static final double ROW_DZ = 900.0D;
@@ -342,7 +344,7 @@ public enum RaceTrack {
 	 * {@link #detourTarget()}.
 	 */
 	public double detourCost(Feature f) {
-		double connect = 0.012D, lane = -(DETOUR_INNER + DETOUR_OUTER) / 2.0D;
+		double connect = DETOUR_CONNECT, lane = -(DETOUR_INNER + DETOUR_OUTER) / 2.0D;
 		double from = f.start() - connect, to = f.end() + connect;
 		int n = 400;
 		double direct = 0.0D, detour = 0.0D;
@@ -466,6 +468,22 @@ public enum RaceTrack {
 	public Feature terrainAt(double t) {
 		Feature f = featureAt(t);
 		return f != null && f.terrain() ? f : null;
+	}
+
+	/** Lane at a steering target: enter and leave only through the actual detour connectors. */
+	public double detourLaneAt(double t, double directLane, ChocoboColor color, boolean knowsBog) {
+		double progress = t - Math.floor(t);
+		for (Feature feature : features) {
+			if (!feature.terrain() || feature.suits(color)
+					|| (feature.type() == Feature.Type.MUD && !knowsBog)) continue;
+			double from = feature.start() - DETOUR_CONNECT;
+			double to = feature.end() + DETOUR_CONNECT;
+			if (progress < from || progress > to) continue;
+			double blend = progress < feature.start() ? (progress - from) / DETOUR_CONNECT
+					: progress > feature.end() ? (to - progress) / DETOUR_CONNECT : 1.0D;
+			return directLane + (-(DETOUR_INNER + DETOUR_OUTER) / 2.0D - directLane) * blend;
+		}
+		return directLane;
 	}
 
 	/** A ridge across the direct line here (climbers' shortcut). */

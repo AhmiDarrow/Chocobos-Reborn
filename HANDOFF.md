@@ -1,3 +1,7 @@
+# Current release: 1.0.16 — Smoother remote races
+
+The latency and six-racer harness work is complete. See [QA results](docs/qa/README.md), [improvement tracker](docs/LATENCY_IMPROVEMENTS.md), and [release notes](docs/RELEASE_1.0.16.md). Validated with 162 unit tests, 27 GameTests, all 24 C–S tracks with three player clients and three AI, and five dedicated-server network profiles. All peers require 1.0.16. Publication records are in docs/curseforge.md. The historical handoff below predates this release.
+
 # Chocobos Reborn — session handoff (internal)
 
 Date: 2026-09-16 (evening). Repo: the checkout root (Windows dev box)

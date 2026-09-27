@@ -1,0 +1,283 @@
+{
+  "config": {
+    "tracks": "B_GLACIER,A_DEEPS,A_TEMPLE,A_INFERNO,S_CITADEL,S_STARFALL,C_MEADOW,C_ORCHARD,C_SHORE,C_DOWNS,C_CIDER,C_LAGOON,B_CANYON,B_FORD,B_FROST,B_MESA,B_RAPIDS,A_CRYSTAL,A_CANOPY,A_EMBER,S_SKYWAY,S_KEEP,S_VOID,S_MAELSTROM",
+    "guest_added_rtt_ms": 150,
+    "guest2_added_rtt_ms": 300,
+    "guest2_one_way_jitter_ms": 40,
+    "guest2_burst_ms": 600,
+    "humans": 3,
+    "ai": 3,
+    "grid_rotation": 1,
+    "trace_track": "B_GLACIER",
+    "strict_corrections": true,
+    "strict_ai_stalls": true,
+    "host": "integrated",
+    "started_utc": "2026-09-27T00:44:35.496951+00:00",
+    "production_source_sha256": "ed0b556e5e4d2ab97b3ea90759bd590cb1e85eeecc11e1c80f575f32f739f7b1",
+    "bird_class": "same as course",
+    "bird": {
+      "color": "GOLD",
+      "grade": "WONDERFUL",
+      "speed": 50,
+      "stamina": 100,
+      "intelligence": 0,
+      "cooperation": 100
+    }
+  },
+  "coverage": {
+    "expected": 24,
+    "completed": 3,
+    "missing": [
+      "A_CANOPY",
+      "A_CRYSTAL",
+      "A_EMBER",
+      "A_INFERNO",
+      "B_CANYON",
+      "B_FORD",
+      "B_FROST",
+      "B_MESA",
+      "B_RAPIDS",
+      "C_CIDER",
+      "C_DOWNS",
+      "C_LAGOON",
+      "C_MEADOW",
+      "C_ORCHARD",
+      "C_SHORE",
+      "S_CITADEL",
+      "S_KEEP",
+      "S_MAELSTROM",
+      "S_SKYWAY",
+      "S_STARFALL",
+      "S_VOID"
+    ],
+    "flagged_tracks": [
+      "A_DEEPS",
+      "A_TEMPLE"
+    ],
+    "errors": [
+      {
+        "track": "A_INFERNO",
+        "event": "error",
+        "reason": "participant_disconnected"
+      },
+      {
+        "track": "A_TEMPLE",
+        "reason": "AI crossed the line without lap credit",
+        "racers": {
+          "Seifer": 1
+        }
+      }
+    ],
+    "expected_humans": 3,
+    "expected_ai": 3
+  },
+  "races": [
+    {
+      "track": "B_GLACIER",
+      "both_finished": true,
+      "ticks": 2279,
+      "host_place": 1,
+      "guest_place": 3,
+      "host_rtt_start_finish": [
+        0,
+        0
+      ],
+      "guest_rtt_start_finish": [
+        164,
+        159
+      ],
+      "guest_minus_host_observed_ms": 203.5,
+      "guest_minus_host_credited_ms": 42.0,
+      "all_humans_finished": true,
+      "field_size": 6,
+      "field_finished": 3,
+      "guest2_place": 2,
+      "guest2_rtt_start_finish": [
+        340,
+        325
+      ],
+      "guest2_minus_host_credited_ms": 1.7,
+      "telemetry_complete": true,
+      "host_vehicle_corrections": 0,
+      "host_correction_count_source": "end_event",
+      "host_last_client_tick": 1950,
+      "host_sampled_fps_median": 60,
+      "host_ten_tick_interval_ms_p95": 506.3,
+      "host_collision_samples": 0,
+      "host_peak_sampled_speed": 2.0034,
+      "guest_vehicle_corrections": 0,
+      "guest_correction_count_source": "end_event",
+      "guest_last_client_tick": 1950,
+      "guest_sampled_fps_median": 59,
+      "guest_ten_tick_interval_ms_p95": 510.36,
+      "guest_collision_samples": 0,
+      "guest_peak_sampled_speed": 2.0034,
+      "guest2_vehicle_corrections": 0,
+      "guest2_correction_count_source": "end_event",
+      "guest2_last_client_tick": 1960,
+      "guest2_sampled_fps_median": 59.0,
+      "guest2_ten_tick_interval_ms_p95": 508.54,
+      "guest2_collision_samples": 0,
+      "guest2_peak_sampled_speed": 2.0034,
+      "guest_same_running_tick_path_gap_median_blocks": 0.476,
+      "guest_same_running_tick_path_gap_max_blocks": 1.377,
+      "guest_same_running_tick_stamina_difference_max": 0,
+      "guest_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest_same_running_tick_sample_count": 195,
+      "guest2_same_running_tick_path_gap_median_blocks": 0.107,
+      "guest2_same_running_tick_path_gap_max_blocks": 0.953,
+      "guest2_same_running_tick_stamina_difference_max": 0,
+      "guest2_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest2_same_running_tick_sample_count": 195,
+      "review_needed": false,
+      "ai_longest_stagnation_ticks": {
+        "Vincent": 20,
+        "Broden": 30,
+        "Wedge": 30
+      },
+      "ai_stall_flags": [],
+      "ai_uncredited_laps": {},
+      "sampled_server_tick_ms_p95": 8.19,
+      "sampled_server_tick_ms_max": 19.65
+    },
+    {
+      "track": "A_DEEPS",
+      "both_finished": true,
+      "ticks": 2720,
+      "host_place": 1,
+      "guest_place": 2,
+      "host_rtt_start_finish": [
+        0,
+        0
+      ],
+      "guest_rtt_start_finish": [
+        157,
+        154
+      ],
+      "guest_minus_host_observed_ms": 400.0,
+      "guest_minus_host_credited_ms": 244.5,
+      "all_humans_finished": true,
+      "field_size": 6,
+      "field_finished": 3,
+      "guest2_place": 3,
+      "guest2_rtt_start_finish": [
+        304,
+        315
+      ],
+      "guest2_minus_host_credited_ms": 350.0,
+      "telemetry_complete": true,
+      "host_vehicle_corrections": 0,
+      "host_correction_count_source": "end_event",
+      "host_last_client_tick": 2390,
+      "host_sampled_fps_median": 60,
+      "host_ten_tick_interval_ms_p95": 505.81,
+      "host_collision_samples": 11,
+      "host_peak_sampled_speed": 2.0033,
+      "guest_vehicle_corrections": 0,
+      "guest_correction_count_source": "end_event",
+      "guest_last_client_tick": 2400,
+      "guest_sampled_fps_median": 59.0,
+      "guest_ten_tick_interval_ms_p95": 510.4,
+      "guest_collision_samples": 11,
+      "guest_peak_sampled_speed": 2.0032,
+      "guest2_vehicle_corrections": 0,
+      "guest2_correction_count_source": "end_event",
+      "guest2_last_client_tick": 2410,
+      "guest2_sampled_fps_median": 59,
+      "guest2_ten_tick_interval_ms_p95": 511.16,
+      "guest2_collision_samples": 11,
+      "guest2_peak_sampled_speed": 2.0032,
+      "guest_same_running_tick_path_gap_median_blocks": 4.728,
+      "guest_same_running_tick_path_gap_max_blocks": 11.099,
+      "guest_same_running_tick_stamina_difference_max": 0,
+      "guest_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest_same_running_tick_sample_count": 239,
+      "guest2_same_running_tick_path_gap_median_blocks": 4.728,
+      "guest2_same_running_tick_path_gap_max_blocks": 11.099,
+      "guest2_same_running_tick_stamina_difference_max": 0,
+      "guest2_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest2_same_running_tick_sample_count": 239,
+      "review_needed": true,
+      "ai_longest_stagnation_ticks": {
+        "Beatrix": 40,
+        "Yuffie": 40,
+        "Kuja": 40
+      },
+      "ai_stall_flags": [],
+      "ai_uncredited_laps": {},
+      "sampled_server_tick_ms_p95": 6.56,
+      "sampled_server_tick_ms_max": 38.07
+    },
+    {
+      "track": "A_TEMPLE",
+      "both_finished": true,
+      "ticks": 2635,
+      "host_place": 2,
+      "guest_place": 1,
+      "host_rtt_start_finish": [
+        0,
+        0
+      ],
+      "guest_rtt_start_finish": [
+        156,
+        166
+      ],
+      "guest_minus_host_observed_ms": 150.0,
+      "guest_minus_host_credited_ms": -11.0,
+      "all_humans_finished": true,
+      "field_size": 6,
+      "field_finished": 3,
+      "guest2_place": 3,
+      "guest2_rtt_start_finish": [
+        336,
+        355
+      ],
+      "guest2_minus_host_credited_ms": 65.9,
+      "telemetry_complete": true,
+      "host_vehicle_corrections": 0,
+      "host_correction_count_source": "end_event",
+      "host_last_client_tick": 2310,
+      "host_sampled_fps_median": 60,
+      "host_ten_tick_interval_ms_p95": 505.45,
+      "host_collision_samples": 11,
+      "host_peak_sampled_speed": 2.0034,
+      "guest_vehicle_corrections": 0,
+      "guest_correction_count_source": "end_event",
+      "guest_last_client_tick": 2310,
+      "guest_sampled_fps_median": 59,
+      "guest_ten_tick_interval_ms_p95": 507.38,
+      "guest_collision_samples": 11,
+      "guest_peak_sampled_speed": 2.0034,
+      "guest2_vehicle_corrections": 0,
+      "guest2_correction_count_source": "end_event",
+      "guest2_last_client_tick": 2310,
+      "guest2_sampled_fps_median": 59,
+      "guest2_ten_tick_interval_ms_p95": 508.2,
+      "guest2_collision_samples": 11,
+      "guest2_peak_sampled_speed": 2.0034,
+      "guest_same_running_tick_path_gap_median_blocks": 0.018,
+      "guest_same_running_tick_path_gap_max_blocks": 2.77,
+      "guest_same_running_tick_stamina_difference_max": 0,
+      "guest_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest_same_running_tick_sample_count": 231,
+      "guest2_same_running_tick_path_gap_median_blocks": 0.0,
+      "guest2_same_running_tick_path_gap_max_blocks": 2.117,
+      "guest2_same_running_tick_stamina_difference_max": 0,
+      "guest2_same_running_tick_dash_lock_mismatch_samples": 0,
+      "guest2_same_running_tick_sample_count": 231,
+      "review_needed": true,
+      "ai_longest_stagnation_ticks": {
+        "Laguna": 30,
+        "Seifer": 70,
+        "Steiner": 50
+      },
+      "ai_stall_flags": [],
+      "ai_uncredited_laps": {
+        "Seifer": 1
+      },
+      "sampled_server_tick_ms_p95": 6.03,
+      "sampled_server_tick_ms_max": 8.39
+    }
+  ],
+  "interrupted_reason": "Stopped after Temple AI Seifer completed a geometric circuit without lap credit; Inferno interrupted. Glacier packet fix passed with zero corrections and +1.7 ms guest2 credited difference."
+}

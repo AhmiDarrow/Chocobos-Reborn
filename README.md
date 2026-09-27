@@ -4,9 +4,9 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.15**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.0.16**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
-[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [Release 1.0.15](https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.15)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [1.0.16 development notes](docs/RELEASE_1.0.16.md)
 
 Original work. Original birds, original calls, original art, original music. A fan work, not affiliated with Square Enix.
 
@@ -108,3 +108,5 @@ Java 21. `./gradlew test`, `./gradlew runVerification` (headless GameTests), the
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
 Created by Ahmi Darrow.
+
+Latency work and remaining coverage: [improvement tracker](docs/LATENCY_IMPROVEMENTS.md). Run real client races with `python tools/latency_harness.py`, then six-racer heats (one host, two delayed guests, three AI) across all C/B/A/S tracks with `python tools/paired_race_harness.py --rtt 150 --rtt2 300`. Setup, results and limitations are described in the tracker.

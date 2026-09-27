@@ -94,18 +94,18 @@ public final class RacePayloads {
 	}
 
 	/**
-	 * Client to server, every tick the local rider is dashing, and once when they stop.
-	 * Optional: a guest still on an older jar simply never sends it.
+	 * Client to server on mount, on key changes, and every five ticks as a heartbeat.
+	 * Bound to the mount so queued input cannot affect a different bird.
 	 * <p>
 	 * The vanilla sprint flag is a one-shot. Clearing it on the server (the bar hit
 	 * empty) syncs back over the guest's ping and her client keeps dashing locally
 	 * without sending START_SPRINTING again, so the bar refills and stays full.
 	 */
-	public record RiderDash(boolean dash) implements CustomPacketPayload {
+	public record RiderDash(int entityId, boolean dash) implements CustomPacketPayload {
 		public static final Type<RiderDash> TYPE = new Type<>(
 				ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rider_dash"));
 		public static final StreamCodec<RegistryFriendlyByteBuf, RiderDash> CODEC = StreamCodec.composite(
-				ByteBufCodecs.BOOL, RiderDash::dash, RiderDash::new);
+				ByteBufCodecs.VAR_INT, RiderDash::entityId, ByteBufCodecs.BOOL, RiderDash::dash, RiderDash::new);
 
 		@Override
 		public Type<? extends CustomPacketPayload> type() {
@@ -116,7 +116,7 @@ public final class RacePayloads {
 			ctx.enqueueWork(() -> {
 				if (ctx.player() instanceof ServerPlayer sp
 						&& sp.getVehicle() instanceof tk.darrow.chocobosreborn.entity.ChocoboEntity bird
-						&& bird.getControllingPassenger() == sp) {
+						&& bird.getId() == p.entityId() && bird.getControllingPassenger() == sp) {
 					bird.noteRiderDash(p.dash());
 				}
 			});
@@ -141,6 +141,23 @@ public final class RacePayloads {
 					tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sp.serverLevel()).rename(sp, p.bird(), p.name());
 				}
 			});
+		}
+	}
+
+	/** Echoed immediately on the network thread, carrying only the server's nonce. */
+	public record LatencyProbe(long nonce) implements CustomPacketPayload {
+		public static final Type<LatencyProbe> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "latency_probe"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, LatencyProbe> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_LONG, LatencyProbe::nonce, LatencyProbe::new);
+		@Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+		public static void handle(LatencyProbe p, IPayloadContext ctx) { ctx.reply(new LatencyReply(p.nonce())); }
+	}
+
+	public record LatencyReply(long nonce) implements CustomPacketPayload {
+		public static final Type<LatencyReply> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "latency_reply"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, LatencyReply> CODEC = StreamCodec.composite(ByteBufCodecs.VAR_LONG, LatencyReply::nonce, LatencyReply::new);
+		@Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+		public static void handle(LatencyReply p, IPayloadContext ctx) {
+			if (ctx.player() instanceof ServerPlayer player) RaceLatency.reply(player, p.nonce());
 		}
 	}
 }

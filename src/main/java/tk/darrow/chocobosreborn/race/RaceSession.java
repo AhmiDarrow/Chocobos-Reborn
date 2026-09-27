@@ -59,8 +59,11 @@ public class RaceSession {
 		 * placed yet: {@link #settleFinishes} places finishers in crossing order.
 		 */
 		double finishTime = Double.NaN;
+		double observedFinishTime = Double.NaN;
+		int finishLatencyMs;
 		/** Fine lap progress at the end of the last tick, for timing the crossing inside a tick. */
 		double lastFine = Double.NaN;
+		int startLatencyMs;
 		boolean forfeited;
 		boolean settled;
 		@Nullable RacerGoal goal;
@@ -240,6 +243,7 @@ public class RaceSession {
 			racers.add(new Racer(birds.get(i), players.get(i).getUUID(), players.get(i).getName().getString(),
 					RaceTrack.stallOffset(i, grid), track.progressAt(stall.x(), stall.z())));
 			birds.get(i).setRacing(true);
+			birds.get(i).setRaceHeld(true);
 			birds.get(i).setRaceTrack(track.ordinal());
 			birds.get(i).setOrderedToSit(false);
 		}
@@ -519,6 +523,20 @@ public class RaceSession {
 		return sb.toString();
 	}
 
+	/** Read-only diagnostics, retaining timing after teardown for race QA. */
+	public record Timing(int laps, int place, boolean forfeited, double observedTick, double creditedTick,
+	                     int startLatencyMs, int finishLatencyMs) {}
+
+	public @Nullable Timing timing(UUID player) {
+		for (Racer r : racers) {
+			if (player.equals(r.player)) {
+				return new Timing(r.laps, r.finishIndex < 0 ? 0 : r.finishIndex + 1, r.forfeited,
+						r.observedFinishTime, r.finishTime, r.startLatencyMs, r.finishLatencyMs);
+			}
+		}
+		return null;
+	}
+
 	private List<Racer> humans() {
 		List<Racer> out = new ArrayList<>();
 		for (Racer r : racers) {
@@ -636,9 +654,13 @@ public class RaceSession {
 		if (left <= 0) {
 			state = State.RUNNING;
 			for (Racer r : racers) {
+				ServerPlayer starter = r.serverPlayer();
+				r.startLatencyMs = starter == null ? 0 : tk.darrow.chocobosreborn.net.RaceLatency.millis(starter);
 				ChocoboEntity e = r.anyEntity();
 				if (e != null && e.isAlive()) {
-					e.fillStamina();   // HOLD can drain a sprinting rider; everyone leaves the grid full
+					e.setRaceHeld(false);
+					e.fillStamina();   // everyone leaves the grid full
+                    if (starter != null) e.beginRaceInputs(starter);
 				}
 				if (r.goal != null) {
 					r.goal.running = true;
@@ -701,9 +723,10 @@ public class RaceSession {
 				r.laps++;
 				ServerPlayer player = r.serverPlayer();
 				if (RaceScoring.finished(r.laps, track.getLaps())) {
-					// the crossing inside this tick, less the rider's ping: host, guests and AI on one clock
-					r.finishTime = tick - 1 + RaceScoring.crossFraction(fineBefore, fine)
-							- (player == null ? 0.0D : RaceScoring.lagCreditTicks(player.connection.latency()));
+					// Account for outbound GO delay and inbound finish delay separately.
+					r.observedFinishTime = tick - 1 + RaceScoring.crossFraction(fineBefore, fine);
+					r.finishLatencyMs = player == null ? 0 : tk.darrow.chocobosreborn.net.RaceLatency.millis(player);
+					r.finishTime = r.observedFinishTime - RaceScoring.lagCreditTicks(r.startLatencyMs, r.finishLatencyMs);
 					if (r.human()) {
 						e.setRacing(false);   // unlock dismount; grace must not DNF a placed rider
 						if (firstFinishTick < 0) {
@@ -727,6 +750,12 @@ public class RaceSession {
 					continue;
 				}
 				ChocoboEntity mine = me.entity();
+                if (mine != null && player.connection.hasChannel(tk.darrow.chocobosreborn.net.RiderPayloads.Hud.TYPE)) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                            new tk.darrow.chocobosreborn.net.RiderPayloads.Hud(mine.getId(),
+                                    RaceScoring.displayLap(me.laps, track.getLaps()), track.getLaps(), placeNow(me), racers.size()));
+                    continue;
+                }
 				boolean locked = mine != null && mine.dashLocked();
 				player.displayClientMessage(Component.translatable(locked
 								? "chocobosreborn.race.hud_locked" : "chocobosreborn.race.hud",
