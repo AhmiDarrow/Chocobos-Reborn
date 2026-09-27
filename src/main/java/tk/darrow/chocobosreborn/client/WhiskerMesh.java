@@ -86,6 +86,7 @@ public final class WhiskerMesh {
 	public final Part[] parts;
 	/** {@code lods[level - 1]}: decimated copies of {@link #parts}, built on first use. */
 	private final Part[][] lods = new Part[LOD_CELL.length][];
+	private final Part[][] femaleParts = new Part[LOD_CELL.length + 1][];
 	public final Clip[] clips;
 	public final Map<String, Clip> clipByName = new HashMap<>();
 	public final float height, width;
@@ -127,6 +128,62 @@ public final class WhiskerMesh {
 
 	public static int lodLevels() {
 		return LOD_CELL.length;
+	}
+
+	/** Keep the crest surface intact: deleting its triangles opens the female's skull. */
+	public Part[] parts(int level, boolean male) {
+		if (male) {
+			return parts(level);
+		}
+		int index = Math.max(0, Math.min(level, LOD_CELL.length));
+		if (femaleParts[index] == null) {
+			int crest = -1;
+			for (int i = 0; i < boneNames.length; i++) {
+				if (boneNames[i].equals("crest_male")) crest = i;
+			}
+			Part[] source = parts(index);
+			Part[] result = new Part[source.length];
+			for (int i = 0; i < source.length; i++) result[i] = shortCrest(source[i], crest);
+			femaleParts[index] = result;
+		}
+		return femaleParts[index];
+	}
+
+	static Part shortCrest(Part p, int crest) {
+		float base = Float.POSITIVE_INFINITY;
+		for (int v = 0; v < p.vertexCount; v++) {
+			for (int k = 0; k < 4; k++) {
+				if (p.bone[v * 4 + k] == crest && p.weight[v * 4 + k] > 0) {
+					base = Math.min(base, p.pos[v * 3 + 1]);
+				}
+			}
+		}
+		if (!Float.isFinite(base)) return p;
+		Part out = new Part(p.name, p.textured, p.vertexCount, p.triCount);
+		System.arraycopy(p.pos, 0, out.pos, 0, p.pos.length);
+		System.arraycopy(p.normal, 0, out.normal, 0, p.normal.length);
+		System.arraycopy(p.uv, 0, out.uv, 0, p.uv.length);
+		System.arraycopy(p.rgb, 0, out.rgb, 0, p.rgb.length);
+		System.arraycopy(p.emit, 0, out.emit, 0, p.emit.length);
+		System.arraycopy(p.bone, 0, out.bone, 0, p.bone.length);
+		System.arraycopy(p.weight, 0, out.weight, 0, p.weight.length);
+		System.arraycopy(p.tri, 0, out.tri, 0, p.tri.length);
+		for (int v = 0; v < p.vertexCount; v++) {
+			// A continuous, positive scale above the crest root cannot tear shared edges.
+			if (out.pos[v * 3 + 1] > base) {
+				out.pos[v * 3 + 1] = base + (out.pos[v * 3 + 1] - base) * 0.28F;
+				// Inverse transpose of the vertical compression.
+				float x = out.normal[v * 3], y = out.normal[v * 3 + 1] / 0.28F, z = out.normal[v * 3 + 2];
+				float length = (float) Math.sqrt(x * x + y * y + z * z);
+				if (length > 0) {
+					out.normal[v * 3] = x / length;
+					out.normal[v * 3 + 1] = y / length;
+					out.normal[v * 3 + 2] = z / length;
+				}
+			}
+		}
+		finish(out);
+		return out;
 	}
 
 	/**

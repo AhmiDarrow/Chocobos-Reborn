@@ -15,13 +15,8 @@ public final class RacePrizes {
 	private RacePrizes() {
 	}
 
-	public static int gp(RaceClass rc, int place, boolean ranked) {
-		int first = switch (rc) {
-			case C -> 20;
-			case B -> 40;
-			case A -> 80;
-			case S -> 150;
-		};
+	public static int gp(RaceClass rc, int place, boolean ranked, boolean grandPrix) {
+		int first = RaceScoring.purse(rc, grandPrix);
 		if (!ranked) {
 			first /= 2;
 		}

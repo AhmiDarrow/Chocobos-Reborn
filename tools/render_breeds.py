@@ -61,9 +61,9 @@ for name in names:
         # solid breeds are not in the jar: derive from the shipped yellow like the client does
         yellow = TEXDIR / variant / "yellow.png"
         px = np.asarray(Image.open(yellow).convert("RGBA")).astype(np.float32) / 255.0
-        out = recolor_plumage(px, PLUMAGE[name], variant)
+        recolored = recolor_plumage(px, PLUMAGE[name], variant)
         p = Path(tempfile.gettempdir()) / f"chocobosreborn_{variant}_{name}.png"
-        Image.fromarray((np.clip(out, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGBA").save(p)
+        Image.fromarray((np.clip(recolored, 0, 1) * 255.0 + 0.5).astype(np.uint8), "RGBA").save(p)
     # the blend's albedo is packed; swap in a fresh image loaded from the shipped atlas
     img = bpy.data.images.load(str(p), check_existing=False)
     for n in nodes:

@@ -18,7 +18,8 @@ public final class ModEntities {
 	public static final DeferredHolder<EntityType<?>, EntityType<ChocoboEntity>> CHOCOBO =
 			ENTITIES.register("chocobo", () -> EntityType.Builder.of(ChocoboEntity::new, MobCategory.CREATURE)
 					.sized(1.75F, ChocoboEntity.ADULT_H)
-					.clientTrackingRange(10)
+					.clientTrackingRange(24)
+					.updateInterval(1)
 					.build("chocobosreborn:chocobo"));
 
 	public static final DeferredHolder<EntityType<?>, EntityType<KinStewardEntity>> KIN_STEWARD =

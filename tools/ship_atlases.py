@@ -28,7 +28,7 @@ def ship(variant: str) -> int:
     dst.mkdir(parents=True, exist_ok=True)
     total = 0
     for stale in dst.glob("*.png"):
-        if stale.stem not in SHIPPED:
+        if stale.stem not in (*SHIPPED, 'eyes_blink'):
             stale.unlink()
             print(f"{variant}/{stale.name}: removed (derived on the client)")
     for master in sorted(src.glob("*.png")):

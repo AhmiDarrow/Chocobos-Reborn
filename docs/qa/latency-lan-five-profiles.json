@@ -1,0 +1,97 @@
+[
+  {
+    "profile": "baseline",
+    "finished": true,
+    "telemetry_complete": true,
+    "session_ticks": 1360,
+    "vehicle_corrections": 0,
+    "first_placed_sample_tick": 1310,
+    "client_last_running_sample_tick": 1030,
+    "observed_rtt_ms_min_max": [
+      9,
+      12
+    ],
+    "race_probe_rtt_ms_min_max": [
+      18,
+      24
+    ],
+    "stamina_min": 1,
+    "dash_locked_samples": 43
+  },
+  {
+    "profile": "120ms",
+    "finished": true,
+    "telemetry_complete": true,
+    "session_ticks": 1365,
+    "vehicle_corrections": 0,
+    "first_placed_sample_tick": 1310,
+    "client_last_running_sample_tick": 1040,
+    "observed_rtt_ms_min_max": [
+      101,
+      130
+    ],
+    "race_probe_rtt_ms_min_max": [
+      149,
+      182
+    ],
+    "stamina_min": 0,
+    "dash_locked_samples": 44
+  },
+  {
+    "profile": "300ms",
+    "finished": true,
+    "telemetry_complete": true,
+    "session_ticks": 1466,
+    "vehicle_corrections": 0,
+    "first_placed_sample_tick": 1410,
+    "client_last_running_sample_tick": 1040,
+    "observed_rtt_ms_min_max": [
+      213,
+      299
+    ],
+    "race_probe_rtt_ms_min_max": [
+      328,
+      346
+    ],
+    "stamina_min": 1,
+    "dash_locked_samples": 49
+  },
+  {
+    "profile": "jitter",
+    "finished": true,
+    "telemetry_complete": true,
+    "session_ticks": 1451,
+    "vehicle_corrections": 0,
+    "first_placed_sample_tick": 1400,
+    "client_last_running_sample_tick": 1030,
+    "observed_rtt_ms_min_max": [
+      173,
+      215
+    ],
+    "race_probe_rtt_ms_min_max": [
+      146,
+      195
+    ],
+    "stamina_min": 1,
+    "dash_locked_samples": 42
+  },
+  {
+    "profile": "burst",
+    "finished": true,
+    "telemetry_complete": true,
+    "session_ticks": 1630,
+    "vehicle_corrections": 0,
+    "first_placed_sample_tick": 1580,
+    "client_last_running_sample_tick": 1040,
+    "observed_rtt_ms_min_max": [
+      301,
+      614
+    ],
+    "race_probe_rtt_ms_min_max": [
+      157,
+      231
+    ],
+    "stamina_min": 0,
+    "dash_locked_samples": 54
+  }
+]

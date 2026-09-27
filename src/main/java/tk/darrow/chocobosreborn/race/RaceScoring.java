@@ -14,23 +14,38 @@ public final class RaceScoring {
 		return firstFinishTick >= 0 && raceTicks - firstFinishTick > 40;
 	}
 
-	public static Promotion afterFirstPlace(RaceClass current, int classWins) {
+	/**
+	 * A sprint win is one point. A grand prix win is three. Nine points promote.
+	 * Nine sprint wins, or three grand prix wins, or a mix that adds to nine.
+	 */
+	public static Promotion afterFirstPlace(RaceClass current, int classWins, boolean grandPrix) {
 		if (current == RaceClass.S) {
-			return new Promotion(RaceClass.S, RaceClass.WINS_TO_PROMOTE, false);
+			return new Promotion(RaceClass.S, RaceClass.POINTS_TO_PROMOTE, false);
 		}
-		int wins = classWins + 1;
-		if (wins >= RaceClass.WINS_TO_PROMOTE) {
+		int wins = classWins + (grandPrix ? RaceClass.GRAND_PRIX_POINTS : RaceClass.SPRINT_POINTS);
+		if (wins >= RaceClass.POINTS_TO_PROMOTE) {
 			return new Promotion(current.next(), 0, true);
 		}
 		return new Promotion(current, wins, false);
 	}
 
-	/** First-places still needed in this class; Class S is the top of the ladder. */
+	/** Points still needed in this class. Class S is the top of the ladder. */
 	public static int winsUntilPromote(RaceClass current, int classWins) {
 		if (current == RaceClass.S) {
 			return 0;
 		}
-		return Math.max(0, RaceClass.WINS_TO_PROMOTE - classWins);
+		return Math.max(0, RaceClass.POINTS_TO_PROMOTE - classWins);
+	}
+
+	/** First-place GP. A sprint pays the base. A grand prix pays three times that. */
+	public static int purse(RaceClass raceClass, boolean grandPrix) {
+		int sprint = switch (raceClass) {
+			case C -> 6;
+			case B -> 12;
+			case A -> 24;
+			case S -> 48;
+		};
+		return grandPrix ? sprint * RaceClass.GRAND_PRIX_POINTS : sprint;
 	}
 
 	public static boolean wrappedPastStart(double lastProgress, double nowProgress) {
@@ -143,6 +158,19 @@ public final class RaceScoring {
 	/** Boost-pad length. 50 ticks with no intelligence, 70 at 100. */
 	public static int boostTicks(int intelligence) {
 		return 50 + Math.max(0, Math.min(100, intelligence)) / 5;
+	}
+
+	/**
+	 * How many ticks a remote chocobo may take to reach a newly received position.
+	 * A steady gallop is about 1.35 blocks a tick, so an on-time packet keeps its own
+	 * step count. A late packet glides instead of popping. A jump past 24 blocks is a
+	 * real teleport and keeps the packet's steps.
+	 */
+	public static int remoteGlideSteps(int packetSteps, double distanceSquared) {
+		int steps = Math.max(1, packetSteps);
+		if (!Double.isFinite(distanceSquared) || distanceSquared > 24.0D * 24.0D) return steps;
+		int glide = (int) Math.ceil(Math.sqrt(distanceSquared) / 1.35D);
+		return Math.min(8, Math.max(steps, glide));
 	}
 
 	/** Boost-pad strength. +55% with no intelligence, +75% at 100. */

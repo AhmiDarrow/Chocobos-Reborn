@@ -80,7 +80,7 @@ async def main(args):
         "guest2_burst_ms": args.burst2, "humans": len(roles), "ai": 0 if args.duel else 3, "grid_rotation": args.grid_rotation, "trace_track": args.trace_track, "strict_corrections": True,
         "strict_ai_stalls": True, "host": "integrated", "started_utc": datetime.now(timezone.utc).isoformat(),
         "production_source_sha256": source.hexdigest(), "bird_class": "same as course",
-        "bird": {"color": "GOLD", "grade": "WONDERFUL", "speed": 50, "stamina": 100, "intelligence": 0, "cooperation": 100}}, indent=2))
+        "bird": "class bird: C yellow, B green or blue, A black or flame, S gold, field training"}, indent=2))
     common.OUT = OUT
     for role in roles:
         options(BASE / role)

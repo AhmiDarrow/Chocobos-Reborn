@@ -31,6 +31,8 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	/** Saddle, bridle and reins are baked into a second Meshy mesh (tools/fresh_ship.py --tag saddled). */
 	private static final ResourceLocation[] SKINS_SADDLED = skins("chocobo_saddled");
 	private static final Map<String, ResourceLocation[]> SKINS_ARMOR = new HashMap<>();
+	private static final Map<ResourceLocation, ResourceLocation> BLINK_SKINS = new HashMap<>();
+	private static final Map<String, ResourceLocation> EYELIDS = new HashMap<>();
 
 	/** Mesh id for this bird's outfit: armour tier mesh if it has one, else saddled, else plain. */
 	private static String meshId(ChocoboEntity e) {
@@ -58,6 +60,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 			{232, 164, 22}, {146, 84, 214}, {232, 104, 36},
 	};
 	private static final int[] YELLOW = {245, 184, 18};
+	private static final int[] FLAME_LID = {190, 42, 30};
 
 	/** Sampled bone matrices for the frame and two scratch copies for the gait crossfade. */
 	private float[] bones = new float[0], idleBones = new float[0], walkBones = new float[0];
@@ -88,7 +91,17 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		} else {
 			set = SKINS;
 		}
-		if (ChocoboColor.values()[id].derivedAtlas()) {
+		boolean derived = ChocoboColor.values()[id].derivedAtlas();
+		if (e.isAddedToLevel() && EyeBlink.closed(e.tickCount, e.getId())) {
+			ResourceLocation closed = BLINK_SKINS.computeIfAbsent(set[id], key -> ResourceLocation.fromNamespaceAndPath(
+					key.getNamespace(), key.getPath().replace(".png", "_blink.png")));
+			ResourceLocation mask = EYELIDS.computeIfAbsent(mesh, key -> ResourceLocation.fromNamespaceAndPath(
+					ChocobosReborn.MOD_ID, "textures/entity/" + key + "/eyes_blink.png"));
+			int[] lidTint = id == ChocoboColor.FLAME.getId() ? FLAME_LID : PLUMAGE[id];
+			DerivedAtlasTexture.ensureBlink(closed, derived ? set[ChocoboColor.YELLOW.getId()] : set[id], mask, lidTint, derived);
+			return closed;
+		}
+		if (derived) {
 			// the jar ships yellow, End and Nether; the solid breeds are recoloured from yellow at load
 			DerivedAtlasTexture.ensure(set[id], set[ChocoboColor.YELLOW.getId()], PLUMAGE[id]);
 		}
@@ -162,9 +175,6 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 			hideBone(m, "saddle");
 			hideBone(m, "bridle");
 		}
-		if (!e.male()) {
-			hideBone(m, "crest_male");
-		}
 
 		ps.pushPose();
 		float bodyYaw = Mth.rotLerp(partial, e.yBodyRotO, e.yBodyRot);
@@ -179,7 +189,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();
 		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
-		for (WhiskerMesh.Part part : m.parts(lodLevel(e))) {
+		for (WhiskerMesh.Part part : m.parts(lodLevel(e), e.male())) {
 			skinner.skin(part, hidden, anyHidden);
 			emit(vc, part, colors(part, breed), light, overlay, quads);
 			if (part.emissiveTri.length > 0) {
@@ -339,7 +349,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	}
 
 	private static boolean isPlumage(int r, int g, int b) {
-		return r > 160 && g > 120 && b < 120 && (r - g) < 60;   // beak orange has r-g >= 70
+		return AtlasTint.isPlumage(r, g, b);
 	}
 
 	private static int clamp(int v) {

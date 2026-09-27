@@ -67,7 +67,7 @@ The town: a plaza round the arrival medallion, the chocobo fountain, awninged ma
 - **Pell the Broker** swaps birds between players or hands over a gift.
 - Stalls, all priced in **GP**: Sage Wynn (greens), Bilo the Nutkeeper (nuts), Tack (saddles, lures), the Fair (the Almanac, pocketwatches, fireworks, leads) and **Marl's GP Exchange**.
 
-Classes run C → B → A → S. Three first-place finishes promote; a bird never drops a class.
+Classes run C → B → A → S. Nine points promote: a sprint is 1, a grand prix is 3. A bird never drops a class.
 
 ## Chocobo Farm
 
@@ -103,4 +103,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.0.16. Created by Ahmi Darrow.
+Version 1.0.17. Created by Ahmi Darrow.

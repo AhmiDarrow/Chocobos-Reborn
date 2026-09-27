@@ -1,8 +1,8 @@
 """Breed palette + plumage recolour for the chocobo atlases.
 
-recolor_plumage(px, rgb) shifts only texels that ChocoboMeshRenderer.isPlumage
-would treat as plumage (r>160, g>120, b<120, r-g<90), luminance-preserving, so
-beak / eyes / legs / claws stay. PLUMAGE is the nine breed colours (sRGB 0-255).
+recolor_plumage(px, rgb) matches AtlasTint.recolorPixels: the warm feather seed
+plus bounded shadow-pinhole cleanup. Beak / eyes / legs / claws stay.
+PLUMAGE contains the eight breed colours (sRGB 0-255).
 """
 from __future__ import annotations
 
@@ -41,7 +41,17 @@ def plumage_mask(px, variant="chocobo"):
     ri = (r * 255.0).astype(np.int32)
     gi = (g * 255.0).astype(np.int32)
     bi = (b * 255.0).astype(np.int32)
-    plum = (ri > 160) & (gi > 120) & (bi < 120) & ((ri - gi) < 60)   # beak orange has r-g >= 70
+    plum = (ri > 160) & (gi > 120) & (bi < 120) & ((ri - gi) < 70)   # includes palette yellow (r-g=61), excludes beak
+    # Bounded, synchronous neighbourhood fill, identical to AtlasTint.recolorPixels.
+    # Shadowed warm pinholes inside plumage should not stay yellow on dark breeds.
+    from scipy.ndimage import convolve
+    warm = (ri > 80) & (gi > 60) & (ri >= gi) & (ri * 100 < gi * 145) & (bi * 100 < gi * 70)
+    for _ in range(2):
+        neighbours = convolve(plum.astype(np.uint8), np.ones((3, 3), np.uint8), mode='constant')
+        fill = warm & (neighbours >= 5)
+        fill[[0, -1], :] = False
+        fill[:, [0, -1]] = False
+        plum |= fill
     return plum
 
 

@@ -16,8 +16,8 @@ package tk.darrow.chocobosreborn.race;
  * <li>{@code wobble}: lane noise in blocks (sloppy driving).</li>
  * <li>{@code stumbleChancePerLap}: expected stumbles (a 0.55x speed hiccup for 20
  * ticks) per lap.</li>
- * <li>{@code rubberBand}: how much the racer speeds up when the player is well
- * ahead / slows when well behind (0 = honest pace).</li>
+ * <li>{@code rubberBand}: kept at 0. The field holds its own pace. A gap to the
+ * player does not speed it up or slow it down.</li>
  * <li>{@code lineHold}: how tightly it holds the inside racing line (0..1).</li>
  * </ul>
  */
@@ -36,9 +36,11 @@ public record RacerProfile(double cruise, double dash, double energyDrain, doubl
 			// Divided by fieldTraining so a typical NPC of this class still sits near the old
 			// pace; a rival at 100 training then actually pulls away on stats.
 			// Reaction is measured from GO (the riders see the same countdown), so no field jumps the lights.
-			case C -> new RacerProfile(0.845D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.10D, 0.00D, 16, 30, 0.90D, 1.00D, 0.10D, 0.35D);
-			case B -> new RacerProfile(0.882D, 1.27D, 1.0D / 140.0D, 1.0D / 360.0D, 0.25D, 0.20D, 12, 20, 0.60D, 0.50D, 0.06D, 0.60D);
-			case A -> new RacerProfile(0.887D, 1.32D, 1.0D / 170.0D, 1.0D / 300.0D, 0.30D, 0.35D, 10, 14, 0.35D, 0.20D, 0.03D, 0.80D);
+			// Dash threshold sits near the rider lock so a class bird does not tap
+			// the bar the moment it unlocks. No class rubber-bands on the player's gap.
+			case C -> new RacerProfile(0.845D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.40D, 0.00D, 16, 30, 0.90D, 1.00D, 0.00D, 0.35D);
+			case B -> new RacerProfile(0.882D, 1.27D, 1.0D / 140.0D, 1.0D / 360.0D, 0.42D, 0.20D, 12, 20, 0.60D, 0.50D, 0.00D, 0.60D);
+			case A -> new RacerProfile(0.887D, 1.32D, 1.0D / 170.0D, 1.0D / 300.0D, 0.45D, 0.35D, 10, 14, 0.35D, 0.20D, 0.00D, 0.80D);
 			case S -> new RacerProfile(0.923D, 1.36D, 1.0D / 200.0D, 1.0D / 260.0D, 0.30D, 0.45D, 8, 11, 0.15D, 0.05D, 0.00D, 0.95D);
 		};
 		return switch (role) {

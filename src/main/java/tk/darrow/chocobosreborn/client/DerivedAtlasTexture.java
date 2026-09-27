@@ -26,10 +26,30 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 
 	private final ResourceLocation source;
 	private final float[] tint;
+	private final ResourceLocation eyelids;
+	private final boolean recolorSource;
+	private final boolean yellowLids;
 
 	private DerivedAtlasTexture(ResourceLocation source, int[] rgb) {
+		this(source, rgb, null, true);
+	}
+
+	private DerivedAtlasTexture(ResourceLocation source, int[] rgb, ResourceLocation eyelids, boolean recolorSource) {
 		this.source = source;
 		this.tint = AtlasTint.tint(rgb);
+		this.eyelids = eyelids;
+		this.recolorSource = recolorSource;
+		this.yellowLids = rgb[0] == 245 && rgb[1] == 184 && rgb[2] == 18;
+	}
+
+	/** Cache a closed-eye variant once; no image processing occurs per render frame. */
+	public static void ensureBlink(ResourceLocation derived, ResourceLocation source, ResourceLocation eyelids, int[] rgb, boolean recolorSource) {
+		if (REGISTERED.contains(derived)) return;
+		TextureManager textures = Minecraft.getInstance().getTextureManager();
+		if (textures.getTexture(derived, null) == null) {
+			textures.register(derived, new DerivedAtlasTexture(source, rgb, eyelids, recolorSource));
+		}
+		REGISTERED.add(derived);
 	}
 
 	/**
@@ -54,9 +74,27 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 			image = NativeImage.read(in);
 		}
 		int w = image.getWidth(), h = image.getHeight();
+		int[] pixels = new int[w * h];
+		for (int y = 0; y < h; y++) {
+			for (int x = 0; x < w; x++) pixels[y * w + x] = image.getPixelRGBA(x, y);
+		}
+		if (recolorSource) AtlasTint.recolorPixels(pixels, w, h, tint);
+		if (eyelids != null) {
+			var resource = manager.getResource(eyelids);
+			if (resource.isPresent()) {
+				try (InputStream in = resource.get().open(); NativeImage mask = NativeImage.read(in)) {
+					for (int y = 0; y < h; y++) {
+						for (int x = 0; x < w; x++) {
+							int lid = mask.getPixelRGBA(x * mask.getWidth() / w, y * mask.getHeight() / h);
+							if ((lid >>> 24) != 0) pixels[y * w + x] = yellowLids ? lid : AtlasTint.recolorAbgr(lid, tint);
+						}
+					}
+				}
+			}
+		}
 		for (int y = 0; y < h; y++) {
 			for (int x = 0; x < w; x++) {
-				image.setPixelRGBA(x, y, AtlasTint.recolorAbgr(image.getPixelRGBA(x, y), tint));
+				image.setPixelRGBA(x, y, pixels[y * w + x]);
 			}
 		}
 		if (!RenderSystem.isOnRenderThreadOrInit()) {

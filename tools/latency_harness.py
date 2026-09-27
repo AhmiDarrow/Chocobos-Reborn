@@ -19,8 +19,10 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "build/latency"
-OUT = BASE / "results"
+OUT = Path(os.environ["LATENCY_RESULTS"]) if os.environ.get("LATENCY_RESULTS") else BASE / "results"
 TRACK = "C_MEADOW"
+UPSTREAM_HOST = os.environ.get("LATENCY_UPSTREAM_HOST", "127.0.0.1")
+UPSTREAM_PORT = int(os.environ.get("LATENCY_UPSTREAM_PORT", "25578"))
 
 
 async def relay(reader, writer, network_path=None):
@@ -59,7 +61,7 @@ async def relay(reader, writer, network_path=None):
 
 
 async def proxy(reader, writer, network_path=None):
-    upstream_reader, upstream_writer = await asyncio.open_connection("127.0.0.1", 25578)
+    upstream_reader, upstream_writer = await asyncio.open_connection(UPSTREAM_HOST, UPSTREAM_PORT)
     try:
         await asyncio.gather(relay(reader, upstream_writer, network_path), relay(upstream_reader, writer, network_path))
     except (ConnectionError, OSError):
@@ -73,6 +75,17 @@ def runtime_env():
     env["JAVA_TOOL_OPTIONS"] = (env.get("JAVA_TOOL_OPTIONS", "") + ' -Djdk.net.unixdomain.tmpdir="' + str(temp) + '"'
                                + " -Dchocobosreborn.harness.track=" + TRACK)
     return env
+
+
+def point_client_results():
+    """Send the dev client at the same results folder the dedicated server writes."""
+    if not os.environ.get("LATENCY_RESULTS"):
+        return
+    vm = ROOT / "build/moddev/latencyClientRunVmArgs.txt"
+    lines = [line for line in vm.read_text(encoding="utf-8").splitlines()
+             if not line.startswith("-Dchocobosreborn.harness.output=")]
+    lines.append("-Dchocobosreborn.harness.output=" + str(OUT).replace("\\", "\\\\"))
+    vm.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def launch(side, log):
@@ -120,19 +133,34 @@ async def main():
                 cwd=ROOT, env=runtime_env(), stdout=prepare_log, stderr=subprocess.STDOUT)
         if await prepared.wait() != 0:
             raise RuntimeError("Harness preparation failed; see build/latency/prepare.log")
+    point_client_results()
     with (BASE / "server.log").open("w") as server_log, (BASE / "client.log").open("w") as client_log:
         proxy_server = await asyncio.start_server(proxy, "127.0.0.1", 25579)
         try:
-            server = launch("server", server_log)
-            processes.append(server)
-            for _ in range(180):
-                if server.poll() is not None:
-                    raise RuntimeError("Server exited; see build/latency/server.log")
-                if 'For help, type "help"' in (BASE / "server.log").read_text(errors="replace"):
+            server = None
+            if os.environ.get("LATENCY_SKIP_SERVER") == "1":
+                for _ in range(180):
+                    try:
+                        probe_reader, probe_writer = await asyncio.open_connection(UPSTREAM_HOST, UPSTREAM_PORT)
+                    except OSError:
+                        await asyncio.sleep(2)
+                        continue
+                    probe_writer.close()
+                    await probe_writer.wait_closed()
                     break
-                await asyncio.sleep(2)
+                else:
+                    raise TimeoutError("Remote server did not accept a connection")
             else:
-                raise TimeoutError("Server startup timed out")
+                server = launch("server", server_log)
+                processes.append(server)
+                for _ in range(180):
+                    if server.poll() is not None:
+                        raise RuntimeError("Server exited; see build/latency/server.log")
+                    if 'For help, type "help"' in (BASE / "server.log").read_text(errors="replace"):
+                        break
+                    await asyncio.sleep(2)
+                else:
+                    raise TimeoutError("Server startup timed out")
             client = launch("client", client_log)
             processes.append(client)
             for _ in range(1200):
@@ -144,7 +172,7 @@ async def main():
                     if result.returncode:
                         raise RuntimeError("Dedicated race checks failed; see results/summary.json")
                     return
-                if client.poll() is not None or server.poll() is not None:
+                if client.poll() is not None or (server is not None and server.poll() is not None):
                     raise RuntimeError("Game exited; inspect client.log/server.log")
                 await asyncio.sleep(2)
             raise TimeoutError("Harness timed out")
@@ -153,7 +181,7 @@ async def main():
             await proxy_server.wait_closed()
             for process in reversed(processes):
                 if process.poll() is None:
-                    if process is server:
+                    if server is not None and process is server:
                         try:
                             process.stdin.write(b"stop\n")
                             process.stdin.flush()

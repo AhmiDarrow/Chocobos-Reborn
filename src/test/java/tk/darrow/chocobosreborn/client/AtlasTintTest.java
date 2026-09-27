@@ -9,12 +9,29 @@ import java.io.File;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The Java breed recolour reproduces tools/paint_albedo.recolor_plumage. */
 class AtlasTintTest {
 	private static final int[] GREEN = {76, 176, 90};
 	private static final int[] BLACK = {44, 42, 50};
+
+	@Test
+	void fillsShadowedFeatherPinholesButPreservesIsolatedLeatherAndBeak() {
+		int[] pixels = new int[49];
+		java.util.Arrays.fill(pixels, 0xFF1496C8);
+		pixels[24] = 0xFF326E8C; // muted yellow (140,110,50) surrounded by feathers
+		pixels[23] = 0xFF0F6AE6; // orange beak is protected even inside plumage
+		pixels[25] = 0xFF1A1A1A; // pupil
+		AtlasTint.recolorPixels(pixels, 7, 7, AtlasTint.tint(BLACK));
+		assertNotEquals(0xFF326E8C, pixels[24]);
+		assertEquals(0xFF0F6AE6, pixels[23]);
+		assertEquals(0xFF1A1A1A, pixels[25]);
+		java.util.Arrays.fill(pixels, 0xFF326E8C);
+		AtlasTint.recolorPixels(pixels, 7, 7, AtlasTint.tint(BLACK));
+		for (int pixel : pixels) assertEquals(0xFF326E8C, pixel, "continuous leather has no feather neighbours");
+	}
 
 	@Test
 	void beakEyesAndLegsAreLeftAlone() {
@@ -29,8 +46,7 @@ class AtlasTintTest {
 	void plumageTakesTheBreedColourByLuminance() {
 		float[] t = AtlasTint.tint(GREEN);
 		// values from paint_albedo.recolor_plumage on the same texels
-		// (the palette yellow itself sits on the r-g < 60 guard after the float32 round trip: untouched)
-		assertEquals(0xF5B812, AtlasTint.recolor(245, 184, 18, t));
+		assertEquals(0x4CB05A, AtlasTint.recolor(245, 184, 18, t), "palette yellow must not leave yellow freckles");
 		assertEquals(0x3E904A, AtlasTint.recolor(200, 150, 20, t), "shadowed feather");
 		assertEquals(0x56C766, AtlasTint.recolor(255, 210, 60, t), "lit feather");
 		assertEquals(0x1D1B21, AtlasTint.recolor(161, 121, 0, AtlasTint.tint(BLACK)), "black, darkest plumage clamps at 0.5");
@@ -68,10 +84,12 @@ class AtlasTintTest {
 				String[] c = breed[1].split(",");
 				float[] tint = AtlasTint.tint(new int[]{Integer.parseInt(c[0]), Integer.parseInt(c[1]), Integer.parseInt(c[2])});
 				int off = 0, maxDiff = 0;
+				int[] pixels = yellow.getRGB(0, 0, yellow.getWidth(), yellow.getHeight(), null, 0, yellow.getWidth());
+				for (int i = 0; i < pixels.length; i++) pixels[i] = swapRedBlue(pixels[i]);
+				AtlasTint.recolorPixels(pixels, yellow.getWidth(), yellow.getHeight(), tint);
 				for (int y = 0; y < yellow.getHeight(); y++) {
 					for (int x = 0; x < yellow.getWidth(); x++) {
-						int s = yellow.getRGB(x, y);
-						int got = AtlasTint.recolor(s >> 16 & 0xFF, s >> 8 & 0xFF, s & 0xFF, tint);
+						int got = swapRedBlue(pixels[y * yellow.getWidth() + x]) & 0xFFFFFF;
 						int want = expected.getRGB(x, y) & 0xFFFFFF;
 						if (got != want) {
 							off++;
@@ -85,5 +103,9 @@ class AtlasTintTest {
 				assertTrue(maxDiff <= 1, variant + "/" + breed[0] + " max diff " + maxDiff);
 			}
 		}
+	}
+
+	private static int swapRedBlue(int p) {
+		return p & 0xFF00FF00 | (p & 255) << 16 | p >> 16 & 255;
 	}
 }

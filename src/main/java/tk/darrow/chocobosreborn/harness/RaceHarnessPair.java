@@ -81,8 +81,8 @@ public final class RaceHarnessPair {
             if (--wait > 0) return;
             RaceTrack track = TRACKS[course];
             for (int i = 0; i < players.length; i++) {
+                RaceHarnessBirds.dress(birds[i], track);
                 players[i].startRiding(birds[i], true);
-                birds[i].setRaceClass(track.getRaceClass());
             }
             if (FULL_FIELD) {
                 // The same ordinary six-slot session used by the heat timetable, including its real AI.
@@ -176,10 +176,7 @@ public final class RaceHarnessPair {
         ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
         bird.moveTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z, 0, 0);
         bird.setAge(0);
-        bird.setColor(ChocoboColor.GOLD);
-        bird.setGrade(ChocoboGrade.WONDERFUL);
-        bird.setGenes(50, 100, 0, 100);
-        bird.setRaceClass(RaceClass.S);
+        RaceHarnessBirds.dress(bird, TRACKS[0]);
         bird.setSaddledForPreview(true);
         bird.tame(player);
         bird.setOrderedToSit(false);

@@ -164,8 +164,14 @@ def paint_weights(body, arm, lm):
     head_lo = _ramp(zn, lm["neck_top"] - soft, lm["neck_top"] + soft)
     crest_lo = _ramp(zn, lm["skull_top"] - 0.006, lm["skull_top"] + 0.006)
     # the tail fan rises through the neck band at y > 0: keep it off the neck
-    tail_mask = (y > lm["tail_y0"] - 0.04 * H) & (zn > 0.36) & (zn < 0.85)
-    tail_w = _ramp(y, lm["tail_y0"] - 0.08 * H, lm["tail_y0"] + 0.02 * H) * tail_mask
+    tail_w = _ramp(y, lm["tail_y0"] - 0.10 * H, lm["tail_y0"] + 0.02 * H) * _ramp(zn, 0.36, 0.48)
+    # Height alone must not bind the raised rump to the neck. Keep the neck's
+    # influence on the front of the torso, with a continuous transition.
+    front = 1.0 - _ramp(y, lm["body_y"] + 0.02 * H, lm["body_y"] + 0.14 * H)
+    neck_lo *= front
+    neck_mid_lo *= front
+    head_lo *= front
+    crest_lo *= front
     upper = 1.0 - tail_w
     W["body"] += body_w * (1.0 - neck_lo) * upper
     W["neck"] += body_w * (neck_lo - neck_mid_lo) * upper
@@ -181,7 +187,8 @@ def paint_weights(body, arm, lm):
     W["tail"] += body_w * tail_w
 
     # --- wings: side bulges of the torso
-    wing_band = (zn > 0.40) & (zn < 0.66) & (np.abs(y - lm["body_y"]) < 0.30 * H)
+    wing_band = _ramp(zn, 0.40, 0.445) * (1.0 - _ramp(zn, 0.615, 0.66))
+    wing_band *= 1.0 - _ramp(np.abs(y - lm["body_y"]) / H, 0.25, 0.30)
     wide = _ramp(np.abs(x) / H, 0.165, 0.20) * wing_band
     for side, mask in (("l", x < 0), ("r", x >= 0)):
         w = wide * mask * W["body"]

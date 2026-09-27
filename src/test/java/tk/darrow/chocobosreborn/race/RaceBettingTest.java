@@ -126,9 +126,9 @@ class RaceBettingTest {
 	@Test
 	void tackAndTreatsSellTheStaplesForGp() {
 		assertTrue(RaceShops.catalog().stream().anyMatch(line ->
-				line.role().equals("tack") && line.resultId().equals("chocobosreborn:chocobo_saddle") && line.cost() == 12));
+				line.role().equals("tack") && line.resultId().equals("chocobosreborn:chocobo_saddle") && line.cost() == 8));
 		assertTrue(RaceShops.catalog().stream().anyMatch(line ->
-				line.role().equals("treats") && line.resultId().equals("chocobosreborn:zeio_nut") && line.cost() == 128));
+				line.role().equals("treats") && line.resultId().equals("chocobosreborn:zeio_nut") && line.cost() == 96));
 		// nothing dearer than two GP stacks: the merchant screen has two cost slots of 64
 		assertTrue(RaceShops.catalog().stream().allMatch(line -> line.cost() <= 128));
 		assertTrue(RaceShops.catalog().stream().anyMatch(line ->

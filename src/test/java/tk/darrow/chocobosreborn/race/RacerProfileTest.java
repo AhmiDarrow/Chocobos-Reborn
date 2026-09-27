@@ -48,12 +48,14 @@ class RacerProfileTest {
 	}
 
 	@Test
-	void cClassRubberBandsBothWays() {
-		RacerProfile c = RacerProfile.of(RaceClass.C, RacerProfile.Role.FIELD);
-		assertTrue(c.bandFactor(0.25D) > 1.0D, "speeds up when the player is far ahead");
-		assertTrue(c.bandFactor(-0.25D) < 1.0D, "eases off when it leads by a lot");
-		assertEquals(1.0D, c.bandFactor(0.0D), 1.0E-9);
-		assertEquals(c.bandFactor(0.25D), c.bandFactor(2.0D), 1.0E-9, "clamped");
+	void noClassChangesPaceForThePlayerGap() {
+		for (RaceClass rc : LADDER) {
+			RacerProfile profile = RacerProfile.of(rc, RacerProfile.Role.FIELD);
+			assertEquals(0.0D, profile.rubberBand(), 1.0E-9, rc.name());
+			assertEquals(1.0D, profile.bandFactor(0.25D), 1.0E-9);
+			assertEquals(1.0D, profile.bandFactor(-0.25D), 1.0E-9);
+			assertEquals(1.0D, profile.bandFactor(0.0D), 1.0E-9);
+		}
 	}
 
 	@Test

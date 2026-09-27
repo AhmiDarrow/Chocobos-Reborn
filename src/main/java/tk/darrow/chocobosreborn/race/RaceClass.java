@@ -12,7 +12,10 @@ public enum RaceClass {
 	A(2),
 	S(3);
 
-	public static final int WINS_TO_PROMOTE = 3;
+	/** Points to leave a class. A sprint win is 1, a grand prix win is 3. */
+	public static final int POINTS_TO_PROMOTE = 9;
+	public static final int SPRINT_POINTS = 1;
+	public static final int GRAND_PRIX_POINTS = 3;
 
 	private final int id;
 

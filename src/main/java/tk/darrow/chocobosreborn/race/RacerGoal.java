@@ -171,7 +171,10 @@ public class RacerGoal extends Goal {
 		lane = track.detourLaneAt(t + ahead, lane, bird.color(), bogSavvy);
 		RacePoint target = track.pointAtLane((t + ahead) % 1.0D, lane);
 		// terrain is physical now (water slows swimmers, ridges block non-climbers); no attribute fudge
+		// Same stack a rider gets: grade, then training, once each. The profile
+		// cruise sits on top of that, so a class bird is not a flat attribute.
 		double mul = speed * profile.cruise() * profile.bandFactor(playerGap)
+				* RaceScoring.gradeSpeedMul(bird.grade().getRank())
 				* RaceScoring.speedTrainingMul(bird.speedStat());
 		if (dashing) {
 			mul *= profile.dash();

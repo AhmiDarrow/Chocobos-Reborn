@@ -1,6 +1,6 @@
-# Current release: 1.0.16 — Smoother remote races
+# Current release: 1.0.17 — Held pace
 
-The latency and six-racer harness work is complete. See [QA results](docs/qa/README.md), [improvement tracker](docs/LATENCY_IMPROVEMENTS.md), and [release notes](docs/RELEASE_1.0.16.md). Validated with 162 unit tests, 27 GameTests, all 24 C–S tracks with three player clients and three AI, and five dedicated-server network profiles. All peers require 1.0.16. Publication records are in docs/curseforge.md. The historical handoff below predates this release.
+Other birds follow the server stream, the field holds its own pace, and nine points promote. See [release notes](docs/RELEASE_1.0.17.md). The unit suite passed on this commit, including promotion, purse, glide, pace, blink, and tail tests. The five-profile meadow race from this PC to 192.168.0.13 finished with no vehicle correction. GameTests were not re-run for 1.0.17. Server and every rider need this jar. Publication records are in docs/curseforge.md. The 1.0.16 notes remain in docs/RELEASE_1.0.16.md. The historical handoff below predates these releases.
 
 # Chocobos Reborn — session handoff (internal)
 

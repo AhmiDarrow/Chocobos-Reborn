@@ -28,30 +28,32 @@ class RaceScoringTest {
 	}
 
 	@Test
-	void threeFirstPlacesPromoteAndNeverDrop() {
-		RaceScoring.Promotion first = RaceScoring.afterFirstPlace(RaceClass.C, 0);
-		assertEquals(RaceClass.C, first.raceClass());
-		assertEquals(1, first.classWins());
-		assertFalse(first.promoted());
+	void nineSprintsOrThreeGrandPrixPromote() {
+		RaceScoring.Promotion sprint = RaceScoring.afterFirstPlace(RaceClass.C, 0, false);
+		assertEquals(1, sprint.classWins());
+		assertFalse(sprint.promoted());
+		assertEquals(8, RaceScoring.afterFirstPlace(RaceClass.C, 7, false).classWins());
+		RaceScoring.Promotion ninth = RaceScoring.afterFirstPlace(RaceClass.C, 8, false);
+		assertEquals(RaceClass.B, ninth.raceClass());
+		assertEquals(0, ninth.classWins());
+		assertTrue(ninth.promoted());
 
-		RaceScoring.Promotion second = RaceScoring.afterFirstPlace(RaceClass.C, 1);
-		assertEquals(2, second.classWins());
-		assertFalse(second.promoted());
-
-		RaceScoring.Promotion third = RaceScoring.afterFirstPlace(RaceClass.C, 2);
-		assertEquals(RaceClass.B, third.raceClass());
-		assertEquals(0, third.classWins());
-		assertTrue(third.promoted());
+		assertEquals(3, RaceScoring.afterFirstPlace(RaceClass.C, 0, true).classWins());
+		assertEquals(6, RaceScoring.afterFirstPlace(RaceClass.C, 3, true).classWins());
+		RaceScoring.Promotion thirdPrix = RaceScoring.afterFirstPlace(RaceClass.C, 6, true);
+		assertEquals(RaceClass.B, thirdPrix.raceClass());
+		assertTrue(thirdPrix.promoted());
+		assertFalse(RaceScoring.afterFirstPlace(RaceClass.C, 5, true).promoted());
 	}
 
 	@Test
 	void sClassNeverDrops() {
-		RaceScoring.Promotion stay = RaceScoring.afterFirstPlace(RaceClass.S, 3);
+		RaceScoring.Promotion stay = RaceScoring.afterFirstPlace(RaceClass.S, 9, false);
 		assertEquals(RaceClass.S, stay.raceClass());
 		assertFalse(stay.promoted());
 		assertEquals(0, RaceScoring.winsUntilPromote(RaceClass.S, stay.classWins()));
-		assertEquals(3, RaceScoring.winsUntilPromote(RaceClass.C, 0));
-		assertEquals(1, RaceScoring.winsUntilPromote(RaceClass.C, 2));
+		assertEquals(9, RaceScoring.winsUntilPromote(RaceClass.C, 0));
+		assertEquals(7, RaceScoring.winsUntilPromote(RaceClass.C, 2));
 	}
 
 	@Test
@@ -494,12 +496,21 @@ class RaceScoringTest {
 
 	@Test
 	void classBPromotesToAThenS() {
-		RaceScoring.Promotion toA = RaceScoring.afterFirstPlace(RaceClass.B, 2);
+		RaceScoring.Promotion toA = RaceScoring.afterFirstPlace(RaceClass.B, 6, true);
 		assertEquals(RaceClass.A, toA.raceClass());
 		assertTrue(toA.promoted());
-		RaceScoring.Promotion toS = RaceScoring.afterFirstPlace(RaceClass.A, 2);
+		RaceScoring.Promotion toS = RaceScoring.afterFirstPlace(RaceClass.A, 8, false);
 		assertEquals(RaceClass.S, toS.raceClass());
 		assertTrue(toS.promoted());
+	}
+
+	@Test
+	void grandPrixPaysThreeSprintPurses() {
+		assertEquals(6, RaceScoring.purse(RaceClass.C, false));
+		assertEquals(18, RaceScoring.purse(RaceClass.C, true));
+		assertEquals(12, RaceScoring.purse(RaceClass.B, false));
+		assertEquals(24, RaceScoring.purse(RaceClass.A, false));
+		assertEquals(144, RaceScoring.purse(RaceClass.S, true));
 	}
 
 	/** A host (~0 ms), a guest (120 ms) and an AI bird that all cross together finish together. */
@@ -535,6 +546,17 @@ class RaceScoringTest {
 		assertTrue(RaceScoring.finishSettled(earliestNext - 1e-6, now));
 		assertFalse(RaceScoring.finishSettled(earliestNext, now));
 	}
+	@Test
+	void aLateRemotePositionGlidesInsteadOfPopping() {
+		assertEquals(1, RaceScoring.remoteGlideSteps(1, 0.0D));
+		assertEquals(1, RaceScoring.remoteGlideSteps(1, 1.0D));
+		assertEquals(3, RaceScoring.remoteGlideSteps(1, 16.0D));
+		assertEquals(3, RaceScoring.remoteGlideSteps(3, 1.0D));
+		assertEquals(1, RaceScoring.remoteGlideSteps(1, 30.0D * 30.0D));
+		assertEquals(1, RaceScoring.remoteGlideSteps(1, Double.NaN));
+		assertEquals(8, RaceScoring.remoteGlideSteps(1, 20.0D * 20.0D));
+	}
+
 	@Test
 	void changingPingCreditsOnlyTheTripsActuallyTaken() {
 		// 200 ms RTT at GO (100 ms outbound), 100 ms at finish (50 ms inbound).

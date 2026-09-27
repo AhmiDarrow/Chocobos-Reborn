@@ -758,17 +758,27 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * First-place finish at Chocobo Square. Ranked wins count for the farm line
-	 * and promote the class after three (never demoted).
+	 * First-place finish at Chocobo Square. Ranked wins count for the farm line.
+	 * A sprint is one point and a grand prix is three. Nine points promote.
+	 * The class never drops.
 	 */
-	public void recordFirstPlace(boolean ranked) {
+	public void recordFirstPlace(boolean ranked, boolean grandPrix) {
 		if (!ranked) {
 			return;
 		}
 		this.entityData.set(DATA_WINS, raceWins() + 1);
-		RaceScoring.Promotion p = RaceScoring.afterFirstPlace(raceClass(), classWins());
+		RaceScoring.Promotion p = RaceScoring.afterFirstPlace(raceClass(), classWins(), grandPrix);
 		this.entityData.set(DATA_CLASS, p.raceClass().getId());
 		this.entityData.set(DATA_CLASS_WINS, p.classWins());
+	}
+
+	/** Stamp training exactly. Feeding still goes through {@link #addTraining}. */
+	public void setTraining(int speed, int stamina, int intelligence, int cooperation) {
+		int cap = ChocoboGreen.MAX_POINTS;
+		this.entityData.set(DATA_TR_SPEED, Math.max(0, Math.min(cap, speed)));
+		this.entityData.set(DATA_TR_STAMINA, Math.max(0, Math.min(cap, stamina)));
+		this.entityData.set(DATA_TR_INTEL, Math.max(0, Math.min(cap, intelligence)));
+		this.entityData.set(DATA_TR_COOP, Math.max(0, Math.min(cap, cooperation)));
 	}
 
 	/** 0 chicobo (25% player), 1 (50% player), 2 (75% player), 3 adult. */
@@ -1789,7 +1799,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	@Override
+	public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
+		if (level().isClientSide && !isControlledByLocalInstance()) {
+			steps = RaceScoring.remoteGlideSteps(steps, distanceToSqr(x, y, z));
+		}
+		super.lerpTo(x, y, z, yRot, xRot, steps);
+	}
+
+	@Override
 	public void travel(Vec3 travel) {
+		if (level().isClientSide && !isControlledByLocalInstance()) {
+			// The server stream places this bird. Local physics would run it ahead of
+			// that stream, and the next position packet would yank it back.
+			setDeltaMovement(Vec3.ZERO);
+			return;
+		}
 		if (raceHeld()) {
 			pendingJump = -1;
 			flapTicks = 0;
