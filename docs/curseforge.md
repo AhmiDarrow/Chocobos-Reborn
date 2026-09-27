@@ -19,6 +19,17 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.16 - Smoother remote races
+Uploaded 2026-09-26: `chocobosreborn-1.0.16.jar` as file **8986453** ("Chocobos Reborn 1.0.16 - Smoother remote races",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.16.md`) via
+`tools/upload_curseforge.py`. API upload accepted; public moderation status was not verified.
+Server and every client require 1.0.16. Validated across all 24 tracks with three player clients
+and three normal AI, plus five dedicated-server profiles, 162 unit tests and 27 GameTests.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.16
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/8986453
+SHA-256: `f66f6e46cd9a093564c37722a64dd8265e8ac6cbf60f96f3a534054e0c30407e`.
+The GitHub asset digest matches the tested local jar.
+
 ## 1.0.15 - Long bloodlines
 Uploaded 2026-09-25: `chocobosreborn-1.0.15.jar` as file **8977931** ("Chocobos Reborn 1.0.15 - Long bloodlines",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.15.md`) via
