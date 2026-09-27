@@ -19,6 +19,15 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.17 - Held pace
+Uploaded 2026-09-27: `chocobosreborn-1.0.17.jar` as file **8995550** ("Chocobos Reborn 1.0.17 - Held pace",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.17.md`) via
+`tools/upload_curseforge.py`. Other birds follow the server stream, the field holds its own pace, and nine points promote. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.17
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/8995550
+SHA-256: `1768d75217fa5fbea2fa1bc6d6210b5e9fbc177cc69ec46dfa28402cfbc1d4af`.
+The GitHub asset digest matches the tested local jar.
+
 ## 1.0.16 - Smoother remote races
 Uploaded 2026-09-26: `chocobosreborn-1.0.16.jar` as file **8986453** ("Chocobos Reborn 1.0.16 - Smoother remote races",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.16.md`) via
