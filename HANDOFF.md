@@ -2043,3 +2043,54 @@ Every ladder line holds; no expectation moved, nothing in the AI retuned.
 pool sits at 0.12 so its shortcut stripe starts after the start arrow (at 0.08 the stripe painted over the arrow).
 In-game look wanted: the crest hairpins (Skyway tip, Void handle top, Eclipse horns), the Rampart right angles at
 r 18, ten grand stands on a 450-block lap, and five colliding birds on the Skyway notch bog.
+
+### Short grands prix: class A
+
+Class A's six grands prix rebuilt to the lap-share rule (`RaceTrackTest.grandPrixLapShare`) against A's
+shortest sprint (A_DEEPS, 1420): six new outlines, laps 372-590, heats 1710-2025 blocks (1.20-1.43x a
+sprint). Sprints untouched. Every id, ordinal, index, theme, lap count, course name, shape name, feature
+type set (the colour lean) and set piece is unchanged; every course keeps two colour features and a bog.
+
+| id | name | laps x lap | heat (x sprint) | shape | features (detour cost, target 13) | landmark | borrows from |
+|---|---|---|---|---|---|---|---|
+| a_crystal | Crystal Caverns | 5 x 372 | 1860 (1.31x) | DEE: the start straight is the D's flat back, a bowl climbing 180 degrees round the far end (hill 4), a crest straight sagging home over the top, a tight drop (R ~12) and a short flat side back to the line | bog 0.34-0.44 (15.5), water 0.4675-0.5375 (16.6), ridge 0.6875-0.7375 (16.6); boosts 0.2725, 0.65, 0.835 | amethyst geode, t 0.56 (the water pushes it off 0.5) | Monza: a long straight into the Parabolica, here climbing; the Curva Grande's gentle kink is the sagging crest straight where the bog and the pool sit |
+| a_canopy | Canopy Rush | 4 x 440 | 1760 (1.24x) | ELBOW: a boot; the foot is the start straight, a double-apex hairpin at the toe, the inside of the elbow one long reverse sweeper, a climb up the upright to a hairpin at the top (hill 5), a run down its back | water 0.2925-0.3225 (16.3), bog 0.6575-0.7075 (15.3), ridge 0.9175-0.9475 (16.6); boosts 0.2575, 0.595, 0.8825 | step pyramid, t 0.5 | COTA turn 1 (the climb to a hairpin at the top of the upright); the elbow's reverse sweeper is a Becketts-style change of direction; the ridge on the run to the flag is a Mario Kart last-corner risk |
+| a_ember | Ember Fields | 3 x 590 | 1770 (1.25x) | TRIDENT: a trident head; a broad back (the start straight), two deep notches (R ~19) cut down into its top leaving three points, the middle one a free-standing tine over the crest (hill 5) | bog 0.19-0.23 (14.5), lava 0.7825-0.8125 (15.7), ridge 0.865-0.945 (16.0); boosts 0.305, 0.51, 0.7325 | fortress tower with its lava fall, t 0.5 (the middle tine) | Baku's castle section (the three points: tight, walled, one bird wide through the tips) and Monaco's Loews/Portier (hairpin, reverse U, hairpin); a Monza straight home with the ridge on it |
+| a_grotto | Blindfish Grotto | 5 x 405 | 2025 (1.43x) | BLINDFISH: a cave fish; the flat belly is the start straight, a round nose hairpin, the back sweeping down into a forked tail: two hairpin tips (R ~10.5) either side of a straight trailing edge | water 0.3175-0.3675 (16.4), bog 0.41-0.49 (15.4), water 0.6875-0.7275 (16.6); boosts 0.5875, 0.6275, 0.8725 | eyeless cave fish, t 0.53 | Baby Park / Luigi Circuit (a tiny loop run five times), Suzuka's hairpin twice at the tail; the back is a long downhill reverse sweep with the shortcuts on it |
+| a_moonshelf | Moonshelf Hollow | 4 x 455 | 1820 (1.28x) | SHELFCAP: a shelf fungus on its trunk; the trunk is the start straight, the cap climbs and rolls over a long crest (hill 4) to its lip (a hairpin), the gilled underside sweeps back down to the trunk in one long reverse curve | ridge 0.465-0.495 (16.5), lava 0.5275-0.5575 (16.5), bog 0.6875-0.7275 (15.3); boosts 0.30, 0.615, 0.92 | dead trunk ringed with shelf fungi, t 0.59 | Spa: up Raidillon and over the crest (the cap), then Interlagos' descending sweep back to the pits (the underside) |
+| a_machete | Machete Cut | 3 x 570 | 1710 (1.20x) | MACHETE: the edge is the start straight, sweeping up to the point, a flat spine back into a narrower handle, a round pommel (hairpin), and an S-step at the heel onto the edge | water 0.4125-0.4525 (16.5), bog 0.48-0.53 (14.8), ridge 0.5825-0.6225 (15.9); boosts 0.2625, 0.7225, 0.9325 | machete in a jungle stump, t 0.56 | Montreal: the long straight, L'Epingle (the pommel hairpin) and the last chicane (the heel S) onto the line; the spine is a shortcut alley, Mario Kart style |
+
+Numbers held (checked with every class A line of the suite green): lap shares 5 laps 0.262 / 0.285, 4 laps
+0.310 / 0.320, 3 laps 0.401 / 0.415; more laps never a longer lap; heats 1.20-1.43x. **The shortest A lap
+(372) sits between the most B's shortest can be (0.29 x 1280 = 371) and the least S's can be (0.24 x 1560 =
+374), so "grand prix laps get longer up the ladder" holds whatever B and S land with.** (The brief suggested
+376-410 for the 5-lap courses; above 374 an S 5-lap course at its floor would undercut A.) Legs 40-50 apart
+(need 38), tightest corners ~10-12 blocks, hills 2-5, seven stands each (3-4 in, 3-4 out), 129-154 fans.
+
+**The detour window is the hard part at this size.** A grand prix this short has the floor target (13), so
+a colour detour must cost 12-16.9. The cost model (`detourCost`) steps the lane's normal once per block, and
+every step adds its jump to the detour: a straight costs about 17.6 at 372 blocks, 17.1 at 405, 16.6 at 440
+and 15.0 at 580, and a bend of either hand adds, except a gentle reverse (concave) bend with a long span,
+where the step is smaller than the sampling step and the geometry wins. So on the 5- and 4-lap courses
+every colour feature sits on a long, gentle right-hander (a sagging crest, a reverse sweeper), spans are
+long (0.03-0.10 of a lap) and the colour costs sit near the top of the window (16.3-16.6); the bog is always
+the cheapest (14.5-15.5, not the 45 % the doc aims at: nothing on a lap this short gets lower without folding
+the road). The 3-lap courses can use straights.
+
+**How the shapes were made**: a turtle outline (straights and arcs, closed by solving a few straights'
+lengths) in a scratch Python mirror of `TrackSpline`, a feature solver over `detourCost`, and a Python port
+of `CourseStands.planStands` (seven stands is the other hard constraint: every feature and boost blocks 12
+blocks either side, the landmark 22), all checked against the real classes by a scratch probe; none of it
+committed. The 38-block leg rule rules out small serpentines: any U-turn whose legs are 80 blocks apart
+along the lap must be 38 wide, which is why Ember's notches are R ~19 and its middle tine is short.
+
+**Ladder** (`RaceSimTest`, every line green, no expectation moved): A field average 79.2 -> 53.7 s, field best
+70.1 -> 47.2 s, half-trained Black driven well 67.2 -> 44.1 s (still wins, by 6.6 %, was 4.1 %), fresh Black
+71.6 s vs field average 53.7 s (still loses). Heats a third shorter; the ratios barely move.
+
+**For the merge**: six A islands changed shape, so `COURSE_VERSION` goes up with the other classes (left
+alone here). Full `test` on this branch: 244 tests, 1 skipped, 1 failure,
+`sprintsAreOneLongLapGrandsPrixShortLapsMoreLapsShorter` on C_MEADOW's lap share (class C has not landed
+on this branch; B and S have not either); every class A line of it passes. Needs an in-game look: Grotto's two tail hairpins and its two boosts
+0.04 apart after the upper tip (the only boost set that seats all seven stands), Ember's tines at three-lap
+pace with bumping, the long ridges (Ember's 0.08 of a lap on the run home), and Crystal's climbing bowl.
