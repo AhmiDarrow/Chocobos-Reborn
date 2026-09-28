@@ -38,7 +38,7 @@ public record RacerProfile(double cruise, double dash, double energyDrain, doubl
 			// Reaction is measured from GO (the riders see the same countdown), so no field jumps the lights.
 			// Dash threshold sits near the rider lock so a class bird does not tap
 			// the bar the moment it unlocks. No class rubber-bands on the player's gap.
-			case C -> new RacerProfile(0.845D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.40D, 0.00D, 16, 30, 0.90D, 1.00D, 0.00D, 0.35D);
+			case C -> new RacerProfile(0.880D, 1.22D, 1.0D / 110.0D, 1.0D / 420.0D, 0.40D, 0.00D, 14, 26, 0.90D, 0.70D, 0.00D, 0.35D);
 			case B -> new RacerProfile(0.882D, 1.27D, 1.0D / 140.0D, 1.0D / 360.0D, 0.42D, 0.20D, 12, 20, 0.60D, 0.50D, 0.00D, 0.60D);
 			case A -> new RacerProfile(0.887D, 1.32D, 1.0D / 170.0D, 1.0D / 300.0D, 0.45D, 0.35D, 10, 14, 0.35D, 0.20D, 0.00D, 0.80D);
 			case S -> new RacerProfile(0.923D, 1.36D, 1.0D / 200.0D, 1.0D / 260.0D, 0.30D, 0.45D, 8, 11, 0.15D, 0.05D, 0.00D, 0.95D);

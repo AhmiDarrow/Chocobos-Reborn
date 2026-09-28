@@ -19,6 +19,8 @@ public final class ChocobosRebornClient {
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceHud::tick);
+		// the crowd in the course stands: drawn, not spawned (see CourseCrowdRenderer)
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(CourseCrowdRenderer::onRenderLevel);
         tk.darrow.chocobosreborn.net.RiderPayloads.Hud.CLIENT_HANDLER = RaceHud::update;
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
 		// parse the plain and saddled birds while the world loads, not as the first one (often a

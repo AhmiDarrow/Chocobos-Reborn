@@ -1,5 +1,7 @@
 package tk.darrow.chocobosreborn.race;
 
+import tk.darrow.chocobosreborn.breed.ChocoboColor;
+
 /**
  * Pure FF7 class and lap rules. Safe to unit-test without a Minecraft server.
  */
@@ -239,12 +241,48 @@ public final class RaceScoring {
 	 * Training points to stamp on a field NPC so the four stats exist. Rivals sit
 	 * at 100; class birds sit below a fully greens-fed player of that ladder.
 	 */
+	/**
+	 * What a class field bird actually cruises at, before its +-5 % form: the
+	 * profile's discipline x the grade it races at (born grade plus one step per
+	 * 120 training points) x its speed training. The same stack a rider gets.
+	 */
+	public static double fieldPace(RaceClass raceClass) {
+		int train = fieldTraining(raceClass.getId(), false);
+		int grade = Math.min(4, Math.min(4, raceClass.getId() + 1) + (train * 4) / 120);
+		return RacerProfile.of(raceClass, RacerProfile.Role.FIELD).cruise() * gradeSpeedMul(grade) * speedTrainingMul(train);
+	}
+
+	/**
+	 * FF7's Teioh runs off the player's own bird. Teiyo cruises at a share of the
+	 * best rider's grade x speed training (B 1.00, A 1.05, S 1.10), never slower
+	 * than 6 % over the field. Jolo runs 4 % under Teiyo. Set once at the grid,
+	 * so a gap during the heat changes nothing.
+	 */
+	public static double rivalPace(RaceClass raceClass, boolean jolo, double riderPace, double fieldPace) {
+		double share = switch (raceClass) {
+			case C, B -> 1.00D;
+			case A -> 1.05D;
+			case S -> 1.10D;
+		};
+		double teiyo = Math.max(fieldPace * 1.06D, share * riderPace);
+		return jolo ? teiyo * 0.96D : teiyo;
+	}
+
+	/** Jolo rides his class's best bird: Blue in B, White in A, Gold only in S. */
+	public static ChocoboColor joloColor(RaceClass rc) {
+		return switch (rc) {
+			case C, B -> ChocoboColor.BLUE;
+			case A -> ChocoboColor.WHITE;
+			case S -> ChocoboColor.GOLD;
+		};
+	}
+
 	public static int fieldTraining(int classId, boolean rival) {
 		if (rival) {
 			return 100;
 		}
 		return switch (Math.max(0, Math.min(3, classId))) {
-			case 0 -> 22;
+			case 0 -> 34;
 			case 1 -> 48;
 			case 2 -> 72;
 			default -> 92;

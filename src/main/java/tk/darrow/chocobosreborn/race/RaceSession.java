@@ -117,8 +117,6 @@ public class RaceSession {
 	private final RaceTrack track;
 	private final boolean ranked;
 	private final List<Racer> racers = new ArrayList<>();
-	/** The crowd in the infield grandstand, spawned for the heat and cleared after. */
-	private final List<KinStewardEntity> fans = new ArrayList<>();
 	/** Kin jockeys riding the AI racers. */
 	private final List<KinStewardEntity> jockeys = new ArrayList<>();
 	private final RaceCourseLayout layout;
@@ -250,7 +248,6 @@ public class RaceSession {
 		if (!duel) {
 			spawnField(players.size(), track.getRaceClass());
 		}
-		spawnFans();
 		for (Racer r : racers) {
 			ChocoboEntity e = r.entity();
 			if (e == null) {
@@ -324,6 +321,18 @@ public class RaceSession {
 				new java.util.Random(level.random.nextLong()));
 		int cardIdx = 0;
 		List<String> announced = new ArrayList<>();
+		// the rivals key off the best rider's own bird, as FF7's Teioh does
+		double fieldPace = RaceScoring.fieldPace(raceClass);
+		double riderPace = 0.0D;
+		for (Racer h : racers) {
+			ChocoboEntity b = h.entity();
+			if (h.human() && b != null) {
+				riderPace = Math.max(riderPace, b.speedMul());
+			}
+		}
+		if (riderPace <= 0.0D) {
+			riderPace = fieldPace;
+		}
 		for (int i = humans; i < FIELD; i++) {
 			ChocoboEntity npc = ModEntities.CHOCOBO.get().create(level);
 			if (npc == null) {
@@ -345,7 +354,7 @@ public class RaceSession {
 			npc.setRaceNpc(true);
 			npc.setPersistenceRequired();
 			npc.setRacing(true);
-			npc.setColor(isTeioh ? ChocoboColor.BLACK : isJolo ? ChocoboColor.GOLD
+			npc.setColor(isTeioh ? ChocoboColor.BLACK : isJolo ? RaceScoring.joloColor(raceClass)
 					: entry != null ? entry.color() : npcColor(raceClass, i));
 			npc.setGrade(ChocoboGrade.byRank(Math.min(4, raceClass.getId() + 1)));
 			npc.setRaceClass(raceClass);
@@ -366,6 +375,10 @@ public class RaceSession {
 			// every racer, rivals included, rolls its own form for this heat: +-5% (Ahmi: each race feels different)
 			r.goal.speed = 1.0D + RacerProfile.VARIANCE * (2.0D * level.random.nextDouble() - 1.0D);
 			r.goal.totalLaps = track.getLaps();
+			if (isTeioh || isJolo) {
+				double own = r.goal.profile.cruise() * npc.speedMul();
+				r.goal.paceScale = RaceScoring.rivalPace(raceClass, isJolo, riderPace, fieldPace) / Math.max(0.05D, own);
+			}
 			npc.installRacer(r.goal);
 			racers.add(r);
 		}
@@ -419,24 +432,6 @@ public class RaceSession {
 		}
 	}
 
-	/** Fans on the grandstand for this heat (one tribe look per seat, cycling). */
-	private void spawnFans() {
-		TownRole[] looks = {TownRole.FAN_SWARM, TownRole.FAN_CLOCK, TownRole.FAN_SPROUT, TownRole.FAN_CLAW};
-		int i = 0;
-		for (RaceCourseLayout.FanPost post : layout.fanPosts()) {
-			KinStewardEntity fan = ModEntities.KIN_STEWARD.get().create(level);
-			if (fan == null) {
-				continue;
-			}
-			fan.moveTo(post.x(), post.y(), post.z(), post.yaw(), 0.0F);
-			fan.setRole(looks[i++ % looks.length]);
-			fan.installFan();
-			fan.setPersistenceRequired();
-			level.addFreshEntity(fan);
-			fans.add(fan);
-		}
-	}
-
 	/** Point a bird (and whoever sits on it) up the road: body, head and rotation history together, or the body drifts back. */
 	private static void face(ChocoboEntity bird, float yaw) {
 		bird.setYRot(yaw);
@@ -458,7 +453,7 @@ public class RaceSession {
 			case C -> ChocoboColor.YELLOW;
 			case B -> i % 2 == 0 ? ChocoboColor.GREEN : ChocoboColor.BLUE;
 			case A -> i % 2 == 0 ? ChocoboColor.WHITE : ChocoboColor.BLACK;
-			case S -> i % 3 == 0 ? ChocoboColor.GOLD : (i % 3 == 1 ? ChocoboColor.BLACK : ChocoboColor.WHITE);
+			case S -> i % 3 == 0 ? ChocoboColor.BLUE : (i % 3 == 1 ? ChocoboColor.BLACK : ChocoboColor.WHITE);
 		};
 	}
 
@@ -945,6 +940,7 @@ public class RaceSession {
 				}
 			}
 		}
+		recordWinner();
 		boolean anyPlaced = humans().stream().anyMatch(h -> h.finishIndex >= 0);
 		if (RaceScoring.scratchRefundsLeftoverBets(anyPlaced)) {
 			refundAllBets();
@@ -953,6 +949,24 @@ public class RaceSession {
 		}
 		settleDuel();
 		teardown();
+	}
+
+	/** A ranked heat's winner goes on Whiskerwind's board (AI regulars too); a rider's win lights the plaza. */
+	private void recordWinner() {
+		if (!ranked || duel) {
+			return;
+		}
+		for (Racer r : racers) {
+			if (r.finishIndex != 0) {
+				continue;
+			}
+			ChocoboEntity b = r.entity();
+			String bird = b != null && b.hasCustomName() && r.human() ? b.getCustomName().getString()
+					: b != null ? "#chocobosreborn.color." + b.color().id() : "?";
+			double seconds = Double.isNaN(r.finishTime) ? 0.0D : Math.max(0.0D, (r.finishTime - HOLD_TICKS) / 20.0D);
+			TownLife.recordWinner(level, track.getRaceClass(), r.name, bird, track.id(), seconds, r.human());
+			return;
+		}
 	}
 
 	/** Spectator (and extra same-heat) Rook stakes: score against the actual first-place bird. */
@@ -1192,10 +1206,6 @@ public class RaceSession {
 				e.discard();
 			}
 		}
-		for (KinStewardEntity fan : fans) {
-			fan.discard();
-		}
-		fans.clear();
 		for (KinStewardEntity jockey : jockeys) {
 			jockey.discard();
 		}
@@ -1239,9 +1249,9 @@ public class RaceSession {
 		return racers.stream().anyMatch(r -> r.bird.equals(bird));
 	}
 
-	/** A fan or jockey this heat spawned (course scrubs keep them). */
+	/** A jockey this heat spawned (course scrubs keep them). The crowd is client-side scenery now. */
 	boolean ownsKin(Entity kin) {
-		return fans.contains(kin) || jockeys.contains(kin);
+		return jockeys.contains(kin);
 	}
 
 	public void abort() {

@@ -39,6 +39,21 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 		}
 	}
 
+	/** Skin of a kin role (also drawn by {@link CourseCrowdRenderer} for the crowd in the stands). */
+	public static ResourceLocation skinTexture(TownRole role) {
+		return SKINS[role.ordinal()];
+	}
+
+	/** Tribe cloak overlay of a kin role, tinted with {@link TownRole#colour()}. */
+	public static ResourceLocation cloakTexture(TownRole role) {
+		return CLOAKS[role.ordinal()];
+	}
+
+	/** Eyes-layer glow of a kin role. */
+	public static RenderType glowType(TownRole role) {
+		return GLOW[role.ordinal()];
+	}
+
 	private static ResourceLocation tex(String name) {
 		return ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "textures/entity/kin/" + name + ".png");
 	}
@@ -141,6 +156,14 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 				rightArm.zRot = 0.1F;
 				leftArm.zRot = -0.1F;
 				cloak.xRot = 0.7F;
+				return;
+			}
+			if (entity.role().resident() && entity.cheering()) {
+				// a resident at the overlook rail while a heat is on: arms up, bouncing
+				float w = Mth.sin(age * 0.45F + entity.getId());
+				rightArm.xRot = -2.6F + w * 0.3F;
+				leftArm.xRot = -2.6F - w * 0.3F;
+				body.y = -Math.abs(w) * 1.5F;
 				return;
 			}
 			switch (entity.role()) {

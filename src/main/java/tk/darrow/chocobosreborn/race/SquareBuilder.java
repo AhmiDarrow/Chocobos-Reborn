@@ -16,6 +16,9 @@ import net.minecraft.world.phys.AABB;
 import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.block.ModBlocks;
 import tk.darrow.chocobosreborn.block.SquareGateBlock;
+import tk.darrow.chocobosreborn.breed.ChocoboColor;
+import tk.darrow.chocobosreborn.item.ModItems;
+import net.minecraft.world.item.ItemStack;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.entity.KinStewardEntity;
 import tk.darrow.chocobosreborn.entity.ModEntities;
@@ -30,9 +33,9 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
 public final class SquareBuilder {
 	public static final int GROUND_Y = 64;
 	/** The village: z from PADDOCK_Z0 (return gate) to PADDOCK_Z1 (the race arch), x within ±PADDOCK_HALF_W. */
-	public static final int PADDOCK_Z0 = -104;
-	public static final int PADDOCK_Z1 = -40;
-	public static final int PADDOCK_HALF_W = 48;
+	public static final int PADDOCK_Z0 = VillageLayout.GATE_Z;
+	public static final int PADDOCK_Z1 = VillageLayout.ARCH_Z;
+	public static final int PADDOCK_HALF_W = 72;
 	/**
 	 * The village is laid ONCE per save: SquareData remembers this version and
 	 * buildPaddock returns at once while it matches (Ahmi: "once Whiskerwind has been
@@ -40,20 +43,29 @@ public final class SquareBuilder {
 	 * only for a deliberate village change; every bump scrubs and relays the village and
 	 * clears the built-course set on the next visit.
 	 */
-	public static final int PADDOCK_VERSION = 12;
+	public static final int PADDOCK_VERSION = 13;
 	/**
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 8;
+	public static final int COURSE_VERSION = 9;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
-	/** Birds that live in the village (untamable scenery). */
-	private static final int TOWN_BIRDS = 5;
-	private static final tk.darrow.chocobosreborn.breed.ChocoboColor[] TOWN_COLOURS = {
-			tk.darrow.chocobosreborn.breed.ChocoboColor.YELLOW, tk.darrow.chocobosreborn.breed.ChocoboColor.GREEN,
-			tk.darrow.chocobosreborn.breed.ChocoboColor.BLUE, tk.darrow.chocobosreborn.breed.ChocoboColor.WHITE,
-			tk.darrow.chocobosreborn.breed.ChocoboColor.BLACK};
+	/**
+	 * The town's own birds (untamable scenery), by patch: the flock grazing in the
+	 * ranch, two saddled birds in the stable yard, chicks in the nursery. Each row:
+	 * centre x, z, restriction radius, spawn spread, saddled, chicks, colours.
+	 */
+	private record Flock(int x, int z, int radius, int spread, boolean saddled, boolean chicks, ChocoboColor... colours) {
+	}
+
+	private static final Flock[] FLOCKS = {
+			new Flock((VillageLayout.RANCH_X0 + VillageLayout.RANCH_X1) / 2, (VillageLayout.RANCH_Z0 + VillageLayout.RANCH_Z1) / 2, 13, 5,
+					false, false, ChocoboColor.YELLOW, ChocoboColor.GREEN, ChocoboColor.BLUE, ChocoboColor.WHITE, ChocoboColor.BLACK, ChocoboColor.YELLOW),
+			new Flock(VillageLayout.STABLE_X, VillageLayout.STABLE_Z + 3, 5, 2, true, false, ChocoboColor.YELLOW, ChocoboColor.YELLOW),
+			new Flock((VillageLayout.NURSERY_X0 + VillageLayout.NURSERY_X1) / 2, (VillageLayout.NURSERY_Z0 + VillageLayout.NURSERY_Z1) / 2, 3, 1,
+					false, true, ChocoboColor.YELLOW, ChocoboColor.YELLOW, ChocoboColor.BLUE),
+	};
 
 	private SquareBuilder() {
 	}
@@ -214,10 +226,10 @@ public final class SquareBuilder {
 			return;
 		}
 		int y = GROUND_Y;
-		// clear the whole footprint (an older village may stand here), then the island
-		int r = VillagePlan.RADIUS + 12;
-		AABB scrub = new AABB(VillagePlan.CX - r, y - 20, VillagePlan.CZ - r,
-				VillagePlan.CX + r + 1, y + 31, VillagePlan.CZ + r + 31);
+		// clear the whole footprint (an older, smaller village may stand here, its shrine too), then the island
+		int r = VillagePlan.RADIUS + 16;
+		int zMin = VillagePlan.CZ - r - 12, zMax = VillagePlan.CZ + r + 30;
+		AABB scrub = new AABB(VillagePlan.CX - r, y - 24, zMin, VillagePlan.CX + r + 1, y + 31, zMax + 1);
 		java.util.List<Entity> saved = new java.util.ArrayList<>();
 		saved.addAll(level.getEntitiesOfClass(net.minecraft.world.entity.player.Player.class, scrub));
 		saved.addAll(level.getEntitiesOfClass(ChocoboEntity.class, scrub));
@@ -227,22 +239,46 @@ public final class SquareBuilder {
 		for (Entity e : saved) {
 			e.teleportTo(Square.ARRIVAL.x, holdY, Square.ARRIVAL.z);
 		}
-		fill(level, VillagePlan.CX - r, y - 20, VillagePlan.CZ - r, VillagePlan.CX + r, y + 30, VillagePlan.CZ + r + 30, "air");
-		fill(level, 44, y - 12, -72, 66, y + 12, -48, "air");
+		fill(level, VillagePlan.CX - r, y - 24, zMin, VillagePlan.CX + r, y + 30, zMax, "air");
 		VillagePlan.island(level);
+		VillageDistrict.lanes(level);
 		VillagePlan.plaza(level);
-		VillagePlan.roads(level, PADDOCK_Z0, PADDOCK_Z1);
+		VillagePlan.avenue(level, PADDOCK_Z0, PADDOCK_Z1);
 		VillagePlan.fountain(level, VillagePlan.PX, VillagePlan.FOUNTAIN_Z);
 		// homes and halls
-		VillageBuildings.cottage(level, -30, -98, VillageBuildings.INFILL, "spruce_stairs", "spruce_slab[type=bottom]");
-		VillageBuildings.cottage(level, 30, -98, VillageBuildings.INFILL_ALT, "dark_oak_stairs", "dark_oak_slab[type=bottom]");
-		VillageBuildings.cottage(level, -30, -48, VillageBuildings.INFILL_ALT, "deepslate_tile_stairs", "deepslate_tile_slab[type=bottom]");
-		VillageBuildings.cottage(level, 30, -50, VillageBuildings.INFILL, "cherry_stairs", "cherry_slab[type=bottom]");
-		VillageBuildings.inn(level, -26, -74);
-		VillageBuildings.stable(level, 28, -82);
-		VillageBuildings.windmill(level, -34, -86);
-		VillageBuildings.raceHall(level, 26, -58);
-		// stalls around the plaza (with striped awnings) and the desks by the south street
+		String[][] roofs = {
+				{VillageBuildings.INFILL, "spruce_stairs", "spruce_slab[type=bottom]"},
+				{VillageBuildings.INFILL_ALT, "dark_oak_stairs", "dark_oak_slab[type=bottom]"},
+				{VillageBuildings.INFILL_ALT, "deepslate_tile_stairs", "deepslate_tile_slab[type=bottom]"},
+				{VillageBuildings.INFILL, "cherry_stairs", "cherry_slab[type=bottom]"},
+				{VillageBuildings.INFILL, "mud_brick_stairs", "mud_brick_slab[type=bottom]"},
+				{VillageBuildings.INFILL_ALT, "spruce_stairs", "spruce_slab[type=bottom]"},
+				{VillageBuildings.INFILL, "deepslate_tile_stairs", "deepslate_tile_slab[type=bottom]"},
+				{VillageBuildings.INFILL_ALT, "cherry_stairs", "cherry_slab[type=bottom]"}};
+		for (int i = 0; i < VillageLayout.COTTAGES.length; i++) {
+			int[] c = VillageLayout.COTTAGES[i];
+			String[] roof = roofs[i % roofs.length];
+			VillageBuildings.cottage(level, c[0], c[1], roof[0], roof[1], roof[2]);
+		}
+		VillageBuildings.inn(level, VillageLayout.INN_X, VillageLayout.INN_Z);
+		VillageBuildings.stable(level, VillageLayout.STABLE_X, VillageLayout.STABLE_Z);
+		VillageBuildings.windmill(level, VillageLayout.MILL_X, VillageLayout.MILL_Z);
+		VillageBuildings.raceHall(level, VillageLayout.HALL_X, VillageLayout.HALL_Z);
+		VillageBuildings.nestBarn(level, VillageLayout.NEST_X, VillageLayout.NEST_Z);
+		VillageBuildings.jockeyLounge(level, VillageLayout.LOUNGE_X, VillageLayout.LOUNGE_Z);
+		// the outer ring
+		VillageDistrict.ranch(level);
+		VillageDistrict.nursery(level);
+		VillageDistrict.pond(level);
+		VillageDistrict.orchard(level);
+		VillageDistrict.winnersBoard(level);
+		VillageDistrict.marketStall(level, VillageLayout.FRUIT_X, VillageLayout.FRUIT_Z, 0, 1, "lime", "melon", "pumpkin", "hay_block");
+		VillageDistrict.marketStall(level, VillageLayout.FISH_X, VillageLayout.FISH_Z, -1, 0, "light_blue", "dried_kelp_block", "packed_ice", "barrel[facing=up]");
+		VillageDistrict.signpost(level, -6, -38, "chocobosreborn.sign.post.fountain", "chocobosreborn.sign.post.arch",
+				"chocobosreborn.sign.post.hall", "chocobosreborn.sign.post.inn");
+		VillageDistrict.signpost(level, 7, -108, "chocobosreborn.sign.post.gate", "chocobosreborn.sign.post.plaza",
+				"chocobosreborn.sign.post.nest", "chocobosreborn.sign.post.mill");
+		// stalls around the plaza (with striped awnings) and the desks by the north street
 		for (TownPosts.KeeperPost post : TownPosts.keeperPosts()) {
 			if (post.role().shops() || post.role() == TownRole.BOOKIE) {
 				booth(level, post);
@@ -256,27 +292,15 @@ public final class SquareBuilder {
 				desk(level, post);
 			}
 		}
-		// trees and gardens where the streets leave room
-		for (int[] t : new int[][]{{-12, -44}, {12, -44}, {-20, -58}, {-14, -88}, {14, -88}, {-40, -66}, {38, -70}}) {
-			if (VillagePlan.onIsland(t[0], t[1])) {
-				VillagePlan.cherry(level, t[0], t[1]);
-			}
-		}
-		for (int[] t : new int[][]{{-8, -100}, {8, -100}, {-38, -78}, {38, -86}, {22, -100}, {-22, -100}}) {
-			if (VillagePlan.onIsland(t[0], t[1])) {
-				tree(level, t[0], y, t[1]);
-			}
-		}
-		for (int[] g : new int[][]{{-6, -96}, {6, -96}, {-24, -62}, {24, -62}}) {
-			garden(level, g[0], y, g[1]);
-		}
-		// the race arch with Esther, the pier beyond it, the return portal, the shrine islet
+		// trees and flower beds wherever the ground is open
+		VillageDistrict.scatter(level);
+		// the race arch with Esther, the overlook beyond it, the return portal, the shrine islet
 		VillagePlan.overlook(level, PADDOCK_Z1);
 		arch(level, y);
-		VillagePlan.funGates(level);
 		VillagePlan.gysahlPatch(level, VillageLayout.GYSAHL_CX, VillageLayout.GYSAHL_CZ);
 		VillagePlan.returnGate(level, PADDOCK_Z0);
-		VillagePlan.shrineIslet(level, 56, -60, 40, -60);
+		VillagePlan.shrineIslet(level, VillageLayout.SHRINE_X, VillageLayout.SHRINE_Z, VillageLayout.SHRINE_FROM_X, VillageLayout.SHRINE_FROM_Z);
+		TownLife.writeBoard(level);
 		for (Entity e : saved) {
 			if (!e.isRemoved()) {
 				e.teleportTo(Square.ARRIVAL.x, Square.ARRIVAL.y, Square.ARRIVAL.z);
@@ -322,6 +346,23 @@ public final class SquareBuilder {
 		if (level.getBlockEntity(new BlockPos(x, y, z)) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
 			writeSign(sign, lines);
 		}
+	}
+
+	/** A waxed oak wall sign with ready-made lines (arrows, names): see {@link #sign} for translated keys. */
+	static void signText(ServerLevel level, int x, int y, int z, String facing, net.minecraft.network.chat.Component... lines) {
+		set(level, x, y, z, "oak_wall_sign[facing=" + facing + "]");
+		if (level.getBlockEntity(new BlockPos(x, y, z)) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+			writeSign(sign, lines);
+		}
+	}
+
+	static void writeSign(net.minecraft.world.level.block.entity.SignBlockEntity sign, net.minecraft.network.chat.Component... lines) {
+		net.minecraft.world.level.block.entity.SignText text = sign.getFrontText();
+		for (int i = 0; i < 4; i++) {
+			text = text.setMessage(i, i < lines.length ? lines[i] : net.minecraft.network.chat.Component.empty());
+		}
+		sign.setText(text, true);
+		sign.setWaxed(true);
 	}
 
 	static void writeSign(net.minecraft.world.level.block.entity.SignBlockEntity sign, String... lines) {
@@ -557,7 +598,9 @@ public final class SquareBuilder {
 				place(level, post.role(), post.x(), post.y(), post.z(), post.yaw());
 			} else {
 				claimed.add(keep);
-				if (best > 9.0D) {
+				// keepers stay at their posts; residents walk their own day, and only a lost one goes home
+				boolean lost = post.role().resident() ? best > 110.0D * 110.0D || keep.getY() < GROUND_Y - 8 : best > 9.0D;
+				if (lost) {
 					keep.moveTo(post.x(), post.y(), post.z(), post.yaw(), 0.0F);
 				}
 			}
@@ -594,22 +637,46 @@ public final class SquareBuilder {
 			k.discard();
 			removed++;
 		}
-		// the town's own birds: a few wander the village, never tamable, respawned when lost
+		// the town's own birds: the ranch flock, the stable pair and the nursery chicks, respawned when lost
 		if (complete) {
 			List<ChocoboEntity> town = level.getEntities(ModEntities.CHOCOBO.get(), village, ChocoboEntity::townBird);
-			for (int i = town.size(); i < TOWN_BIRDS; i++) {
-				ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
-				if (bird == null) {
-					break;
+			java.util.Set<ChocoboEntity> homed = new java.util.HashSet<>();
+			for (Flock f : FLOCKS) {
+				int have = 0;
+				double reach = (f.radius() + 2.0D) * (f.radius() + 2.0D);
+				for (ChocoboEntity b : town) {
+					if (!homed.contains(b) && b.isBaby() == f.chicks() && b.distanceToSqr(f.x() + 0.5D, b.getY(), f.z() + 0.5D) <= reach) {
+						homed.add(b);
+						have++;
+					}
 				}
-				double x = (i % 2 == 0 ? -1 : 1) * (14 + i * 3), z = -70 - (i % 3) * 8;
-				bird.moveTo(x + 0.5D, GROUND_Y + 1, z + 0.5D, level.random.nextFloat() * 360.0F, 0.0F);
-				bird.finalizeSpawn(level, level.getCurrentDifficultyAt(bird.blockPosition()), net.minecraft.world.entity.MobSpawnType.EVENT, null);
-				bird.setColor(TOWN_COLOURS[i % TOWN_COLOURS.length]);
-				bird.setTownBird(true);
-				bird.setPersistenceRequired();
-				bird.restrictTo(new BlockPos(0, GROUND_Y, -72), 30);
-				level.addFreshEntity(bird);
+				for (int i = have; i < f.colours().length; i++) {
+					ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+					if (bird == null) {
+						break;
+					}
+					double x = f.x() + 0.5D + (i % 3 - 1) * f.spread() * 0.7D, z = f.z() + 0.5D + (i / 3 - 0.5D) * f.spread();
+					bird.moveTo(x, GROUND_Y + 1, z, level.random.nextFloat() * 360.0F, 0.0F);
+					bird.finalizeSpawn(level, level.getCurrentDifficultyAt(bird.blockPosition()), net.minecraft.world.entity.MobSpawnType.EVENT, null);
+					bird.setColor(f.colours()[i]);
+					bird.setTownBird(true);
+					bird.setPersistenceRequired();
+					if (f.chicks()) {
+						bird.markChick();
+					}
+					if (f.saddled()) {
+						bird.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
+					}
+					bird.setTownHome(f.x(), f.z(), f.radius());
+					level.addFreshEntity(bird);
+				}
+			}
+			// strays (the old village-wide flock, or a bird that got out) are replaced by their patch's own
+			for (ChocoboEntity b : town) {
+				if (!homed.contains(b)) {
+					b.discard();
+					removed++;
+				}
 			}
 		}
 		if (removed > 0) {

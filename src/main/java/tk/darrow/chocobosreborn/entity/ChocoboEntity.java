@@ -746,6 +746,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 	}
 
+	/** A town bird's patch (ranch, stable yard or nursery): x, z and radius. Null for the old village-wide range. */
+	@Nullable
+	private int[] townHome;
+
+	public void setTownHome(int x, int z, int radius) {
+		townHome = new int[]{x, z, radius};
+		restrictTo(new BlockPos(x, tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, z), radius);
+	}
+
 	public boolean raceNpc() {
 		return this.entityData.get(DATA_RACE_NPC);
 	}
@@ -969,6 +978,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putIntArray("GreensFed", greensFed.clone());
 		tag.putBoolean("RaceNpc", raceNpc());
 		tag.putBoolean("TownBird", townBird());
+		if (townHome != null) {
+			tag.putIntArray("TownHome", townHome);
+		}
 		tag.putBoolean("Wander", wander);
 		if (wanderHome != null) {
 			tag.putLong("WanderHome", wanderHome.asLong());
@@ -1027,6 +1039,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		this.entityData.set(DATA_RACE_NPC, tag.getBoolean("RaceNpc"));
 		this.entityData.set(DATA_TOWN_BIRD, tag.getBoolean("TownBird"));
+		int[] home = tag.getIntArray("TownHome");
+		townHome = home.length == 3 ? home : null;
 		wander = tag.getBoolean("Wander");
 		wanderHome = tag.contains("WanderHome") ? BlockPos.of(tag.getLong("WanderHome")) : null;
 		// vanilla reads "Sitting" into its field directly, past setOrderedToSit
@@ -1050,7 +1064,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
 			ledgerUpdate();
 			if (townBird() && Square.isSquare(level())) {
-				restrictTo(new net.minecraft.core.BlockPos(0, tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, -72), 30);
+				if (townHome != null) {
+					restrictTo(new BlockPos(townHome[0], tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, townHome[1]), townHome[2]);
+				} else {
+					restrictTo(new BlockPos(0, tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, -72), 45);
+				}
 			}
 		}
 	}
@@ -1812,6 +1830,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// The server stream places this bird. Local physics would run it ahead of
 			// that stream, and the next position packet would yank it back.
 			setDeltaMovement(Vec3.ZERO);
+			// Vanilla feeds the gait from the end of travel(). Skipping it froze the
+			// legs of every bird this client does not drive; the lerp still moves
+			// the bird, so the stride follows that motion.
+			calculateEntityAnimation(false);
 			return;
 		}
 		if (raceHeld()) {
@@ -1962,6 +1984,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// does not lock Carob/Zeio forever.
 			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove()) {
 				setInLove(null);
+			}
+			if (townBird() && isBaby() && getAge() > -6000) {
+				setAge(-24000);   // the nursery's chicks stay chicks
 			}
 			int stage = computeStage();
 			if (stage != growthStage()) {

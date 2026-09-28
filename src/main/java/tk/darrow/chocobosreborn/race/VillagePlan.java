@@ -7,12 +7,13 @@ import tk.darrow.chocobosreborn.block.SquareGateBlock;
 
 /**
  * Whiskerwind, the village: an organic sky island with a plaza around the
- * arrival medallion, a chocobo fountain, market stalls, timber cottages, an inn
- * with a bell tower, a stable yard, a windmill on its mound, the race arch with
- * a viewing pier over the void toward the courses, waterfalls off the rim and a
- * bridge to a shrine islet. Everything is code-placed through
- * {@link SquareBuilder#set} / {@link SquareBuilder#fill}; the keepers' stalls are
- * built by {@link SquareBuilder#booth} around {@link TownPosts}.
+ * arrival medallion, a chocobo fountain (a little gold saucer at its feet),
+ * market stalls, timber cottages, an inn with a bell tower, a stable yard, a
+ * windmill on its mound, the race arch with the overlook toward the courses,
+ * waterfalls off the rim and a bridge to a shrine islet. The outer ring (ranch,
+ * nest, pond, orchard, lounge) is {@link VillageDistrict}. Everything is
+ * code-placed through {@link SquareBuilder#set} / {@link SquareBuilder#fill};
+ * positions come from {@link VillageLayout}.
  */
 final class VillagePlan {
 	static final int Y = SquareBuilder.GROUND_Y;
@@ -33,7 +34,6 @@ final class VillagePlan {
 		SquareBuilder.fill(l, x0, y0, z0, x1, y1, z1, id);
 	}
 
-	/** Rim radius at angle theta: 46 +- a few blocks so the island is not a disc. */
 	static double rim(double theta) {
 		return VillageLayout.rim(theta);
 	}
@@ -46,20 +46,18 @@ final class VillagePlan {
 
 	/** Grass top, dirt, then rock deepening toward the centre; roots and waterfalls on the rim. */
 	static void island(ServerLevel l) {
-		int r = RADIUS + 8;
+		int r = RADIUS + 12;
 		for (int x = CX - r; x <= CX + r; x++) {
 			for (int z = CZ - r; z <= CZ + r; z++) {
-				double dx = x - CX, dz = z - CZ;
-				double d = Math.hypot(dx, dz), edge = rim(Math.atan2(dz, dx));
-				if (d > edge) {
+				double inset = VillageLayout.rimInset(x, z);
+				if (inset < 0.0D) {
 					continue;
 				}
-				double inset = edge - d;
-				int depth = (int) Math.min(16.0D, 3.0D + inset * 0.45D);
+				int depth = (int) Math.min(20.0D, 3.0D + inset * 0.35D);
 				set(l, x, Y, z, inset < 1.3D ? "chiseled_sandstone" : "grass_block");
 				fill(l, x, Y - 3, z, x, Y - 1, z, inset < 1.3D ? "sandstone" : "dirt");
 				for (int i = 4; i <= depth; i++) {
-					String rock = i < 7 ? "stone" : i < 11 ? "deepslate" : (i + x + z) % 5 == 0 ? "tuff" : "deepslate";
+					String rock = i < 7 ? "stone" : i < 12 ? "deepslate" : (i + x + z) % 5 == 0 ? "tuff" : "deepslate";
 					set(l, x, Y - i, z, rock);
 				}
 				if (inset < 1.5D && (x * 7 + z * 13) % 4 == 0) {
@@ -67,8 +65,8 @@ final class VillagePlan {
 				}
 			}
 		}
-		// three waterfalls spilling off the rim into the void, from a stone lip
-		for (double theta : new double[]{0.6D, 2.4D, 4.3D}) {
+		// four waterfalls spilling off the rim into the void, from a stone lip (one below the pond)
+		for (double theta : new double[]{0.6D, 2.45D, 3.9D, 5.2D}) {
 			int x = (int) Math.round(CX + (rim(theta) - 2.0D) * Math.cos(theta));
 			int z = (int) Math.round(CZ + (rim(theta) - 2.0D) * Math.sin(theta));
 			fill(l, x - 1, Y, z - 1, x + 1, Y, z + 1, "stone");
@@ -80,28 +78,43 @@ final class VillagePlan {
 			set(l, x + ox, Y + 1, z + oz, "air");
 		}
 		// lantern posts on the kerb, not on the floor (Ahmi)
-		for (int i = 0; i < 8; i++) {
-			double theta = i * Math.PI / 4.0D + 0.35D;
+		for (int i = 0; i < 14; i++) {
+			double theta = i * Math.PI / 7.0D + 0.35D;
 			double along = rim(theta) - 3.0D;
 			int x = (int) Math.round(CX + along * Math.cos(theta));
 			int z = (int) Math.round(CZ + along * Math.sin(theta));
-			if (onIsland(x, z) && Math.hypot(x - PX, z - PZ) > 16.0D && Math.hypot(x, z - FOUNTAIN_Z) > 12.0D) {
+			if (VillageLayout.openGround(x, z) || (onIsland(x, z) && VillageLayout.rimInset(x, z) < 4.0D && clearOfPlots(x, z))) {
 				lamp(l, x, z);
 			}
 		}
 	}
 
+	private static boolean clearOfPlots(int x, int z) {
+		if (Math.abs(x) <= 5) {
+			return false;
+		}
+		for (VillageLayout.Plot p : VillageLayout.plots()) {
+			if (x >= p.x0() - 1 && x <= p.x1() + 1 && z >= p.z0() - 1 && z <= p.z1() + 1) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	// -------------------------------------------------------------- plaza
 
-	/** Paved circle around the arrival medallion with the medallion, lamps and flower beds. */
+	/** Paved circle around the arrival medallion with the medallion, lamps, benches and flower beds. */
 	static void plaza(ServerLevel l) {
-		for (int dx = -14; dx <= 14; dx++) {
-			for (int dz = -14; dz <= 14; dz++) {
+		int pr = VillageLayout.PLAZA_R;
+		for (int dx = -pr; dx <= pr; dx++) {
+			for (int dz = -pr; dz <= pr; dz++) {
 				double r = Math.hypot(dx, dz);
-				if (r > 13.5D) {
+				if (r > pr - 0.5D) {
 					continue;
 				}
-				String b = r > 12.5D ? "chiseled_sandstone" : (dx + dz) % 6 == 0 && r > 5.0D ? "cut_sandstone" : "smooth_sandstone";
+				String b = r > pr - 1.5D ? "chiseled_sandstone"
+						: (dx + dz) % 6 == 0 && r > 5.0D ? "cut_sandstone"
+						: r > 7.5D && r < 8.5D ? "smooth_red_sandstone" : "smooth_sandstone";
 				set(l, PX + dx, Y, PZ + dz, b);
 			}
 		}
@@ -118,23 +131,23 @@ final class VillagePlan {
 		set(l, PX, Y, PZ, "gold_block");
 		for (int sx : new int[]{-1, 1}) {
 			for (int sz : new int[]{-1, 1}) {
-				lamp(l, PX + sx * 9, PZ + sz * 9);
-				flowerBed(l, PX + sx * 12, PZ + sz * 5);
+				lamp(l, PX + sx * 11, PZ + sz * 11);
+				flowerBed(l, PX + sx * 13, PZ + sz * 6);
 			}
 		}
 		// tribe banners on the plaza rim
-		String[] colours = {"yellow", "blue", "green", "orange"};
+		String[] colours = {"yellow", "blue", "green", "orange", "red", "purple"};
 		int i = 0;
-		for (int[] p : new int[][]{{-13, 0}, {13, 0}, {-6, 13}, {6, 13}}) {
+		for (int[] p : new int[][]{{-15, 0}, {15, 0}, {-7, 14}, {7, 14}, {-7, -14}, {7, -14}}) {
 			set(l, PX + p[0], Y + 1, PZ + p[1], "stripped_oak_log");
 			set(l, PX + p[0], Y + 2, PZ + p[1], "stripped_oak_log");
-			set(l, PX + p[0], Y + 3, PZ + p[1], colours[i++ % 4] + "_banner[rotation=8]");
+			set(l, PX + p[0], Y + 3, PZ + p[1], colours[i++ % colours.length] + "_banner[rotation=8]");
 		}
-		// a clipped hedge round the plaza with gaps for the streets; the four lamp posts already carry lanterns
-		for (int dx = -15; dx <= 15; dx++) {
-			for (int dz = -15; dz <= 15; dz++) {
+		// a clipped hedge round the plaza with gaps for the streets
+		for (int dx = -pr - 1; dx <= pr + 1; dx++) {
+			for (int dz = -pr - 1; dz <= pr + 1; dz++) {
 				double r = Math.hypot(dx, dz);
-				if (r > 14.2D && r <= 15.2D && Math.abs(dx) > 3 && Math.abs(dz) > 3 && onIsland(PX + dx, PZ + dz)) {
+				if (r > pr - 0.3D && r <= pr + 0.7D && Math.abs(dx) > 3 && Math.abs(dz) > 3 && onIsland(PX + dx, PZ + dz)) {
 					set(l, PX + dx, Y + 1, PZ + dz, "oak_leaves[persistent=true]");
 					if ((dx * 7 + dz * 3) % 5 == 0) {
 						set(l, PX + dx, Y + 2, PZ + dz, "azalea_leaves[persistent=true]");
@@ -142,12 +155,13 @@ final class VillagePlan {
 				}
 			}
 		}
+		// benches round the medallion: the townsfolk gather here in the afternoon
 		for (int sx : new int[]{-1, 1}) {
 			for (int sz : new int[]{-1, 1}) {
 				String facing = sz < 0 ? "south" : "north";
-				set(l, PX + sx * 6 - 1, Y + 1, PZ + sz * 6, "oak_stairs[facing=" + facing + "]");
-				set(l, PX + sx * 6, Y + 1, PZ + sz * 6, "oak_stairs[facing=" + facing + "]");
-				set(l, PX + sx * 6 + 1, Y + 1, PZ + sz * 6, "oak_stairs[facing=" + facing + "]");
+				for (int k = -1; k <= 1; k++) {
+					set(l, PX + sx * 7 + k, Y + 1, PZ + sz * 7, "oak_stairs[facing=" + facing + "]");
+				}
 			}
 		}
 	}
@@ -169,52 +183,49 @@ final class VillagePlan {
 		set(l, cx - 1, Y + 1, cz + 1, "cornflower");
 	}
 
-	/** Roads: the avenue from the return gate to the arch, and two cross streets. */
-	static void roads(ServerLevel l, int z0, int z1) {
+	/** The avenue from the return gate to the arch, lamps and hedges along it. The streets are {@link VillageDistrict#lanes}. */
+	static void avenue(ServerLevel l, int z0, int z1) {
 		for (int z = z0 + 1; z < z1; z++) {
 			for (int x = -3; x <= 3; x++) {
 				set(l, x, Y, z, Math.abs(x) == 3 ? "cobblestone" : (z % 7 == 0 ? "stone_bricks" : "dirt_path"));
 			}
 		}
-		for (int z : new int[]{-62, -56, -92}) {
-			for (int x = -34; x <= 34; x++) {
-				if (Math.hypot(x - PX, z - PZ) > 13.5D && onIsland(x, z)) {
-					set(l, x, Y, z, "dirt_path");
-				}
-			}
-		}
-		for (int z = -96; z <= -40; z += 8) {
-			if (Math.hypot(0, z - PZ) > 14.0D) {
+		for (int z = z0 + 6; z <= z1 - 4; z += 8) {
+			if (besideAvenue(z)) {
 				lamp(l, -5, z);
 				lamp(l, 5, z);
 			}
 		}
-		// hedges along the avenue
 		for (int z = z0 + 4; z < z1 - 4; z++) {
-			boolean nearFountain = Math.hypot(4, z - FOUNTAIN_Z) < 12.5D;
-			if (Math.hypot(0, z - PZ) > 15.0D && z % 8 != 0 && Math.abs(z + 92) > 2 && !nearFountain && onIsland(4, z)) {
+			if (besideAvenue(z) && Math.floorMod(z - z0 - 6, 8) != 0 && onIsland(4, z)) {
 				set(l, -4, Y + 1, z, "oak_leaves[persistent=true]");
 				set(l, 4, Y + 1, z, "oak_leaves[persistent=true]");
 			}
 		}
 	}
 
+	/** Beside the avenue and not on the plaza, the fountain ring, a cross street or the winners' board. */
+	private static boolean besideAvenue(int z) {
+		return Math.abs(z - PZ) > VillageLayout.PLAZA_R + 1
+				&& Math.abs(z - FOUNTAIN_Z) > VillageLayout.FOUNTAIN_PAVE
+				&& Math.abs(z - VillageLayout.NORTH_ST_Z) > 2
+				&& Math.abs(z - VillageLayout.BOARD_Z) > 3
+				&& z < VillageLayout.ARCH_Z - 4 && z > VillageLayout.GATE_Z + 3;
+	}
+
 	// ----------------------------------------------------------- fountain
 
-	/** A round basin with a stylised chocobo standing in it, water spouting round its feet. */
+	/** A round basin with a stylised chocobo standing in it, and a little gold saucer at its feet. */
 	static void fountain(ServerLevel l, int cx, int cz) {
-		for (int dx = -5; dx <= 5; dx++) {
-			for (int dz = -5; dz <= 5; dz++) {
+		int br = VillageLayout.FOUNTAIN_R;
+		for (int dx = -br - 1; dx <= br + 1; dx++) {
+			for (int dz = -br - 1; dz <= br + 1; dz++) {
 				double r = Math.hypot(dx, dz);
-				if (r > 5.4D) {
+				if (r > br + 0.4D) {
 					continue;
 				}
 				set(l, cx + dx, Y, cz + dz, "smooth_sandstone");
-				if (r > 4.4D) {
-					set(l, cx + dx, Y + 1, cz + dz, "chiseled_sandstone");
-				} else {
-					set(l, cx + dx, Y + 1, cz + dz, "water");
-				}
+				set(l, cx + dx, Y + 1, cz + dz, r > br - 0.6D ? "chiseled_sandstone" : "water");
 			}
 		}
 		// pedestal and bird (facing south: head toward +z)
@@ -237,43 +248,73 @@ final class VillagePlan {
 		set(l, cx, Y + 11, cz, "yellow_concrete");
 		set(l, cx - 1, Y + 10, cz + 2, "yellow_concrete");
 		set(l, cx + 1, Y + 10, cz + 2, "yellow_concrete");
-		for (int sx : new int[]{-3, 3}) {
-			for (int sz : new int[]{-3, 3}) {
-				set(l, cx + sx, Y + 2, cz + sz, "sea_lantern");
+		for (int sx : new int[]{-4, 4}) {
+			for (int sz : new int[]{-4, 4}) {
+				set(l, cx + sx, Y + 1, cz + sz, "sea_lantern");
 			}
 		}
+		goldSaucer(l, cx, cz + 5);
 		// a paved ring round the basin joins the avenue on both sides and the streets east and west
-		for (int dx = -9; dx <= 9; dx++) {
-			for (int dz = -9; dz <= 9; dz++) {
+		int pave = VillageLayout.FOUNTAIN_PAVE;
+		for (int dx = -pave; dx <= pave; dx++) {
+			for (int dz = -pave; dz <= pave; dz++) {
 				double r = Math.hypot(dx, dz);
-				if (r > 5.4D && r <= 8.6D) {
-					set(l, cx + dx, Y, cz + dz, r > 7.6D ? "stone_bricks" : "dirt_path");
+				if (r > br + 0.4D && r <= pave - 0.4D) {
+					set(l, cx + dx, Y, cz + dz, r > pave - 1.4D ? "stone_bricks" : (dx * dz) % 5 == 0 ? "cut_sandstone" : "dirt_path");
 				}
 			}
 		}
-		for (int x = -20; x <= 20; x++) {
-			if (Math.abs(x) > 8 && onIsland(cx + x, cz)) {
-				fill(l, cx + x, Y, cz - 1, cx + x, Y, cz + 1, Math.abs(x) % 6 == 0 ? "stone_bricks" : "dirt_path");
-			}
-		}
+		// the plaque, on the rim in front of the saucer
+		SquareBuilder.sign(l, cx, Y + 1, cz + br + 1, "south", "chocobosreborn.sign.saucer.0", "chocobosreborn.sign.saucer.1",
+				"chocobosreborn.sign.saucer.2", "chocobosreborn.sign.saucer.3");
 	}
 
-	// -------------------------------------------------------- arch and pier
+	/**
+	 * Easter egg (Ahmi): a model of a golden saucer at the statue's feet, a nod to
+	 * the one in FF7. A dark pylon with a lit ring, the golden disc, a glass dome
+	 * with its glow, little domes round the rim and a spire. Our own blocks only.
+	 */
+	static void goldSaucer(ServerLevel l, int sx, int sz) {
+		set(l, sx, Y + 1, sz, "chiseled_polished_blackstone");
+		set(l, sx, Y + 2, sz, "polished_blackstone_wall");
+		set(l, sx, Y + 3, sz, "polished_blackstone_wall");
+		for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+			set(l, sx + d[0], Y + 2, sz + d[1], "end_rod[facing=up]");   // the lights up the tower
+		}
+		// the saucer: a golden disc three across with a rim of four arms
+		fill(l, sx - 1, Y + 4, sz - 1, sx + 1, Y + 4, sz + 1, "gold_block");
+		for (int[] d : new int[][]{{2, 0}, {-2, 0}, {0, 2}, {0, -2}}) {
+			set(l, sx + d[0], Y + 4, sz + d[1], "waxed_cut_copper_slab[type=top]");
+			set(l, sx + d[0], Y + 5, sz + d[1], "yellow_stained_glass");   // the small domes round the park
+		}
+		for (int[] d : new int[][]{{1, 1}, {-1, 1}, {1, -1}, {-1, -1}}) {
+			set(l, sx + d[0], Y + 5, sz + d[1], "yellow_stained_glass_pane");
+		}
+		set(l, sx, Y + 5, sz, "glowstone");                // the big dome, lit from inside
+		set(l, sx + 1, Y + 5, sz, "orange_stained_glass");
+		set(l, sx - 1, Y + 5, sz, "orange_stained_glass");
+		set(l, sx, Y + 5, sz + 1, "orange_stained_glass");
+		set(l, sx, Y + 5, sz - 1, "orange_stained_glass");
+		set(l, sx, Y + 6, sz, "end_rod[facing=up]");       // the spire
+	}
 
-	/** A railed overlook behind the arch on the island's edge: the courses float out beyond it. */
-	static void overlook(ServerLevel l, int z0) {
-		int cz = z0 + 6;
-		for (int dx = -9; dx <= 9; dx++) {
-			for (int dz = 0; dz <= 9; dz++) {
-				double r = Math.hypot(dx, dz);
-				if (r > 9.4D) {
+	// ------------------------------------------------------ the overlook
+
+	/** A railed terrace beyond the arch on the island's edge: the courses float out beyond it. */
+	static void overlook(ServerLevel l, int archZ) {
+		int cz = VillageLayout.OVERLOOK_Z, or = VillageLayout.OVERLOOK_R;
+		for (int dx = -or; dx <= or; dx++) {
+			for (int dz = -3; dz <= or; dz++) {
+				double r = Math.hypot(dx, Math.max(0, dz));
+				if (r > or + 0.4D) {
 					continue;
 				}
 				// the terrace carries its own rock: the island rim wobbles and left benches over the void
-				int depth = (int) (2.0D + (9.4D - r) * 0.8D);
+				int depth = (int) (2.0D + (or + 0.4D - r) * 0.8D);
 				fill(l, dx, Y - depth, cz + dz, dx, Y - 1, cz + dz, "stone");
-				set(l, dx, Y, cz + dz, r > 8.4D ? "cut_sandstone" : (dx + dz) % 5 == 0 ? "chiseled_sandstone" : "smooth_sandstone");
-				if (r > 8.4D) {
+				boolean edge = r > or - 0.6D && dz >= 0;
+				set(l, dx, Y, cz + dz, edge ? "cut_sandstone" : (dx + dz) % 5 == 0 ? "chiseled_sandstone" : "smooth_sandstone");
+				if (edge) {
 					set(l, dx, Y + 1, cz + dz, "sandstone_wall");
 					if ((dx + dz) % 6 == 0) {
 						set(l, dx, Y + 2, cz + dz, "lantern[hanging=false]");   // on the rail, not on the ground
@@ -281,43 +322,17 @@ final class VillagePlan {
 				}
 			}
 		}
-		fill(l, -2, Y, z0, 2, Y, cz, "smooth_sandstone");
+		fill(l, -2, Y, archZ, 2, Y, cz, "smooth_sandstone");
 		for (int sx : new int[]{-1, 1}) {
-			set(l, sx * 7 - 1, Y + 1, cz + 3, "oak_stairs[facing=" + (sx < 0 ? "east" : "west") + "]");
-			set(l, sx * 7, Y + 1, cz + 3, "oak_stairs[facing=" + (sx < 0 ? "east" : "west") + "]");
-		}
-		fill(l, 0, Y + 1, cz + 7, 0, Y + 3, cz + 7, "stripped_oak_log");
-		set(l, 0, Y + 4, cz + 7, "sea_lantern");
-		set(l, 0, Y + 5, cz + 7, "yellow_banner[rotation=0]");
-		SquareBuilder.sign(l, 0, Y + 2, cz + 6, "north", "chocobosreborn.sign.pier.0", "chocobosreborn.sign.pier.1", "chocobosreborn.sign.pier.2", "chocobosreborn.sign.pier.3");
-	}
-
-	/** A railed pier of planks running north from the arch over the void, ending on a viewing deck. */
-	static void pier(ServerLevel l, int z0, int z1) {
-		for (int z = z0; z >= z1; z--) {
-			fill(l, -2, Y, z, 2, Y, z, "spruce_planks");
-			fill(l, -3, Y, z, -3, Y, z, "stripped_spruce_log");
-			fill(l, 3, Y, z, 3, Y, z, "stripped_spruce_log");
-			set(l, -3, Y + 1, z, (z - z1) % 6 == 0 ? "lantern[hanging=false]" : "spruce_fence");
-			set(l, 3, Y + 1, z, (z - z1) % 6 == 0 ? "lantern[hanging=false]" : "spruce_fence");
-			if (z % 4 == 0) {
-				fill(l, -3, Y - 4, z, -3, Y - 1, z, "stripped_spruce_log");
-				fill(l, 3, Y - 4, z, 3, Y - 1, z, "stripped_spruce_log");
+			for (int k = 0; k < 3; k++) {
+				set(l, sx * (7 + k) , Y + 1, cz + 2, "oak_stairs[facing=north]");
 			}
 		}
-		int dz = z1 - 4;
-		fill(l, -6, Y, dz - 4, 6, Y, dz + 4, "spruce_planks");
-		fill(l, -6, Y - 1, dz - 4, 6, Y - 1, dz + 4, "stripped_spruce_log");
-		for (int x = -6; x <= 6; x++) {
-			set(l, x, Y + 1, dz - 4, x % 4 == 0 ? "lantern[hanging=false]" : "spruce_fence");
-		}
-		for (int z = dz - 4; z <= dz + 4; z++) {
-			set(l, -6, Y + 1, z, "spruce_fence");
-			set(l, 6, Y + 1, z, "spruce_fence");
-		}
-		set(l, 0, Y + 1, dz, "campfire[lit=true]");
-		set(l, -3, Y + 1, dz, "spruce_stairs[facing=east]");
-		set(l, 3, Y + 1, dz, "spruce_stairs[facing=west]");
+		fill(l, 0, Y + 1, cz + or - 1, 0, Y + 3, cz + or - 1, "stripped_oak_log");
+		set(l, 0, Y + 4, cz + or - 1, "sea_lantern");
+		set(l, 0, Y + 5, cz + or - 1, "yellow_banner[rotation=0]");
+		SquareBuilder.sign(l, 0, Y + 2, cz + or - 2, "north", "chocobosreborn.sign.pier.0", "chocobosreborn.sign.pier.1",
+				"chocobosreborn.sign.pier.2", "chocobosreborn.sign.pier.3");
 	}
 
 	/** A small islet with a shrine (gold egg on a lectern under a gazebo), joined by a rope bridge. */
@@ -346,7 +361,7 @@ final class VillagePlan {
 		set(l, cx, Y + 2, cz, "gold_block");
 		set(l, cx - 1, Y + 1, cz + 1, "cherry_sapling");
 		set(l, cx + 1, Y + 1, cz - 1, "cherry_sapling");
-		// bridge: straight line of planks with fence rails between the two points
+		// bridge: a line of planks with rope rails between the two points
 		int steps = Math.max(Math.abs(cx - fromX), Math.abs(cz - fromZ));
 		for (int i = 0; i <= steps; i++) {
 			int x = fromX + (cx - fromX) * i / steps, z = fromZ + (cz - fromZ) * i / steps;
@@ -359,44 +374,6 @@ final class VillagePlan {
 				}
 			}
 		}
-	}
-
-	/**
-	 * Practice gates on the town side of the arch, flanking the avenue: a fun sprint
-	 * (west, yellow) and a fun grand prix (east, blue). Ride or click to start.
-	 */
-	static void funGates(ServerLevel l) {
-		funGate(l, VillageLayout.FUN_GATE_WEST_X, VillageLayout.FUN_GATE_Z, SquareGateBlock.Kind.SHORT_COURSE, true);
-		funGate(l, VillageLayout.FUN_GATE_EAST_X, VillageLayout.FUN_GATE_Z, SquareGateBlock.Kind.LONG_COURSE, false);
-	}
-
-	private static void funGate(ServerLevel l, int x, int z, SquareGateBlock.Kind kind, boolean faceEast) {
-		int dir = faceEast ? 1 : -1;
-		String toward = faceEast ? "east" : "west";
-		String away = faceEast ? "west" : "east";
-		fill(l, x - 1, Y, z - 2, x + 1, Y, z + 2, "polished_andesite");
-		fill(l, x, Y + 1, z - 2, x, Y + 5, z + 2, "stone_bricks");
-		fill(l, x, Y + 1, z - 1, x, Y + 3, z + 1, "air");
-		set(l, x, Y + 5, z, "chiseled_stone_bricks");
-		set(l, x, Y + 4, z - 2, "stone_brick_stairs[facing=south,half=top]");
-		set(l, x, Y + 4, z + 2, "stone_brick_stairs[facing=north,half=top]");
-		set(l, x, Y + 1, z - 2, "stone_brick_wall");
-		set(l, x, Y + 1, z + 2, "stone_brick_wall");
-		set(l, x, Y + 2, z - 2, "lantern[hanging=false]");
-		set(l, x, Y + 2, z + 2, "lantern[hanging=false]");
-		for (int dz = -1; dz <= 1; dz++) {
-			l.setBlock(new BlockPos(x + dir, Y + 1, z + dz), ModBlocks.SQUARE_GATE.get().defaultBlockState()
-					.setValue(SquareGateBlock.KIND, kind), 2);
-			set(l, x + dir, Y + 4, z + dz, "sea_lantern");
-		}
-		String shortOrLong = kind == SquareGateBlock.Kind.SHORT_COURSE ? "fun_short" : "fun_long";
-		SquareBuilder.sign(l, x + dir, Y + 3, z - 2, toward, "chocobosreborn.sign." + shortOrLong + ".0",
-				"chocobosreborn.sign." + shortOrLong + ".1", "chocobosreborn.sign." + shortOrLong + ".2",
-				"chocobosreborn.sign." + shortOrLong + ".3");
-		SquareBuilder.sign(l, x + dir, Y + 3, z + 2, toward, "chocobosreborn.sign." + shortOrLong + ".0",
-				"chocobosreborn.sign." + shortOrLong + ".1", "chocobosreborn.sign." + shortOrLong + ".2",
-				"chocobosreborn.sign." + shortOrLong + ".3");
-		set(l, x - dir, Y + 1, z, "stone_brick_stairs[facing=" + away + "]");
 	}
 
 	/** A small farmed gysahl bed beside Sage Wynn's stall. */
@@ -418,25 +395,31 @@ final class VillagePlan {
 				"chocobosreborn.sign.gysahl.1", "chocobosreborn.sign.gysahl.2", "chocobosreborn.sign.gysahl.3");
 	}
 
-	/** The return portal on the south edge: a stone frame around the gate block. */
+	/** The return portal at the north end of the avenue: a gold-trimmed stone frame round the gate light. */
 	static void returnGate(ServerLevel l, int z) {
-		fill(l, -3, Y, z - 1, 3, Y, z + 1, "polished_andesite");
-		fill(l, -2, Y + 1, z, 2, Y + 5, z, "stone_bricks");
-		fill(l, -1, Y + 1, z, 1, Y + 3, z, "air");
-		set(l, 0, Y + 5, z, "chiseled_stone_bricks");
-		set(l, -2, Y + 4, z, "stone_brick_stairs[facing=east,half=top]");
-		set(l, 2, Y + 4, z, "stone_brick_stairs[facing=west,half=top]");
-		set(l, -1, Y + 4, z, "stone_brick_stairs[facing=east,half=top]");
-		set(l, 1, Y + 4, z, "stone_brick_stairs[facing=west,half=top]");
-		set(l, -3, Y + 1, z, "stone_brick_wall");
-		set(l, 3, Y + 1, z, "stone_brick_wall");
-		set(l, -3, Y + 2, z, "lantern[hanging=false]");
-		set(l, 3, Y + 2, z, "lantern[hanging=false]");
+		fill(l, -4, Y, z - 2, 4, Y, z + 2, "polished_andesite");
+		fill(l, -3, Y, z - 1, 3, Y, z + 1, "smooth_stone");
+		fill(l, -2, Y + 1, z, 2, Y + 6, z, "stone_bricks");
+		fill(l, -1, Y + 1, z, 1, Y + 4, z, "air");
+		set(l, 0, Y + 6, z, "chiseled_stone_bricks");
+		set(l, 0, Y + 7, z, "gold_block");
+		set(l, -2, Y + 5, z, "stone_brick_stairs[facing=east,half=top]");
+		set(l, 2, Y + 5, z, "stone_brick_stairs[facing=west,half=top]");
+		set(l, -1, Y + 5, z, "stone_brick_stairs[facing=east,half=top]");
+		set(l, 1, Y + 5, z, "stone_brick_stairs[facing=west,half=top]");
+		for (int sx : new int[]{-3, 3}) {
+			set(l, sx, Y + 1, z, "stone_brick_wall");
+			set(l, sx, Y + 2, z, "stone_brick_wall");
+			set(l, sx, Y + 3, z, "lantern[hanging=false]");
+			set(l, sx, Y + 1, z + 2, "potted_azure_bluet");
+		}
+		set(l, -2, Y + 6, z + 1, "yellow_wall_banner[facing=south]");
+		set(l, 2, Y + 6, z + 1, "yellow_wall_banner[facing=south]");
 		// three gate blocks across the alcove, lit from above, so any path through it goes home
 		for (int x = -1; x <= 1; x++) {
 			l.setBlock(new BlockPos(x, Y + 1, z + 1), ModBlocks.SQUARE_GATE.get().defaultBlockState()
 					.setValue(SquareGateBlock.KIND, SquareGateBlock.Kind.RETURN_GATE), 2);
-			set(l, x, Y + 4, z + 1, "sea_lantern");
+			set(l, x, Y + 5, z + 1, "sea_lantern");
 		}
 		// the town lies south of this gate (larger z): the signs hang on the frame's south face, read from the town
 		SquareBuilder.sign(l, -2, Y + 3, z + 1, "south", "chocobosreborn.sign.gate.0", "chocobosreborn.sign.gate.1", "chocobosreborn.sign.gate.2", "chocobosreborn.sign.gate.3");

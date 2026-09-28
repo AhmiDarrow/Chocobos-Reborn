@@ -29,7 +29,19 @@ public enum TownRole {
 	JOCKEY_SOIL("drummer", "soil", 0x8b5a2b),
 	JOCKEY_CLAW("hunter", "claw", 0xb8512f),
 	JOCKEY_TEIYO("elder", "spindle", 0x62d1c9),  // the named rivals' jockeys
-	JOCKEY_JOLO("drummer", "swarm", 0xd7b23c);
+	JOCKEY_JOLO("drummer", "swarm", 0xd7b23c),
+	// Whiskerwind's townsfolk: they keep a day (home, work, the fountain, the inn) and
+	// line the overlook when a heat is called. They chat but never trade or teleport.
+	RESIDENT_RANCHER("hunter", "soil", 0x8b5a2b),
+	RESIDENT_NURSE("weaver", "sprout", 0x4f9a5a),
+	RESIDENT_GARDENER("weaver", "sprout", 0x4f9a5a),
+	RESIDENT_FISHER("drummer", "claw", 0xb8512f),
+	RESIDENT_MILLER("elder", "soil", 0x8b5a2b),
+	RESIDENT_GROCER("weaver", "clock", 0x4a7fb5),
+	RESIDENT_FISHMONGER("drummer", "swarm", 0xd7b23c),
+	RESIDENT_JOCKEY_A("hunter", "spindle", 0x62d1c9),
+	RESIDENT_JOCKEY_B("hunter", "claw", 0xb8512f),
+	RESIDENT_CLERK("elder", "clock", 0x4a7fb5);
 
 	private final String skin;
 	private final String tribe;
@@ -54,6 +66,11 @@ public enum TownRole {
 	/** Spectators: cheer, never trade or teleport anyone. */
 	public boolean fans() {
 		return this == FAN_SWARM || this == FAN_CLOCK || this == FAN_SPROUT || this == FAN_CLAW;
+	}
+
+	/** Townsfolk with a daily routine: they walk, chat and cheer, nothing else. */
+	public boolean resident() {
+		return name().startsWith("RESIDENT_");
 	}
 
 	/** Behaves like Esther: sends a saddled rider to Chocobo Square, or home again. */

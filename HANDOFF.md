@@ -1,6 +1,6 @@
-# Current release: 1.0.17 — Held pace
+# Current release: 1.0.18 — Race day
 
-Other birds follow the server stream, the field holds its own pace, and nine points promote. See [release notes](docs/RELEASE_1.0.17.md). The unit suite passed on this commit, including promotion, purse, glide, pace, blink, and tail tests. The five-profile meadow race from this PC to 192.168.0.13 finished with no vehicle correction. GameTests were not re-run for 1.0.17. Server and every rider need this jar. Publication records are in docs/curseforge.md. The 1.0.16 notes remain in docs/RELEASE_1.0.16.md. The historical handoff below predates these releases.
+Other birds' legs move again, class C is a race, Teiyo and Jolo pace off the rider's bird, stands and a client-drawn crowd by class, and Whiskerwind v13 (1.5x, townsfolk, bell, winners' board, a gold saucer at the fountain). See [release notes](docs/RELEASE_1.0.18.md) and the two 2026-09-27 sections near the end. Gates on this commit: 186 unit tests, 27 GameTests, jar. Not yet seen in a client. Server and every rider need this jar. Publication records are in docs/curseforge.md.
 
 # Chocobos Reborn — session handoff (internal)
 
@@ -1043,10 +1043,151 @@ The sheet is the working preview, **not the gate** — the gate is the saddle.
 
 Gates: 136 unit tests, 11 GameTests, jar builds.
 
+## Legs, class C, the rivals, Whiskerwind v13 (2026-09-27, unreleased; Ahmi: "class c is too easy, and ai birds legs don't seem to ever move"; "the town needs a rework ... increase its size by about 50% make it feel more alive"; research FF7 and adjust)
+
+### Frozen legs on other birds
+
+1.0.17's `ChocoboEntity.travel` returns early on a client for any bird it does not
+drive (the server stream places it). Vanilla feeds `walkAnimation` from the end of
+`travel`, so every AI bird's and every other rider's legs froze. The early return
+now calls `calculateEntityAnimation(false)` first. Not yet seen in a client.
+
+### Class C, and why 1.0.17 made it easy
+
+1.0.17 put `gradeSpeedMul` on the AI stack (`RacerGoal`), and `grade()` includes one
+step per 120 training points. So the C field ran as Average (x0.94, 22 training x4 =
+88 < 120) and lost C's 10 % rubber band at the same time: a C bird cruised ~0.86 of a
+fresh Good bird. B/A/S got faster in 1.0.17 for the same reason (B Great 1.10, A and
+S Wonderful 1.18). Now:
+
+* C field training 34 (±4 still crosses the first step, so C races at Good), cruise
+  0.845 -> 0.880, reaction 14-26 (was 16-30), stumbles 0.7/lap (was 1.0).
+  `RaceScoring.fieldPace(C)` = 0.985 (was 0.855): a fresh Good bird with no training
+  now has a race. `FieldPaceTest` pins it and the C<B<A<S order.
+* **Teiyo / Jolo run off the rider's bird (FF7 Teioh).** At the grid,
+  `RaceScoring.rivalPace` = max(field x1.06, share x best rider's `speedMul()`),
+  share B 1.00 / A 1.05 / S 1.10; Jolo 4 % under Teiyo. `RacerGoal.paceScale` scales
+  the rival's own stack onto that. Before this a B Teiyo cruised ~1.64 (Wonderful from
+  400 training points x the old x1.17), ~45 % over the B field. Set once per heat, so
+  "the field holds its own pace" still holds.
+* **Colours.** Jolo rides Blue in B, White in A, Gold only in S
+  (`RaceScoring.joloColor`). The S fallback colour is Blue, not Gold. `FieldRoster`
+  class B is Yellow / Green / Blue only (Vincent, Rude, Tseng, Nanaki, Rufus Blue;
+  Reno, Reeve Green; Elena, Scarlet Yellow); class A lost two Blacks and a Yellow to
+  Green / Blue (Kiros, Steiner Green; Vivi Blue). No roster bird is Gold.
+
+FF7 research (agent, sources: FF wiki Chocobo Square / Teioh / breeding, gmo7897
+GameFAQs guide) suggested but **not done**: Teiyo appearance odds B 1/8, A 1/4, S 1/2
+(needs pre-heat bets on him refunded when he does not show), promotion 3 wins
+(= 6 points, sprint 2 / GP 3), R1+R2-style faster stamina refill when holding back,
+pooled breeding wins (FF7 pools the pair's wins: 4 / 9 / 12, 10 % with none), a
+quinella bet, Teiyo x1.25 stamina (`ChocoboEntity.maxStamina` passes teioh=false).
+The research also noted `RacerProfile.energyDrain/energyRecover` are unused: the AI
+spends the same stamina pool as a rider.
+
+### Whiskerwind v13 (PADDOCK_VERSION 13)
+
+`VillageLayout` is the Minecraft-free source of every position: RADIUS 46 -> 69 round
+the same centre (0, -72); plaza (0, -52) r16 (ARRIVAL and `RaceTrack.PADDOCK_Z` moved
+to z -51.5); fountain (0, -84) basin r7 inside a paved ring r12; arch z -24 and the
+overlook r12 beyond it (Esther at z -16.5); return gate z -126. `plots()` lists every
+footprint; `VillagePlanTest` asserts all on the island (0.5 in from the rim) and none
+overlapping, plus residents housed, the schedule, keys translated.
+
+* Old landmarks spread 1.5x: race hall (39, -51), inn (-39, -75), stable (42, -87),
+  windmill (-47, -95), stalls at x ±22.5 round the plaza, Exchange / Rook at x ±15.5
+  past the fountain, Sable / Pell at x ±24.5 on the north street.
+* New (`VillageDistrict`, `VillageBuildings.nestBarn / jockeyLounge`): 8 cottages,
+  streets and lanes as polylines (never pave a plot), a ranch paddock (fence gap 1 wide:
+  grown birds stay in, kin walk through), a closed chick nursery by the nest barn
+  (turtle eggs on hay: they never hatch off sand), a pond with a dock (a waterfall
+  below it), an orchard with the bridge to the shrine islet (now (-38, -158)), the
+  winners' board (x 5..13, z -30) by the arch, two fingerposts (arrows relative to the
+  reader), fruit and fish stalls, trees on a jittered grid (`scatter`).
+* **Practice gates removed** (Ahmi). `SquareGateBlock` SHORT/LONG kinds and
+  `RaceScoring.funGateCourse` are left for old block states; nothing places them.
+  Home sign now says "the north gate".
+* **Easter egg (Ahmi): a gold saucer model at the statue's feet** (`goldSaucer`,
+  5 south of the statue in the basin: blackstone pylon with end-rod lights, 3x3 gold
+  disc with copper arms, glass domes lit by glowstone, end-rod spire) with a plaque
+  "a souvenir from a saucer of gold, far far away". Vanilla blocks only.
+* **Townsfolk**: 10 `TownRole.RESIDENT_*` kin (Tamsin, Orrin, Brisa, Hobb, Wren, Lark,
+  Mabry, Pip, Dunmore, Quill), posted at home in `TownPosts`, `TownRoutineGoal`
+  (thinks once a second): home at night, work 1000-8000, fountain/plaza to 10500, the
+  inn to 12500; a heat within 90 s or running (`TownLife.heatLive`) sends them to the
+  overlook rail (not at night), and they cheer (`DATA_CHEER`, renderer arms-up) for the
+  last 10 s and the race. Doors open (OpenDoorGoal), FOLLOW_RANGE 48, partial paths
+  resume, a walker stuck 45 s out of sight steps onto its spot. Keeper sync leaves
+  residents alone unless >110 blocks off or fallen. Click: their own line or one of 18
+  tips (`chocobosreborn.gossip.N`, all checked against the rules).
+* **Town birds by patch** (`SquareBuilder.FLOCKS`, `ChocoboEntity.setTownHome`, saved
+  as `TownHome`): 6 grazing in the ranch, 2 saddled in the stable yard, 3 chicks in the
+  nursery (a town chick's age is held, it never grows). Strays are replaced.
+* **Race day** (`TownLife`): the inn bell rings 3 strokes at the 2- and 1-minute calls
+  and 5 at GO; the winners' board keeps each class's last ranked winner (SquareData
+  `Winners`; AI regulars count; an unnamed bird shows its colour); a rider's ranked win
+  fires five rockets over the plaza.
+
+Not yet seen in a client: all of the above. First visit rebuilds the village (a
+few seconds; players are held above the plaza and put back).
+
+## Stands and crowd (2026-09-27, Ahmi: "we need more stands and fans, the tracks feel kind of dead; stands inside and outside, class based, S the most popular; as lag free as possible")
+
+* **Siting** (`race/CourseStands`, pure, shared by server and client): the main
+  infield stand on the start straight stays; each class adds more, alternating inside
+  / outside the loop: C +2 (3 total), B +4 (5), A +6 (7), S +9 (10). Rows: main C/B 4,
+  A 5, S 6; extras C 3-4, B 4, A 4-5, S 5-6; extras are 22 / 26 / 28 / 32 blocks long.
+  A site is searched outward from an even spread round the lap and must be off the start
+  zone, 12 blocks clear of every terrain feature (connectors included) and boost strip,
+  22 of the landmark, on a straight or gentle sweeper (turn <= 0.30, then 0.55 / 0.8
+  rad, then a 70 % length), level within 2 blocks, 8 blocks from a stand on the same
+  side, and its whole footprint must be > 3 blocks (tile-centre distance, `CLEAR2` 9)
+  from **every** road tile of the lap (a circuit folds back on itself) and from other
+  stands, the back wall > 6. Road tiles come from `RaceCourseLayout.roadTiles` (the
+  band + detour stamps without the block plan), checked on a distance grid. All 24
+  courses get their full count (C 2 in / 1 out; B 3 / 2; A 3-4 / 3-4; S 5-6 / 4-5).
+* **Stand geometry** uses `CourseStands.lane`, a lane point with the normal blended
+  between spline samples: `pointAtLane`'s stepped normal leaves gaps 20 blocks out on
+  a bend. `stampGround` widens the island under each stand to back wall + 3 (either
+  side), easing back over 6 blocks past the ends so the rim still tapers, and
+  `groundUnderStands` fills any column the stamp missed; a stand floor is the highest
+  road level alongside it, with a plinth where the ground dips.
+* **Looks** (`RaceCourseLayout.buildStand`): C wooden benches (oak / cherry / bamboo by
+  theme) under a green and white awning; B / A the quartz stand with yellow / red aisles
+  under the yellow awning; S grand stands: theme-kerb aisles, taller back wall, solid
+  roof with a kerb trim, flag poles on the roof, wall banners every 2 blocks. Front posts
+  carry the lamps; decoration, flags, verge and lamps keep off stands (`sidesAt`,
+  `nearStand`).
+* **Fans** are `FanPost(x, y, z, yaw, stand)` on seat cells only (never a post or banner
+  column), a deterministic scatter weighted to front rows and the middle, >= 3 per stand;
+  class targets 40 / 80 / 140 / 220 with a +-10 % per-course wobble. Totals: C 36-43,
+  B 72-88, A 129-151, S 198-242.
+* **No fan entities any more.** `RaceSession.spawnFans` and its list are gone;
+  `SquareBuilder.spawnKeepers` still scrubs strays from old worlds. The crowd is drawn by
+  `client/CourseCrowdRenderer` (game bus, `RenderLevelStageEvent` AFTER_ENTITIES), Square
+  only, for courses whose island is within reach of the camera; plans are computed off
+  the render thread on first approach. Per stand: box distance + frustum cull, a check
+  that the stand is built (seat block under the light probe, so an island still on an
+  older plan shows no floating fans), one light sample, one "racing birds within 48"
+  test (bird positions refreshed twice a second per course). Per fan: 96-block and
+  frustum cull, then LOD: < 40 animated (sway, look about; arms up + hop while birds are
+  near) with skin, cloak and eye glow; 40-72 one of two precomputed poses, skin + cloak;
+  72-96 skin only. Draws grouped by texture (<= 12 render-type switches), kin geometry
+  captured once from the baked `KinStewardRenderer.LAYER` and emitted through reused
+  matrices (no allocation in the hot loop). Looks: FAN_SWARM / CLOCK / SPROUT / CLAW
+  picked per fan from a hash, with a 0.90-1.04 size wobble.
+* **`COURSE_VERSION` 8 -> 9.** Tests: `CourseCrowdTest` (per-class stand counts, fan
+  ranges, strictly increasing by class, both sides on every course, no stand block
+  within 3 of any road tile, every fan on a seat in its stand box facing the road, island
+  under every seat column); `RaceTrackTest` no longer pins 8 fans. 172 unit tests green.
+* **Needs an in-game look:** crowd facing and hop, cloak / glow alignment on the
+  captured mesh, light under the S roofs, wall-banner support on diagonal stands,
+  frame time on an S course with the whole crowd in view.
+
 ## Open
 
 1. In-game test pass: the new circuits (hills, kerbs, rails, detours, boost pads,
-   bogs, lava), the infield grandstand crowd, the rebuilt village, saddle combat,
+   bogs, lava), the class-based stands and the drawn crowd, the rebuilt village, saddle combat,
    AI on hairpins, music loop.
 2. Keepers share one model (textures differ per role); a hat / apron per role
    would be next. `kin_elder.png` is used (STEWARD, EXCHANGE, FAN_CLAW).

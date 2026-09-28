@@ -20,7 +20,7 @@ public final class Square {
 			ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "square"));
 
 	/** Where a visiting bird lands, facing the course. */
-	public static final Vec3 ARRIVAL = new Vec3(0.5D, 65.0D, -58.5D);
+	public static final Vec3 ARRIVAL = new Vec3(0.5D, 65.0D, -51.5D);
 	public static final float ARRIVAL_YAW = 180.0F;
 
 	private Square() {

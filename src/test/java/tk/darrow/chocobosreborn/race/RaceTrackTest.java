@@ -374,10 +374,10 @@ class RaceTrackTest {
 		for (RaceTrack track : RaceTrack.values()) {
 			assertTrue(RaceCourseLayout.of(track).blocks().size() > 20_000, track.name() + " dressed");
 		}
-		// the grandstand: eight fans, each standing on a placed block, in the infield off the road
+		// the crowd: every fan standing on a placed block, off the road (CourseCrowdTest has the rest)
 		for (RaceTrack track : RaceTrack.values()) {
 			RaceCourseLayout lay = RaceCourseLayout.of(track);
-			assertEquals(8, lay.fanPosts().size(), track.name());
+			assertTrue(lay.fanPosts().size() >= 30, track.name());
 			for (RaceCourseLayout.FanPost f : lay.fanPosts()) {
 				var below = new RaceCourseLayout.Cell((int) Math.floor(f.x()), (int) Math.floor(f.y()) - 1, (int) Math.floor(f.z()));
 				assertTrue(lay.blocks().containsKey(below), track.name() + " fan floats at " + f);
@@ -395,13 +395,14 @@ class RaceTrackTest {
 	}
 
 	@Test
-	void courseVersionEightRelaysTheIslands() {
+	void courseVersionNineRelaysTheIslands() {
 		// 6: the stamp gaps that dropped a racer through the island into the void are
 		// plugged; 7: the plan is stamped in layers, so scenery, rails and pools no
 		// longer land on the racing line; 8: the River cairn's spring sits in a basin, and
-		// a relay clears what older plans left (stray water washed the boost pads out).
+		// a relay clears what older plans left (stray water washed the boost pads out); 9: class-based
+		// stands inside and outside the loop, the island ground reaching under each.
 		// Older islands have to be re-laid either way.
-		assertEquals(8, SquareBuilder.COURSE_VERSION);
+		assertEquals(9, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

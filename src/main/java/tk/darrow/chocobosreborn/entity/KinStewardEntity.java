@@ -43,6 +43,7 @@ import tk.darrow.chocobosreborn.race.RaceSession;
 import tk.darrow.chocobosreborn.race.RaceShops;
 import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.race.TownRole;
+import tk.darrow.chocobosreborn.race.TownRoutineGoal;
 
 /**
  * Chocobo Kin: Esther the Square Steward, the bookie, and the stall
@@ -52,6 +53,12 @@ import tk.darrow.chocobosreborn.race.TownRole;
 public class KinStewardEntity extends PathfinderMob implements Merchant {
 	private static final EntityDataAccessor<Integer> DATA_ROLE =
 			SynchedEntityData.defineId(KinStewardEntity.class, EntityDataSerializers.INT);
+	/** A resident at the overlook while a heat is live: arms up. Set by {@link TownRoutineGoal}. */
+	private static final EntityDataAccessor<Boolean> DATA_CHEER =
+			SynchedEntityData.defineId(KinStewardEntity.class, EntityDataSerializers.BOOLEAN);
+	/** Tips the townsfolk share (lang chocobosreborn.gossip.N). */
+	private static final int GOSSIP_LINES = 18;
+	private boolean residentGoals;
 
 	@Nullable
 	private Player tradingPlayer;
@@ -67,13 +74,15 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 	public static AttributeSupplier.Builder createAttributes() {
 		return PathfinderMob.createMobAttributes()
 				.add(Attributes.MAX_HEALTH, 40.0D)
-				.add(Attributes.MOVEMENT_SPEED, 0.25D);
+				.add(Attributes.MOVEMENT_SPEED, 0.25D)
+				.add(Attributes.FOLLOW_RANGE, 48.0D);   // residents walk the whole island in one path
 	}
 
 	@Override
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		super.defineSynchedData(builder);
 		builder.define(DATA_ROLE, TownRole.STEWARD.ordinal());
+		builder.define(DATA_CHEER, false);
 	}
 
 	@Override
@@ -119,6 +128,32 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		this.entityData.set(DATA_ROLE, role.ordinal());
 		this.setCustomName(Component.translatable("chocobosreborn.kin." + role.id()));
 		this.offers = null;
+		if (role.resident() && !level().isClientSide) {
+			installResident();
+		}
+	}
+
+	/** Townsfolk: open doors, walk the day, glance at passers-by. */
+	private void installResident() {
+		int index = TownRoutineGoal.indexOf(role());
+		if (residentGoals || index < 0) {
+			return;
+		}
+		residentGoals = true;
+		this.goalSelector.removeAllGoals(g -> true);
+		if (getNavigation() instanceof net.minecraft.world.entity.ai.navigation.GroundPathNavigation ground) {
+			ground.setCanOpenDoors(true);
+		}
+		this.goalSelector.addGoal(1, new net.minecraft.world.entity.ai.goal.OpenDoorGoal(this, true));
+		this.goalSelector.addGoal(2, new TownRoutineGoal(this, index));
+		this.goalSelector.addGoal(3, new LookAtPlayerGoal(this, Player.class, 6.0F));
+		this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));
+	}
+
+	public void setCheering(boolean on) {
+		if (this.entityData.get(DATA_CHEER) != on) {
+			this.entityData.set(DATA_CHEER, on);
+		}
 	}
 
 	@Override
@@ -173,6 +208,14 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		}
 		if (role.fans()) {
 			sp.displayClientMessage(Component.translatable("chocobosreborn.fan.cheer." + random.nextInt(4)), true);
+			return InteractionResult.CONSUME;
+		}
+		if (role.resident()) {
+			// a word about their own work, or a tip the whole town knows
+			Component line = random.nextInt(5) < 2 ? Component.translatable("chocobosreborn.resident." + role.id())
+					: Component.translatable("chocobosreborn.gossip." + random.nextInt(GOSSIP_LINES));
+			sp.sendSystemMessage(Component.translatable("chocobosreborn.resident.say", getDisplayName(), line));
+			getLookControl().setLookAt(sp);
 			return InteractionResult.CONSUME;
 		}
 		if (role.jockey()) {
@@ -472,6 +515,9 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 	 * second, then a distance check. The renderer is the only caller, on the client.
 	 */
 	public boolean cheering() {
+		if (role().resident()) {
+			return this.entityData.get(DATA_CHEER);
+		}
 		if (!role().fans() || !level().isClientSide) {
 			return false;
 		}

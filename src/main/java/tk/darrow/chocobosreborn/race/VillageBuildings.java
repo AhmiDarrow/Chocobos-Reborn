@@ -388,6 +388,81 @@ final class VillageBuildings {
 		}
 	}
 
+	/**
+	 * The nest barn: a plank barn with a wide door, nest boxes of straw along the back
+	 * wall (the eggs sit up where no foot reaches them), a breeding chart by the door.
+	 */
+	static void nestBarn(ServerLevel l, int cx, int cz) {
+		int x0 = cx - 6, x1 = cx + 6, z0 = cz - 4, z1 = cz + 4;
+		frame(l, x0, z0, x1, z1, 1, "spruce_planks");
+		fill(l, x0 + 1, Y, z0 + 1, x1 - 1, Y, z1 - 1, "hay_block");
+		// wide door: two doors side by side under a gold lintel
+		set(l, cx - 1, Y + 1, z1, "spruce_door[facing=north,half=lower,hinge=left]");
+		set(l, cx - 1, Y + 2, z1, "spruce_door[facing=north,half=upper,hinge=left]");
+		set(l, cx, Y + 1, z1, "spruce_door[facing=north,half=lower,hinge=right]");
+		set(l, cx, Y + 2, z1, "spruce_door[facing=north,half=upper,hinge=right]");
+		fill(l, cx - 2, Y + 3, z1, cx + 1, Y + 3, z1, TRIM);
+		fill(l, cx - 1, Y, z1 + 1, cx, Y, z1 + 1, "stone_brick_slab[type=bottom]");
+		window(l, x0 + 3, Y + 2, z1, "south");
+		window(l, x1 - 3, Y + 2, z1, "south");
+		window(l, x0, Y + 2, cz, "west");
+		window(l, x1, Y + 2, cz, "east");
+		gable(l, x0, z0, x1, z1, Y + 5, "spruce_stairs", "spruce_slab[type=bottom]", "spruce_planks", false);
+		fill(l, x0 + 1, Y + 5, z0 + 1, x1 - 1, Y + 5, z1 - 1, "spruce_planks");
+		// nest boxes on the back wall: straw on a shelf, an egg in each, a trapdoor lip
+		for (int x = x0 + 1; x <= x1 - 1; x += 2) {
+			set(l, x, Y + 1, z0 + 1, "hay_block");
+			set(l, x, Y + 2, z0 + 1, "turtle_egg[eggs=" + (1 + Math.floorMod(x, 3)) + "]");
+			set(l, x, Y + 2, z0 + 2, "spruce_trapdoor[facing=south,half=bottom,open=true]");
+		}
+		set(l, cx, Y + 4, cz, "lantern[hanging=true]");
+		set(l, x1 - 1, Y + 1, z1 - 1, "water_cauldron[level=3]");
+		set(l, x0 + 1, Y + 1, z1 - 1, "barrel[facing=up]");
+		// the breeding chart outside the door
+		SquareBuilder.sign(l, cx + 2, Y + 2, z1 + 1, "south", "chocobosreborn.sign.nest.0", "chocobosreborn.sign.nest.1",
+				"chocobosreborn.sign.nest.2", "chocobosreborn.sign.nest.3");
+	}
+
+	/**
+	 * The jockey lounge by the arch: riders off duty. Door on the east side toward the
+	 * avenue, tables, a bar, a trophy shelf and the notice everyone reads.
+	 */
+	static void jockeyLounge(ServerLevel l, int cx, int cz) {
+		int x0 = cx - 5, x1 = cx + 5, z0 = cz - 3, z1 = cz + 3;
+		frame(l, x0, z0, x1, z1, 1, INFILL_ALT);
+		fill(l, x0 + 1, Y, z0 + 1, x1 - 1, Y, z1 - 1, "dark_oak_planks");
+		set(l, x1, Y + 1, cz, "dark_oak_door[facing=west,half=lower]");
+		set(l, x1, Y + 2, cz, "dark_oak_door[facing=west,half=upper]");
+		set(l, x1, Y + 3, cz, TRIM);
+		set(l, x1 + 1, Y, cz, "stone_brick_slab[type=bottom]");
+		set(l, x1 + 1, Y + 3, cz - 1, "lantern[hanging=true]");
+		set(l, x1 + 1, Y + 3, cz + 1, "lantern[hanging=true]");
+		window(l, cx - 2, Y + 2, z1, "south");
+		window(l, cx + 2, Y + 2, z1, "south");
+		window(l, cx, Y + 2, z0, "north");
+		gable(l, x0, z0, x1, z1, Y + 5, "dark_oak_stairs", "dark_oak_slab[type=bottom]", INFILL_ALT, true);
+		fill(l, x0 + 1, Y + 5, z0 + 1, x1 - 1, Y + 5, z1 - 1, "spruce_planks");
+		chimney(l, x0 + 1, z0 + 1, Y + 7);
+		// the bar along the west wall, a table either side, trophies on a shelf
+		fill(l, x0 + 1, Y + 1, cz - 1, x0 + 1, Y + 1, cz + 2, "dark_oak_slab[type=top]");
+		set(l, x0 + 1, Y + 2, cz + 2, "brewing_stand");
+		for (int[] t : new int[][]{{cx - 2, cz - 2}, {cx + 2, cz + 2}}) {
+			set(l, t[0], Y + 1, t[1], "dark_oak_fence");
+			set(l, t[0], Y + 2, t[1], "dark_oak_pressure_plate");
+			set(l, t[0] - 1, Y + 1, t[1], "spruce_stairs[facing=east]");
+			set(l, t[0] + 1, Y + 1, t[1], "spruce_stairs[facing=west]");
+		}
+		set(l, x1 - 1, Y + 1, z0 + 1, "chiseled_quartz_block");
+		set(l, x1 - 1, Y + 2, z0 + 1, "gold_block");
+		set(l, x1 - 2, Y + 1, z0 + 1, "chiseled_quartz_block");
+		set(l, x1 - 2, Y + 2, z0 + 1, "iron_block");
+		set(l, cx, Y + 4, cz, "lantern[hanging=true]");
+		SquareBuilder.sign(l, cx - 1, Y + 2, z0 + 1, "south", "chocobosreborn.sign.lounge.0", "chocobosreborn.sign.lounge.1",
+				"chocobosreborn.sign.lounge.2", "chocobosreborn.sign.lounge.3");
+		SquareBuilder.sign(l, cx + 1, Y + 2, z0 + 1, "south", "chocobosreborn.sign.lounge.4", "chocobosreborn.sign.lounge.5",
+				"chocobosreborn.sign.lounge.6", "chocobosreborn.sign.lounge.7");
+	}
+
 	/** A market stall with a striped awning in the keeper's tribe colour over the counter. */
 	static void awning(ServerLevel l, int px, int pz, int fx, int fz, int rx, int rz, String colour) {
 		for (int w = -3; w <= 3; w++) {

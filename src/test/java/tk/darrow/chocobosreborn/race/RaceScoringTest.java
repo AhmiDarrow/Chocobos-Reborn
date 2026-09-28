@@ -158,7 +158,7 @@ class RaceScoringTest {
 
 	@Test
 	void fieldNpcsGetClassTrainingAndRivalsMaxOut() {
-		assertEquals(22, RaceScoring.fieldTraining(0, false));
+		assertEquals(34, RaceScoring.fieldTraining(0, false));
 		assertEquals(48, RaceScoring.fieldTraining(1, false));
 		assertEquals(72, RaceScoring.fieldTraining(2, false));
 		assertEquals(92, RaceScoring.fieldTraining(3, false));

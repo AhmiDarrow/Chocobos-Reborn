@@ -151,9 +151,10 @@ class RaceBettingTest {
 		var fair = TownPosts.keeperPosts().stream()
 				.filter(post -> post.role() == TownRole.FAIR)
 				.findFirst().orElseThrow();
-		assertEquals(-17.5D, greens.x(), 1.0E-9);
-		assertEquals(-17.5D, fair.x(), 1.0E-9);
-		assertTrue(Math.abs(greens.x() + 16.0D) > 0.4D);
-		assertTrue(Math.abs(fair.x() + 16.0D) > 0.4D);
+		// village v13: the west stalls moved out with the wider plaza; the counter is the block east of the keeper
+		assertEquals(-22.5D, greens.x(), 1.0E-9);
+		assertEquals(-22.5D, fair.x(), 1.0E-9);
+		assertTrue(Math.abs(greens.x() + 21.0D) > 0.4D);
+		assertTrue(Math.abs(fair.x() + 21.0D) > 0.4D);
 	}
 }

@@ -25,8 +25,10 @@ import java.util.Set;
  * lay {@code chocobosreborn:boost_pad} across the band;</li>
  * <li>a chequered start / finish line, a painted six-stall grid, a yellow arrow
  * just past it, a start / finish gantry with lights clear of a mounted bird,
- * lamps on both verges, warning posts before terrain, and the grandstand in the
- * infield beside the start straight with {@link #fanPosts()} for the crowd.</li>
+ * lamps on both verges, warning posts before terrain, and the grandstands: the
+ * main one in the infield beside the start straight and more inside and outside the
+ * loop by class ({@link CourseStands}), with {@link #fanPosts()} for the crowd the
+ * client draws.</li>
  * </ul>
  */
 public final class RaceCourseLayout {
@@ -36,8 +38,8 @@ public final class RaceCourseLayout {
 	public record Tile(int x, int z) {
 	}
 
-	/** Where a fan stands (feet) and the yaw that faces the track. */
-	public record FanPost(double x, double y, double z, float yaw) {
+	/** Where a fan stands (feet), the yaw that faces the track, and the stand ({@link CourseStands#stands()}) it sits in. */
+	public record FanPost(double x, double y, double z, float yaw, int stand) {
 	}
 
 	/** Course-name wall sign on the marshal's tower, facing the grid. */
@@ -59,7 +61,10 @@ public final class RaceCourseLayout {
 	/** Sorted {@link #roadKey} values so {@link #onCourse} does not allocate a tile per probe. */
 	private long[] roadKeys = new long[0];
 	private final Set<Long> chunks = new HashSet<>();
-	private final List<FanPost> fans = new ArrayList<>();
+	private final CourseStands stands;
+	/** Every column a stand block went into, for the road-clearance test. */
+	private final Set<Tile> standTiles = new HashSet<>();
+	private boolean standing;
 	private BoardPost board;
 	private int decoSeed;
 	/** Set while stamping scenery: {@link #put} then refuses to touch a road tile. */
@@ -75,7 +80,9 @@ public final class RaceCourseLayout {
 		double lap = track.lapLength();
 		int steps = (int) Math.ceil(lap * 2.0D);   // 0.5 blocks between stamps
 		boolean sky = theme == RaceTrack.Theme.SKYWAY;
-		double standFrom = 6.0D / lap, standTo = Math.min(50.0D, lap * 0.06D) / lap;
+		// the road tiles first (no blocks yet): the stands are sited against every leg of the lap
+		road.addAll(roadTiles(track));
+		this.stands = CourseStands.of(track, road);
 		// Three passes over the lap, not one: a circuit folds back on itself on a tight
 		// corner, so a section stamped later lands on block columns an earlier one already
 		// used. Laid in one pass, a margin, a tree or a lava pool overwrites road that is
@@ -85,9 +92,10 @@ public final class RaceCourseLayout {
 		// columns and leaves a hole through the island that a racer drops into.
 		for (int i = 0; i < steps; i++) {
 			double t = i / (double) steps;
-			stampGround(t, lap, sky, standFrom, standTo);
-			stampGround(t + 0.5D / steps, lap, sky, standFrom, standTo);
+			stampGround(t, lap, sky);
+			stampGround(t + 0.5D / steps, lap, sky);
 		}
+		groundUnderStands(sky);
 		for (boolean features : new boolean[]{true, false}) {
 			for (int i = 0; i < steps; i++) {
 				double t = i / (double) steps;
@@ -105,27 +113,31 @@ public final class RaceCourseLayout {
 			double t = i / (double) steps;
 			boolean nearFeature = nearFeature(t);
 			boolean startZone = startZone(t);
-			boolean stand = stand(t, standFrom, standTo);
+			int sides = stands.sidesAt(t, 4.0D);
+			boolean innerStand = (sides & 1) != 0, outerStand = (sides & 2) != 0;
 			boolean corner = corner(t, lap);
 			int surf = surf(t);
 			// decoration in the margins: set pieces every 8 blocks alternating sides, small
-			// ground details between them, flag lines along the straights
-			if (!sky && !nearFeature && !startZone && i % 16 == 0) {
+			// ground details between them, flag lines along the straights; none in front of a stand
+			if (!sky && !nearFeature && !startZone && !outerStand && i % 16 == 0) {
 				decorate(t, -(RaceTrack.ROAD_HALF + 5.5D), surf);
 			}
-			if (!nearFeature && !stand && !startZone && i % 16 == 8) {
+			if (!nearFeature && !innerStand && !startZone && i % 16 == 8) {
 				decorate(t, RaceTrack.ROAD_HALF + 5.5D, surf);
 			}
-			if (!sky && !nearFeature && !startZone && i % 6 == 3) {
-				verge(t, (i % 12 == 3 ? -1 : 1) * (RaceTrack.ROAD_HALF + 2.5D + (i % 5)), surf);
+			int vergeSide = i % 12 == 3 ? -1 : 1;
+			if (!sky && !nearFeature && !startZone && i % 6 == 3 && !(vergeSide > 0 ? innerStand : outerStand)) {
+				verge(t, vergeSide * (RaceTrack.ROAD_HALF + 2.5D + (i % 5)), surf);
 			}
-			if (!nearFeature && !startZone && !stand && !corner && i % 24 == 12) {
-				flag(t, -(RaceTrack.ROAD_HALF + 2.0D), surf, i / 24);
-				if (!sky) {
+			if (!nearFeature && !startZone && !corner && i % 24 == 12) {
+				if (!outerStand) {
+					flag(t, -(RaceTrack.ROAD_HALF + 2.0D), surf, i / 24);
+				}
+				if (!sky && !innerStand) {
 					flag(t, RaceTrack.ROAD_HALF + 2.0D, surf, i / 24 + 1);
 				}
 			}
-			if (sky && !nearFeature && !startZone && i % 40 == 0) {
+			if (sky && !nearFeature && !startZone && !outerStand && i % 40 == 0) {
 				decorate(t, -(RaceTrack.ROAD_HALF + 1.0D), surf);
 			}
 		}
@@ -136,7 +148,13 @@ public final class RaceCourseLayout {
 		startLine(lap);
 		startGrid(lap);
 		startArrow(lap);
-		grandstand(lap, standFrom, standTo);
+		sparingRoad = true;   // sited clear of every road tile, but never let a stand onto one
+		standing = true;
+		for (CourseStands.Plan plan : stands.plans()) {
+			buildStand(plan, stands.cells(plan.index()));
+		}
+		standing = false;
+		sparingRoad = false;
 		landmark();
 		plugHoles();
 		for (Cell c : blocks.keySet()) {
@@ -237,17 +255,22 @@ public final class RaceCourseLayout {
 	 * because a coarser stamp skips whole block columns on a tight corner and leaves a
 	 * hole straight through the island.
 	 */
-	private void stampGround(double t, double lap, boolean sky, double standFrom, double standTo) {
+	private void stampGround(double t, double lap, boolean sky) {
 		boolean nearFeature = nearFeature(t);
 		int surf = surf(t);
-		boolean stand = stand(t, standFrom, standTo);
 		double margin = sky ? 1.5D : MARGIN;
-		double outer = nearFeature ? RaceTrack.DETOUR_OUTER + 3.0D : RaceTrack.ROAD_HALF + 1.0D + margin;
-		double inner = stand ? RaceTrack.ROAD_HALF + 22.0D : RaceTrack.ROAD_HALF + 1.0D + margin;
+		double normalOuter = nearFeature ? RaceTrack.DETOUR_OUTER + 3.0D : RaceTrack.ROAD_HALF + 1.0D + margin;
+		double normalInner = RaceTrack.ROAD_HALF + 1.0D + margin;
+		// the island reaches out under every stand (either side), easing back past its ends
+		double outer = stands.groundReach(t, -1, normalOuter);
+		double inner = stands.groundReach(t, 1, normalInner);
 		// island rock under everything, ground on top of the margins
 		for (double o = -outer; o <= inner; o += LANE_STEP) {
 			RacePoint q = track.pointAtLane(t, o);
 			int x = floor(q.x()), z = floor(q.z());
+			if ((o > normalInner || o < -normalOuter) && nearRoad(x, z)) {
+				continue;   // a stand's apron reaching toward another leg of the lap: leave that leg alone
+			}
 			boolean underRoad = Math.abs(o) <= RaceTrack.ROAD_HALF + 1.0D || (nearFeature && o <= -RaceTrack.ROAD_HALF - 1.0D);
 			int depth = underRoad ? (sky ? 2 : 5) : taper(o, -outer, inner);
 			for (int d = 1; d <= depth; d++) {
@@ -256,6 +279,37 @@ public final class RaceCourseLayout {
 			if (!underRoad) {
 				boolean rim = o < -outer + 0.75D || o > inner - 0.75D;
 				put(x, surf, z, rim ? theme.wall : (sky ? theme.base : theme.ground));
+			}
+		}
+	}
+
+	/**
+	 * Fill any column under a stand, its apron and its run-out that the ground stamp
+	 * missed (the stamp walks the track's stepped normal, which opens gaps twenty blocks
+	 * out on a bend): no stand stands over the void.
+	 */
+	private void groundUnderStands(boolean sky) {
+		double lap = track.lapLength();
+		for (CourseStands.Plan p : stands.plans()) {
+			double reach = p.back() + 3.0D;
+			double run = CourseStands.GROUND_RUN / lap;
+			for (double t = p.from() - run; t <= p.to() + run; t += 0.25D / lap) {
+				double outside = Math.max(p.from() - t, t - p.to()) * lap;
+				double edge = outside <= 0.0D ? reach
+						: reach - (reach - (RaceTrack.ROAD_HALF + 2.0D)) * (outside / CourseStands.GROUND_RUN);
+				int surf = surf(t);
+				for (double o = RaceTrack.ROAD_HALF + 2.0D; o <= edge; o += LANE_STEP) {
+					double[] q = CourseStands.lane(track, t, p.side() * o);
+					int x = floor(q[0]), z = floor(q[1]);
+					if (blocks.containsKey(new Cell(x, surf - 1, z)) || blocks.containsKey(new Cell(x, surf, z)) || nearRoad(x, z)) {
+						continue;
+					}
+					put(x, surf, z, edge - o < 0.75D ? theme.wall : (sky ? theme.base : theme.ground));
+					int depth = taper(o, -1.0E9D, edge);
+					for (int d = 1; d <= depth; d++) {
+						put(x, surf - d, z, theme.base);
+					}
+				}
 			}
 		}
 	}
@@ -386,6 +440,10 @@ public final class RaceCourseLayout {
 
 	/** Inside a feature or one of its connectors: the detour is open and the band is terrain. */
 	private boolean nearFeature(double t) {
+		return nearFeature(track, t);
+	}
+
+	private static boolean nearFeature(RaceTrack track, double t) {
 		for (RaceTrack.Feature f : track.terrainFeatures()) {
 			if (t >= f.start() - CONNECT && t <= f.end() + CONNECT) {
 				return true;
@@ -394,14 +452,57 @@ public final class RaceCourseLayout {
 		return false;
 	}
 
+	/**
+	 * The road tiles of a course (band and detours) without the rest of the plan: the same
+	 * stamps {@link #stampRoad} lays, so stands can be sited against every leg of the lap
+	 * (and the client can place the crowd) without building half a million blocks.
+	 */
+	static Set<Tile> roadTiles(RaceTrack track) {
+		Set<Tile> out = new HashSet<>();
+		int steps = (int) Math.ceil(track.lapLength() * 2.0D);
+		for (int i = 0; i < steps; i++) {
+			double t0 = i / (double) steps;
+			for (double t : new double[]{t0, t0 + 0.5D / steps}) {
+				for (double o = -RaceTrack.ROAD_HALF; o <= RaceTrack.ROAD_HALF; o += LANE_STEP) {
+					RacePoint q = track.pointAtLane(t, o);
+					out.add(new Tile(floor(q.x()), floor(q.z())));
+				}
+				if (nearFeature(track, t)) {
+					double from = track.terrainAt(t) != null ? RaceTrack.DETOUR_INNER : RaceTrack.ROAD_HALF + 0.5D;
+					for (double o = -RaceTrack.DETOUR_OUTER; o <= -from; o += LANE_STEP) {
+						RacePoint q = track.pointAtLane(t, o);
+						out.add(new Tile(floor(q.x()), floor(q.z())));
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Where along the lap the landmark stands: the far side, nudged off any terrain. */
+	static double landmarkT(RaceTrack track) {
+		double t = 0.5D;
+		while (track.terrainAt(t) != null || track.terrainAt(t + 0.02D) != null || track.terrainAt(t - 0.02D) != null) {
+			t += 0.03D;
+		}
+		return t;
+	}
+
+	/** On or beside a road tile. */
+	private boolean nearRoad(int x, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				if (road.contains(new Tile(x + dx, z + dz))) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	/** The grid, the line and the run-off behind it: no decoration here. */
 	private static boolean startZone(double t) {
 		return t < 0.05D || t > 0.985D;
-	}
-
-	/** Alongside the grandstand: the infield is the stand, not margin. */
-	private static boolean stand(double t, double standFrom, double standTo) {
-		return t >= standFrom && t <= standTo;
 	}
 
 	/** A corner: kerbs are striped and the rail runs both sides. */
@@ -417,21 +518,23 @@ public final class RaceCourseLayout {
 	// ------------------------------------------------------------ dressing
 
 	private void lamps(double lap) {
-		double standFrom = 6.0D / lap, standTo = Math.min(50.0D, lap * 0.06D) / lap;
 		int lamps = (int) (lap / 40.0D);
 		for (int i = 0; i < lamps; i++) {
 			double t = i / (double) lamps;
 			if (track.terrainAt(t) != null || t < 0.05D) {
 				continue;
 			}
-			boolean stand = t >= standFrom && t <= standTo;
+			int sides = stands.sidesAt(t, 4.0D);
 			int y = (int) track.groundY(t) - 1;
 			for (int side : new int[]{-1, 1}) {
-				if (side > 0 && stand) {
-					continue;
+				if ((sides & (side > 0 ? 1 : 2)) != 0) {
+					continue;   // the stand has its own lamps on its front posts
 				}
 				RacePoint q = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.5D));
 				int x = floor(q.x()), z = floor(q.z());
+				if (stands.nearStand(x, z)) {
+					continue;
+				}
 				put(x, y, z, theme.wall);
 				put(x, y + 1, z, theme.post);
 				put(x, y + 2, z, theme.post);
@@ -585,62 +688,109 @@ public final class RaceCourseLayout {
 	}
 
 	/**
-	 * Tiered seats in the infield along the start straight: four rows rising
-	 * inward, a roofed back wall with banners, lamps, and eight fan posts.
+	 * One grandstand from its {@link CourseStands.Plan}: tiered seat rows rising away from
+	 * the road (a plinth where the ground dips), a back wall, a roof, front posts with
+	 * lamps and banners. The class sets the look: C wooden benches under a striped
+	 * awning, B / A the quartz stand, S a grand stand with a taller wall, a solid roof
+	 * with a trim, flags on top and banners along the back.
 	 */
-	private void grandstand(double lap, double from, double to) {
-		int y = (int) track.groundY(0.02D) - 1;
-		double[] tg = track.tangent(0.02D);
-		// seats face the track: toward decreasing offset, i.e. the outward normal
-		double nx = tg[1], nz = -tg[0];   // (+normal points inward; outward = -(-tz, tx))
-		String facing = Math.abs(nx) > Math.abs(nz) ? (nx > 0 ? "east" : "west") : (nz > 0 ? "south" : "north");
-		float yaw = (float) Math.toDegrees(Math.atan2(-nx, nz));
-		double base = RaceTrack.ROAD_HALF + 4.5D;   // first row's offset
-		int steps = (int) Math.ceil((to - from) * lap * 2.0D);
-		for (int k = 0; k < 4; k++) {
-			for (int s = 0; s <= steps; s++) {
-				double t = from + (to - from) * s / steps;
-				for (double o = base + k * 2.0D; o < base + k * 2.0D + 2.0D; o += 0.5D) {
-					RacePoint q = track.pointAtLane(t, o);
-					int x = floor(q.x()), z = floor(q.z());
-					for (int h = 0; h <= k; h++) {
-						put(x, y + h, z, theme.wall);
-					}
-					boolean seatRow = o < base + k * 2.0D + 1.0D;
-					put(x, y + k + 1, z, seatRow ? stairs(facing) : ((s / 3 + k) % 2 == 0 ? "yellow_concrete" : "red_concrete"));
-				}
+	private void buildStand(CourseStands.Plan p, List<CourseStands.Cell> cells) {
+		int y = p.y();
+		CourseStands.Tier tier = p.tier();
+		String wood = switch (theme) {
+			case ORCHARD -> "cherry";
+			case SHORE -> "bamboo";
+			default -> "oak";
+		};
+		// the seat rows, exactly as CourseStands placed the fans on them
+		for (CourseStands.Cell c : cells) {
+			for (int h = c.ground() + 1; h < y; h++) {
+				put(c.x(), h, c.z(), theme.wall);
 			}
+			for (int h = 0; h <= c.row(); h++) {
+				put(c.x(), y + h, c.z(), theme.wall);
+			}
+			String facing = yawFacing(c.yaw());
+			String top;
+			if (c.seat()) {
+				top = tier == CourseStands.Tier.BENCH ? wood + "_stairs[facing=" + facing + "]" : stairs(facing);
+			} else if (tier == CourseStands.Tier.BENCH) {
+				top = wood + "_planks";
+			} else if (tier == CourseStands.Tier.GRAND) {
+				top = c.stripe() == 0 ? theme.kerbA : theme.kerbB;
+			} else {
+				top = c.stripe() == 0 ? "yellow_concrete" : "red_concrete";
+			}
+			put(c.x(), y + c.row() + 1, c.z(), top);
 		}
-		// back wall, roof and lamps
+		// back wall, roof, posts and banners
+		int roof = p.roofY();
+		double back = p.back();
+		double from = p.from(), to = p.to();
+		int steps = stands.steps(p);
 		for (int s = 0; s <= steps; s++) {
 			double t = from + (to - from) * s / steps;
-			RacePoint back = track.pointAtLane(t, base + 8.5D);
-			int bx = floor(back.x()), bz = floor(back.z());
-			for (int h = 0; h <= 7; h++) {
-				put(bx, y + h, bz, h == 5 && (s / 6) % 2 == 0 ? theme.kerbB : theme.wall);
+			double[] tg = track.tangent(t);
+			String facing = cardinal(new double[]{p.side() * tg[1], -p.side() * tg[0]});
+			int ground = surf(t);
+			double[] bq = CourseStands.lane(track, t, p.side() * back);
+			int bx = floor(bq[0]), bz = floor(bq[1]);
+			for (int h = ground + 1; h < y; h++) {
+				put(bx, h, bz, theme.wall);
 			}
-			for (double o = base - 0.5D; o <= base + 8.5D; o += 0.5D) {
-				RacePoint q = track.pointAtLane(t, o);
-				put(floor(q.x()), y + 8, floor(q.z()), (s / 4) % 2 == 0 ? "yellow_wool" : "white_wool");   // striped awning
+			for (int h = y; h < roof; h++) {
+				boolean band = h == y + p.rows() + 1 && (s / 6) % 2 == 0;
+				put(bx, h, bz, band ? theme.kerbB : theme.wall);
 			}
-			if (s % 8 == 0) {
-				RacePoint front = track.pointAtLane(t, base - 0.5D);
-				for (int h = 0; h <= 7; h++) {
-					put(floor(front.x()), y + h, floor(front.z()), h == 3 ? theme.lamp : theme.post);
+			for (double o = CourseStands.BASE - 0.5D; o <= back + 1.0E-6D; o += 0.5D) {
+				double[] q = CourseStands.lane(track, t, p.side() * o);
+				String cover = switch (tier) {
+					case GRAND -> o < CourseStands.BASE ? theme.kerbA : theme.wall;
+					case BENCH -> (s / 4) % 2 == 0 ? "white_wool" : "green_wool";
+					default -> (s / 4) % 2 == 0 ? "yellow_wool" : "white_wool";   // striped awning
+				};
+				put(floor(q[0]), roof, floor(q[1]), cover);
+			}
+			if (CourseStands.postStep(s)) {
+				double[] front = CourseStands.lane(track, t, p.side() * (CourseStands.BASE - 0.5D));
+				int fx = floor(front[0]), fz = floor(front[1]);
+				for (int h = ground + 1; h < y; h++) {
+					put(fx, h, fz, theme.wall);
+				}
+				for (int h = y; h < roof; h++) {
+					put(fx, h, fz, h == y + 3 ? theme.lamp : theme.post);
 				}
 			}
-			if (s % 8 == 4) {
-				put(bx, y + 6, bz, FLAG_COLOURS[Math.floorMod(s / 8, FLAG_COLOURS.length)] + "_banner[rotation=8]");
+			if (CourseStands.bannerStep(tier, s)) {
+				// a banner on the inside face of the back wall, above the top row
+				double[] wq = CourseStands.lane(track, t, p.side() * (back - 0.5D));
+				String colour = FLAG_COLOURS[Math.floorMod(s / 4 + p.index(), FLAG_COLOURS.length)];
+				put(floor(wq[0]), y + p.rows() + 2, floor(wq[1]), colour + "_wall_banner[facing=" + facing + "]");
+			}
+			if (tier == CourseStands.Tier.GRAND && s % 8 == 0) {
+				// flag poles along the roof line
+				put(bx, roof + 1, bz, theme.post);
+				put(bx, roof + 2, bz, theme.post);
+				put(bx, roof + 3, bz, FLAG_COLOURS[Math.floorMod(s / 8 + p.index(), FLAG_COLOURS.length)]
+						+ "_banner[rotation=" + bannerRotation(facing) + "]");
 			}
 		}
-		// fan posts: two per row, spread along the stand, standing on the seats
-		for (int k = 0; k < 4; k++) {
-			for (int j = 0; j < 2; j++) {
-				double t = from + (to - from) * (0.2D + 0.6D * j + 0.1D * k) / 1.3D;
-				RacePoint q = track.pointAtLane(t, base + k * 2.0D + 0.5D);
-				fans.add(new FanPost(Math.floor(q.x()) + 0.5D, y + k + 1.5D, Math.floor(q.z()) + 0.5D, yaw));
-			}
-		}
+	}
+
+	/** Compass direction a fan (and so a seat) with this yaw faces. */
+	private static String yawFacing(float yaw) {
+		double r = Math.toRadians(yaw);
+		return cardinal(new double[]{-Math.sin(r), Math.cos(r)});
+	}
+
+	/** Standing-banner rotation that shows the face toward {@code facing}. */
+	private static int bannerRotation(String facing) {
+		return switch (facing) {
+			case "south" -> 0;
+			case "west" -> 4;
+			case "north" -> 8;
+			default -> 12;
+		};
 	}
 
 	/**
@@ -671,6 +821,9 @@ public final class RaceCourseLayout {
 	private void flag(double t, double offset, int surf, int n) {
 		RacePoint q = track.pointAtLane(t, offset);
 		int x = floor(q.x()), z = floor(q.z());
+		if (stands.nearStand(x, z)) {
+			return;
+		}
 		String colour = FLAG_COLOURS[Math.floorMod(n, FLAG_COLOURS.length)];
 		put(x, surf + 1, z, theme.post);
 		put(x, surf + 2, z, theme.post);
@@ -681,6 +834,9 @@ public final class RaceCourseLayout {
 	private void verge(double t, double offset, int surf) {
 		RacePoint q = track.pointAtLane(t, offset);
 		int x = floor(q.x()), z = floor(q.z());
+		if (stands.nearStand(x, z)) {
+			return;
+		}
 		int pick = Math.floorMod(x * 31 + z * 17, 4);
 		String block = switch (theme) {
 			case MEADOW -> pick == 0 ? "short_grass" : pick == 1 ? "short_grass" : pick == 2 ? "azure_bluet" : "poppy";
@@ -710,10 +866,7 @@ public final class RaceCourseLayout {
 
 	/** A themed monument at the far side of the circuit (t = 0.5), beside the road, and an arch over it for a few themes. */
 	private void landmark() {
-		double t = 0.5D;
-		while (track.terrainAt(t) != null || track.terrainAt(t + 0.02D) != null || track.terrainAt(t - 0.02D) != null) {
-			t += 0.03D;
-		}
+		double t = landmarkT(track);
 		int surf = (int) track.groundY(t) - 1;
 		// the two courses that share a theme get different set pieces, so no two of the
 		// twenty-four look the same from the saddle
@@ -1131,6 +1284,10 @@ public final class RaceCourseLayout {
 	private void decorate(double t, double offset, int surf) {
 		RacePoint q = track.pointAtLane(t, offset);
 		int x = floor(q.x()), z = floor(q.z());
+		if (stands.nearStand(x, z) || stands.nearStand(x + 2, z) || stands.nearStand(x - 2, z)
+				|| stands.nearStand(x, z + 2) || stands.nearStand(x, z - 2)) {
+			return;   // a set piece is up to five wide: keep it out of a stand on another leg
+		}
 		int y = surf + 1;
 		int pick = (decoSeed++ * 7 + 3) % 5;
 		switch (theme) {
@@ -1378,6 +1535,9 @@ public final class RaceCourseLayout {
 		if (sparingRoad && road.contains(new Tile(x, z))) {
 			return;   // a fold of the course put the racing line here: leave it alone
 		}
+		if (standing) {
+			standTiles.add(new Tile(x, z));
+		}
 		blocks.put(new Cell(x, y, z), block);
 	}
 
@@ -1457,9 +1617,19 @@ public final class RaceCourseLayout {
 		return Collections.unmodifiableSet(chunks);
 	}
 
-	/** Where the crowd stands in the infield grandstand. */
+	/** Where the crowd stands, every stand of the course (see {@link CourseStands}). */
 	public List<FanPost> fanPosts() {
-		return Collections.unmodifiableList(fans);
+		return stands.fanPosts();
+	}
+
+	/** The course's stands (boxes, light probes, fan ranges). */
+	public List<CourseStands.Stand> stands() {
+		return stands.stands();
+	}
+
+	/** Columns holding a stand block, for tests. */
+	Set<Tile> standTiles() {
+		return Collections.unmodifiableSet(standTiles);
 	}
 
 	/** Marshal-tower sign that names the course, facing the grid. */

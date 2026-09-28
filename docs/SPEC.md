@@ -117,16 +117,21 @@ blocks. Sneak with an empty hand opens equipment. Flight: `getFlyingSpeed` + `tr
 
 ## Whiskerwind (Chocobo Square)
 
-Own dimension `chocobosreborn:square`: a void world. `SquareBuilder` + `VillagePlan`
-lay the village on an organic sky island centred at (0,-72) (`PADDOCK_VERSION`
-rebuilds): plaza and arrival medallion, chocobo fountain, market stalls, cottages, the
-inn and bell tower, stable yard, windmill, the race arch with an overlook over the void,
-practice sprint/GP gates on the town side of the arch, a gysahl bed by Sage Wynn, a
-shrine islet. Each of the 24 courses is its own circuit island built on first use at
+Own dimension `chocobosreborn:square`: a void world. `SquareBuilder`, `VillagePlan` and
+`VillageDistrict` lay the village on an organic sky island of radius 69 centred at (0,-72)
+(`PADDOCK_VERSION` 13 rebuilds; every position is in `VillageLayout`): plaza and arrival
+medallion, chocobo fountain with a little gold saucer at the statue's feet, market stalls,
+eight cottages, the inn and bell tower, stable yard, windmill, race hall, the race arch
+with the overlook over the void, the winners' board, the ranch, the nest barn and chick
+nursery, the jockey lounge, a pond with a dock, an orchard, a gysahl bed by Sage Wynn,
+signposts, and a shrine islet. Ten townsfolk (`TownRole.RESIDENT_*`, `TownRoutineGoal`)
+keep a day (home, work, the fountain, the inn) and line the overlook to cheer when a heat
+is called; the inn bell rings the calls and the start (`TownLife`). Each of the 24 courses is its own circuit island built on first use at
 `RaceTrack.centerX/Z()`. The dimension is a true void (`the_void` biome, no layers), natural
 spawns are cancelled (`RaceManager.onFinalizeSpawn`), blocks cannot be broken or placed by
-players (`onBreak` / `onPlace`, creative operators excepted), and five untamable town birds
-(`ChocoboEntity.townBird`) wander the village. Nothing there hurts anyone: race birds and
+players (`onBreak` / `onPlace`, creative operators excepted), and untamable town birds
+(`ChocoboEntity.townBird`) live in three patches: the ranch flock, a saddled pair in the
+stable yard and chicks in the nursery that never grow. Nothing there hurts anyone: race birds and
 town birds are invulnerable (`ChocoboEntity.isInvulnerableTo`) and so is a visiting player
 (`RaceManager.onInvulnerabilityCheck`, anything short of `BYPASSES_INVULNERABILITY`), a
 burning rider is put out, and a visitor who goes over the edge is set down in the paddock
@@ -174,9 +179,9 @@ transport, a settle period and a five-second title countdown precede GO). The fi
 an AI racer's stall (six in all). Esther announces to the whole Square at two minutes
 and one minute and counts the last ten seconds; riders not in the saddle at the mark
 are dropped. The field is filled with AI (`RacerProfile` by class, driven by
-`RacerMoveControl` at rider scale, each with a kin jockey in the saddle; Jolo (Gold)
-and Teiyo (Black) from B); three
-first-place finishes promote, never demote; prizes GP + greens / nuts for a finished
+`RacerMoveControl` at rider scale, each with a kin jockey in the saddle; Teiyo (Black) and
+Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own bird by
+`RaceScoring.rivalPace`); nine points promote (sprint win 1, grand prix 3), never demote; prizes GP + greens / nuts for a finished
 course. Bets at Rook before the heat (pending in player data) or during the hold. No
 racing in armour.
 

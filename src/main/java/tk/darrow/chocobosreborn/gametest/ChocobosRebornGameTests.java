@@ -698,8 +698,9 @@ public class ChocobosRebornGameTests {
 	}
 
 	private static void forceArena(ServerLevel level, boolean on) {
+		// the whole v13 village: x +-72, z -134 (the north posts and cottages) to the overlook and beyond
 		for (int cx = -5; cx <= 4; cx++) {
-			for (int cz = -5; cz <= 3; cz++) {
+			for (int cz = -9; cz <= 3; cz++) {
 				level.setChunkForced(cx, cz, on);
 			}
 		}
@@ -825,7 +826,7 @@ public class ChocobosRebornGameTests {
 			}
 		}
 		helper.assertTrue(placed > layout.blocks().size() * 0.95, "course placed: " + placed + "/" + layout.blocks().size());
-		helper.assertTrue(square.getBlockState(new BlockPos(6, 64, -58)).is(Blocks.SMOOTH_SANDSTONE), "paddock floor");
+		helper.assertTrue(square.getBlockState(new BlockPos(5, 64, -50)).is(Blocks.SMOOTH_SANDSTONE), "paddock floor");
 		// Keepers: one per post, however many times the Square is entered, even with a stray duplicate.
 		var dup = ModEntities.KIN_STEWARD.get().create(square);
 		helper.assertTrue(dup != null, "dup kin");

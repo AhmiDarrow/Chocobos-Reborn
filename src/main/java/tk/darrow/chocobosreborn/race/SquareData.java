@@ -35,6 +35,8 @@ public class SquareData extends SavedData {
 	private final Map<UUID, ReturnPoint> returns = new HashMap<>();
 	private final Map<UUID, Integer> owedGp = new HashMap<>();
 	private CompoundTag heats = new CompoundTag();
+	/** The winners' board: the last ranked winner per class (class id -> rider, bird, course, seconds). */
+	private CompoundTag winners = new CompoundTag();
 	/** Bookie and duel stakes held by live heats and open duel challenges; anything still here on load was lost to a crash. */
 	private final Map<UUID, Integer> heldStakes = new HashMap<>();
 	/** Course chunks a live heat has force-loaded; anything still here at server start is unforced. */
@@ -54,6 +56,7 @@ public class SquareData extends SavedData {
 		d.paddockVersion = tag.getInt("PaddockVersion");
 		d.courseVersion = tag.getInt("CourseVersion");
 		d.keepersSpawned = tag.getBoolean("KeepersSpawned");
+		d.winners = tag.getCompound("Winners");
 		ListTag list = tag.getList("Returns", Tag.TAG_COMPOUND);
 		for (int i = 0; i < list.size(); i++) {
 			CompoundTag r = list.getCompound(i);
@@ -92,6 +95,7 @@ public class SquareData extends SavedData {
 		tag.putInt("PaddockVersion", paddockVersion);
 		tag.putInt("CourseVersion", courseVersion);
 		tag.putBoolean("KeepersSpawned", keepersSpawned);
+		tag.put("Winners", winners.copy());
 		ListTag list = new ListTag();
 		returns.forEach((id, rp) -> {
 			CompoundTag r = new CompoundTag();
@@ -159,6 +163,16 @@ public class SquareData extends SavedData {
 			setDirty();
 		}
 		return out;
+	}
+
+	/** Last ranked winner of this class, or an empty tag. */
+	public CompoundTag winner(int classId) {
+		return winners.getCompound(Integer.toString(classId)).copy();
+	}
+
+	public void setWinner(int classId, CompoundTag w) {
+		winners.put(Integer.toString(classId), w.copy());
+		setDirty();
 	}
 
 	public CompoundTag heats() {

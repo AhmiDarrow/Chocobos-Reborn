@@ -23,6 +23,8 @@ public class RacerGoal extends Goal {
 	private final RaceCourseLayout layout;
 	private final double startLane;
 	public double speed = 1.0D;
+	/** Teiyo / Jolo: scales this bird's own stack onto {@link RaceScoring#rivalPace}. 1 for the field. */
+	public double paceScale = 1.0D;
 	public boolean running;
 	public RacerProfile profile = RacerProfile.of(RaceClass.C, RacerProfile.Role.FIELD);
 	/** Laps the player is ahead of this racer (negative = this racer leads). */
@@ -173,7 +175,7 @@ public class RacerGoal extends Goal {
 		// terrain is physical now (water slows swimmers, ridges block non-climbers); no attribute fudge
 		// Same stack a rider gets: grade, then training, once each. The profile
 		// cruise sits on top of that, so a class bird is not a flat attribute.
-		double mul = speed * profile.cruise() * profile.bandFactor(playerGap)
+		double mul = speed * paceScale * profile.cruise() * profile.bandFactor(playerGap)
 				* RaceScoring.gradeSpeedMul(bird.grade().getRank())
 				* RaceScoring.speedTrainingMul(bird.speedStat());
 		if (dashing) {

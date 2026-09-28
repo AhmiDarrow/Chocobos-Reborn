@@ -460,6 +460,7 @@ public final class RaceManager {
 			DuelDesk.tick(square);
 			TradeDesk.tick(square);
 			HeatSchedule.tick(square);
+			TownLife.tick(square);
 		}
 		if (square != null) {
 			for (ServerPlayer p : square.players()) {
@@ -622,6 +623,7 @@ public final class RaceManager {
 		}
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
+		TownLife.reset();
 		ServerLevel square = Square.level(event.getServer());
 		if (square != null) {
 			HeatSchedule.reset(square);

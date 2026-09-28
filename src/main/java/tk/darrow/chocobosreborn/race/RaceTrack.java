@@ -211,7 +211,7 @@ public enum RaceTrack {
 	public static final double TRACK_Y = 65.0D;
 	public static final double PADDOCK_X = 0.5D;
 	public static final double PADDOCK_Y = 65.0D;
-	public static final double PADDOCK_Z = -58.5D;
+	public static final double PADDOCK_Z = -51.5D;
 	public static final double STALL_SPACING = 1.8D;
 	public static final double STALL_HALF_WIDTH = 5.0D;
 	/** Road band either side of the line; features replace this band, detours sit outside it. */
