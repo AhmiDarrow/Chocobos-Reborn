@@ -170,8 +170,11 @@ away (swing out, round, swing back) and every feature sits on a level stretch of
 that puts that near `detourTarget()` (2 % of a lap, 13-28 blocks), spread round the lap,
 clear of the bunched field off the grid, with the bog always the cheapest thing to go
 round. `CourseBalanceTest` and `CourseIslandTest` hold it. Lap progress is the nearest centre-line sample, so
-both routes credit progress; `RacerGoal` brakes for corners and takes the detour when
-its bird does not suit the feature (C birds sometimes blunder into bogs).
+both routes credit progress; `RacerGoal` lifts for hairpins, takes the detour when
+its bird does not suit the feature (C birds sometimes blunder into bogs), lines up for a
+boost strip's lane (`RacerProfile.boostAim`), passes on the side with room, parks off the
+line once finished, and spends its own bird's stamina bar (`RacerProfile.wantsDash`: never
+into the lock, a final push, no look at the player).
 `RaceCourseLayout` stamps the island, features, detours, stand and lists chunks;
 `RaceSession` force-loads them for the heat. `CourseMapDumpTest` draws every course to
 `build/track_maps/`.
@@ -184,8 +187,10 @@ an AI racer's stall (six in all). Esther announces to the whole Square at two mi
 and one minute and counts the last ten seconds; riders not in the saddle at the mark
 are dropped. The field is filled with AI (`RacerProfile` by class, driven by
 `RacerMoveControl` at rider scale, each with a kin jockey in the saddle; Teiyo (Black) and
-Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own bird by
-`RaceScoring.rivalPace`); nine points promote (sprint win 1, grand prix 3), never demote; prizes GP + greens / nuts for a finished
+Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own bird, land
+speed included, by `RaceScoring.rivalPaceAbs`; field birds run their class's land speed and
+keep a quarter of their colour's edge, `RaceScoring.fieldLandSpeed`; the ladder is simulated
+in `RaceSimTest`); nine points promote (sprint win 1, grand prix 3), never demote; prizes GP + greens / nuts for a finished
 course. Bets at Rook before the heat (pending in player data) or during the hold. No
 racing in armour.
 

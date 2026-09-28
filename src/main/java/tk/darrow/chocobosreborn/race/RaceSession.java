@@ -327,17 +327,17 @@ public class RaceSession {
 				new java.util.Random(level.random.nextLong()));
 		int cardIdx = 0;
 		List<String> announced = new ArrayList<>();
-		// the rivals key off the best rider's own bird, as FF7's Teioh does
-		double fieldPace = RaceScoring.fieldPace(raceClass);
+		// the rivals key off the best rider's own bird, as FF7's Teioh does: its land
+		// speed x grade x speed training, the pace the rider actually cruises at
 		double riderPace = 0.0D;
 		for (Racer h : racers) {
 			ChocoboEntity b = h.entity();
 			if (h.human() && b != null) {
-				riderPace = Math.max(riderPace, b.speedMul());
+				riderPace = Math.max(riderPace, b.color().landSpeed() * b.speedMul());
 			}
 		}
 		if (riderPace <= 0.0D) {
-			riderPace = fieldPace;
+			riderPace = RaceScoring.fieldPaceAbs(raceClass);
 		}
 		for (int i = humans; i < FIELD; i++) {
 			ChocoboEntity npc = ModEntities.CHOCOBO.get().create(level);
@@ -382,8 +382,11 @@ public class RaceSession {
 			r.goal.speed = 1.0D + RacerProfile.VARIANCE * (2.0D * level.random.nextDouble() - 1.0D);
 			r.goal.totalLaps = track.getLaps();
 			if (isTeioh || isJolo) {
-				double own = r.goal.profile.cruise() * npc.speedMul();
-				r.goal.paceScale = RaceScoring.rivalPace(raceClass, isJolo, riderPace, fieldPace) / Math.max(0.05D, own);
+				double own = npc.color().landSpeed() * r.goal.profile.cruise() * npc.speedMul();
+				r.goal.paceScale = RaceScoring.rivalPaceAbs(raceClass, isJolo, riderPace) / Math.max(0.01D, own);
+			} else {
+				// a field bird runs its class's land speed, keeping a quarter of its colour's edge
+				r.goal.paceScale = RaceScoring.fieldLandSpeed(npc.color(), raceClass) / Math.max(0.05D, npc.color().landSpeed());
 			}
 			npc.installRacer(r.goal);
 			racers.add(r);
@@ -690,7 +693,6 @@ public class RaceSession {
 	}
 
 	private void tickRunning() {
-		Racer lead = leadHuman();
 		for (Racer r : racers) {
 			if (r.forfeited) {
 				continue;
@@ -744,9 +746,7 @@ public class RaceSession {
 				}
 			}
 			if (!r.human() && r.goal != null) {
-				r.goal.lapsDone = r.laps;
-				double mine = lead == null ? 0.0D : lead.laps + lead.progress.lastProgress();
-				r.goal.playerGap = mine - (r.laps + r.progress.lastProgress());
+				r.goal.lapsDone = r.laps;   // the field holds its own pace: no gap to anyone is fed
 			}
 			if (step == RaceLapProgress.Step.LAP) {
 				r.laps++;
@@ -825,23 +825,6 @@ public class RaceSession {
 						RaceScoring.placeOf(r.finishIndex, finishCount)), false);
 			}
 		}
-	}
-
-	@Nullable
-	private Racer leadHuman() {
-		Racer best = null;
-		double bestKey = -1.0D;
-		for (Racer h : humans()) {
-			if (h.forfeited) {
-				continue;
-			}
-			double key = RaceScoring.sortKey(h.finishIndex >= 0, h.finishIndex, h.laps, currentProgress(h));
-			if (best == null || key > bestKey) {
-				best = h;
-				bestKey = key;
-			}
-		}
-		return best;
 	}
 
 	private int placeNow(Racer me) {

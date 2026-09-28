@@ -35,15 +35,45 @@ class FieldPaceTest {
 	}
 
 	@Test
-	void rivalsRunOffTheRidersBirdAndNeverTrailTheField() {
-		double field = RaceScoring.fieldPace(RaceClass.B);
-		// a slow rider: the rival still beats the field
-		assertEquals(field * 1.06D, RaceScoring.rivalPace(RaceClass.B, false, 0.5D, field), 1.0E-9);
-		// a strong rider: S Teiyo is 10 % over the rider's stack, Jolo 4 % under Teiyo
-		double s = RaceScoring.fieldPace(RaceClass.S);
-		assertEquals(1.10D * 2.0D, RaceScoring.rivalPace(RaceClass.S, false, 2.0D, s), 1.0E-9);
-		assertEquals(1.10D * 2.0D * 0.96D, RaceScoring.rivalPace(RaceClass.S, true, 2.0D, s), 1.0E-9);
+	void rivalsRunOffTheRidersBirdAndNeverTrailTheirFloor() {
+		// AI pass 2026-09-27: floor and shares re-set from RaceSimTest (the old floor 1.06 and
+		// shares 1.00-1.10 made B Teiyo faster than a maxed Green once colour was counted)
+		double field = RaceScoring.fieldPaceAbs(RaceClass.B);
+		// a slow rider: the rival sits on his floor
+		assertEquals(field * RaceScoring.rivalFloor(RaceClass.B), RaceScoring.rivalPaceAbs(RaceClass.B, false, 0.05D), 1.0E-9);
+		// a strong rider: S Teiyo is 8 % over the rider's cruise, Jolo 4 % under Teiyo
+		assertEquals(1.08D * 2.0D, RaceScoring.rivalPaceAbs(RaceClass.S, false, 2.0D), 1.0E-9);
+		assertEquals(1.08D * 2.0D * 0.96D, RaceScoring.rivalPaceAbs(RaceClass.S, true, 2.0D), 1.0E-9);
 		assertTrue(RaceScoring.rivalPace(RaceClass.A, false, 1.6D, 0.0D) < RaceScoring.rivalPace(RaceClass.S, false, 1.6D, 0.0D));
+	}
+
+	@Test
+	void rivalsPaceTheRidersLandSpeedToo() {
+		// 1.0.18 fed the rider's grade x training only and ran it on Teiyo's Black land speed:
+		// a Green rider in B met a Teiyo faster than a maxed Green. The pace now has land speed in.
+		double yellow = RaceScoring.absolutePace(ChocoboColor.YELLOW.landSpeed(), 4, 100);
+		double gold = RaceScoring.absolutePace(ChocoboColor.GOLD.landSpeed(), 4, 100);
+		assertEquals(1.08D * gold, RaceScoring.rivalPaceAbs(RaceClass.S, false, gold), 1e-9);
+		assertTrue(RaceScoring.rivalPaceAbs(RaceClass.S, false, gold) > RaceScoring.rivalPaceAbs(RaceClass.S, false, yellow));
+	}
+
+	@Test
+	void fieldBirdsKeepAQuarterOfTheirColourEdge() {
+		// a Yellow in S used to run at half a Black's pace and was never in the race
+		double ref = RaceScoring.classLandSpeed(RaceClass.S);
+		assertEquals(ref + 0.25D * (ChocoboColor.YELLOW.landSpeed() - ref),
+				RaceScoring.fieldLandSpeed(ChocoboColor.YELLOW, RaceClass.S), 1e-12);
+		for (RaceClass rc : LADDER) {
+			double lo = Double.MAX_VALUE, hi = 0.0D;
+			for (FieldRoster.Entry e : FieldRoster.home(rc)) {
+				double v = RaceScoring.fieldLandSpeed(e.color(), rc);
+				lo = Math.min(lo, v);
+				hi = Math.max(hi, v);
+			}
+			assertTrue(hi / lo < 1.20D, rc + " field spread " + hi / lo);
+		}
+		// the colours still order the field: a Black is the S favourite over a Yellow
+		assertTrue(RaceScoring.fieldLandSpeed(ChocoboColor.BLACK, RaceClass.S) > RaceScoring.fieldLandSpeed(ChocoboColor.YELLOW, RaceClass.S));
 	}
 
 	@Test

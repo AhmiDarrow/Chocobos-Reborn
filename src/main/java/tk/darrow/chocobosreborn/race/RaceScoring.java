@@ -270,17 +270,18 @@ public final class RaceScoring {
 
 	/**
 	 * FF7's Teioh runs off the player's own bird. Teiyo cruises at a share of the
-	 * best rider's grade x speed training (B 1.00, A 1.05, S 1.10), never slower
-	 * than 6 % over the field. Jolo runs 4 % under Teiyo. Set once at the grid,
-	 * so a gap during the heat changes nothing.
+	 * best rider's cruise (B 0.92, A 1.00, S 1.08; callers pass it with land speed in,
+	 * {@link #rivalPaceAbs}), never under {@link #rivalFloor} x the field. His 100-point
+	 * stamina and intelligence and S discipline do the rest (RaceSimTest). Jolo runs 4 % under
+	 * Teiyo. Set once at the grid, so a gap during the heat changes nothing.
 	 */
 	public static double rivalPace(RaceClass raceClass, boolean jolo, double riderPace, double fieldPace) {
 		double share = switch (raceClass) {
-			case C, B -> 1.00D;
-			case A -> 1.05D;
-			case S -> 1.10D;
+			case C, B -> 0.92D;
+			case A -> 1.00D;
+			case S -> 1.08D;
 		};
-		double teiyo = Math.max(fieldPace * 1.06D, share * riderPace);
+		double teiyo = Math.max(fieldPace * rivalFloor(raceClass), share * riderPace);
 		return jolo ? teiyo * 0.96D : teiyo;
 	}
 
@@ -881,5 +882,69 @@ public final class RaceScoring {
 	/** A saved heat mark that is already due must not fire on the first tick after reload. */
 	public static long persistHeatStart(long saved, long now, int period, int minLead) {
 		return saved > now ? saved : nextHeatMark(now, period, minLead);
+	}
+
+	// ---- AI pass (2026-09-27): pace in movement-speed units, colour included.
+	// A bird's land speed (Yellow 0.20 .. Gold 0.50) multiplies everything else, for a
+	// rider and for the AI alike, so pace has to be compared with it in.
+
+	/**
+	 * The land speed a class field is paced round: the colour a rider usually brings
+	 * to that class (C Yellow, B Green / Blue, A between White and Black, S a notch
+	 * over Black: the legends). Gold is the S reward, so it is not the yardstick.
+	 */
+	public static double classLandSpeed(RaceClass rc) {
+		return switch (rc) {
+			case C -> 0.20D;
+			case B -> 0.27D;
+			case A -> 0.375D;
+			case S -> 0.42D;
+		};
+	}
+
+	/** Share of a field bird's colour edge (or deficit) over {@link #classLandSpeed} it keeps. */
+	public static final double FIELD_COLOUR_SHARE = 0.25D;
+
+	/**
+	 * What a field bird of {@code color} runs at in this class instead of its raw land
+	 * speed. Without this a Yellow in S ran at half a Black's pace and was never in the
+	 * race; now the colours are the class favourites and outsiders by a few percent.
+	 */
+	public static double fieldLandSpeed(ChocoboColor color, RaceClass rc) {
+		double ref = classLandSpeed(rc);
+		return ref + FIELD_COLOUR_SHARE * (color.landSpeed() - ref);
+	}
+
+	/** A bird's cruise in movement-speed units: land speed x grade x speed training (a rider's stack). */
+	public static double absolutePace(double landSpeed, int gradeRank, int speedStat) {
+		return landSpeed * gradeSpeedMul(gradeRank) * speedTrainingMul(speedStat);
+	}
+
+	/** The class field's cruise in movement-speed units, before its +-5 % form. */
+	public static double fieldPaceAbs(RaceClass rc) {
+		return classLandSpeed(rc) * fieldPace(rc);
+	}
+
+	/**
+	 * Teiyo's / Jolo's cruise in movement-speed units: {@link #rivalPace} fed with the
+	 * best rider's own land speed x grade x training, so a rival paces a Yellow and a
+	 * Gold alike instead of running a Black's land speed on a Yellow's multiplier.
+	 */
+	public static double rivalPaceAbs(RaceClass rc, boolean jolo, double riderPaceAbs) {
+		return rivalPace(rc, jolo, riderPaceAbs, fieldPaceAbs(rc));
+	}
+
+	/**
+	 * Teiyo's slowest cruise as a share of the field's. Under 1 low down: his
+	 * 100-point stamina and intelligence are worth more against a B field (48 points)
+	 * than an S one (92), and on this floor he should sit just ahead of the field's
+	 * best bird, not a lap clear of it.
+	 */
+	public static double rivalFloor(RaceClass rc) {
+		return switch (rc) {
+			case C, B -> 0.86D;
+			case A -> 0.98D;
+			case S -> 1.03D;
+		};
 	}
 }

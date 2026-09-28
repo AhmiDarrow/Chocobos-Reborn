@@ -1230,6 +1230,90 @@ before each fork, once per lap per feature, the rider's action bar says "Shortcu
 ahead! ... stay on the coloured stripe" (with a chime) when the bird suits it, or
 "... take the road round the outside". Tests: `RaceLapProgressTest` (rewritten),
 `ShortcutMarkerTest`.
+## AI pass (2026-09-27, unreleased; Ahmi: "another AI pass for quality and balance")
+
+### Bugs found and fixed
+
+* **Rivals ignored colour.** `rivalPace` got the rider's grade x training only and ran it on
+  Teiyo's Black (0.40) / Jolo's land speed, so a Green rider in B met a Teiyo faster than a
+  maxed Green (sim: 59 s vs 69.5 s) and a Gold S Jolo beat a maxed Black. Now
+  `RaceScoring.rivalPaceAbs` is fed the rider's land speed x grade x training.
+* **Field colour spread.** Field birds ran their raw land speed: a Yellow in S was at half a
+  Black's pace, never in the race. `RaceScoring.fieldLandSpeed` = class land speed
+  (`classLandSpeed`: C 0.20, B 0.27, A 0.375, S 0.42) + a quarter of the colour's edge;
+  `RaceSession.spawnField` sets that as the field bird's `paceScale`.
+* **Sprints were "the last lap" from GO**: the AI burnt its bar off the grid and into the
+  first corner. Now `RacerProfile.finalPush` = the last lap of a GP / last half of a sprint.
+* **Boost strips**: each covers one 3-block lane (outside / centre / inside); the inside line
+  never touched an outside one. The AI now lines up for a strip at `boostAim`
+  (C 45 % .. S 95 %), `RacerLine.aimsForBoost`.
+* **Passing** always swung 2.2 outward: an outer bird aimed through the outside rail. Now
+  it goes round on the side away from the slow bird unless that side has no room, only when
+  the other bird is actually in its lane, and every aimed lane is clamped to ±4.5
+  (`RacerLine.LANE_LIMIT`, rail on the kerb at 6.5).
+* **Stumbles** rolled per tick on a 900-tick lap: a C grand-prix lap (~3500 ticks) got ~4x
+  the class rate. Now per block run (`RacerLine.stumbleChance`).
+* **Finished birds** coasted at 0.6x on the racing line (and still dashed). Now they park in
+  lane -3.5 and never dash.
+* **Dash economy**: the threshold/reserve rule hovered the bar at 30-45 % all race and flickered
+  the dash on and off at the threshold. `RacerProfile.wantsDash`: bursts with hysteresis,
+  never below 3 % (no lock), no burn into a braking corner unless the bar is plentiful,
+  plenty (reserve + 25 %) spent anywhere, the reserve spent in the push. A per-heat
+  `withTemper` (front-runner / closer) moves the reserve so the field does not look cloned.
+* **Rubber-band remnants removed**: `rubberBand` / `bandFactor`, the player-gap dash trigger
+  and `RaceSession`'s playerGap feed are gone; `RacerProfileTest` fails if a profile ever
+  grows a band / gap / player component again.
+* **Dead fields removed**: `energyDrain` / `energyRecover` and `averageSpeed()` (the AI has
+  always spent its bird's own bar). The honest number is now the simulation.
+
+Checked and fine: shortcut choice (`RacerLineTest` walks every colour x every feature on all
+24 courses: suited birds straight through, everyone else on the detour, bogs gone round by
+savvy birds of any colour), start reaction, detour connectors.
+
+### Numbers (`RacerProfile.of`)
+
+| class | cruise | dash | reserve | reaction | wobble | stumbles/lap | line | hairpin lift | boost aim |
+|---|---|---|---|---|---|---|---|---|---|
+| C | 0.885 (was 0.880) | 1.24 (1.22) | 0.05 | 14-26 | 0.90 | 0.60 (0.70) | 0.35 | 26 % (30) | 45 % |
+| B | 0.885 (0.882) | 1.32 (1.27) | 0.10 | 11-19 | 0.60 | 0.40 (0.50) | 0.60 | 21 % | 65 % |
+| A | 0.945 (0.887) | 1.40 (1.32) | 0.15 | 9-14 | 0.35 | 0.20 | 0.80 | 16 % | 85 % |
+| S | 0.990 (0.923) | 1.48 (1.36) | 0.20 | 7-11 | 0.15 | 0.05 | 0.95 | 11 % | 95 % |
+
+Rivals: S discipline; cruise = max(`rivalFloor` x field, share x rider's cruise), floor
+B 0.86 / A 0.98 / S 1.03 (was 1.06 everywhere), share B 0.92 / A 1.00 / S 1.08 (was 1.00 /
+1.05 / 1.10); Jolo 4 % under Teiyo. The floor is under 1 low down because Teiyo's 100-point
+stamina and intelligence are worth far more against a B field (48 points) than an S one.
+
+### The ladder (`RaceSimTest`, table in `build/race_sim.txt`)
+
+`RaceSim` (test code, no Minecraft) runs one bird over the real course geometry with the
+real stamina rules (pool, drain, intel skip, 1/3 recovery, lock at empty, dash / empty
+multipliers, boost strips, detour cost, 5 ticks per block of ridge for climbers) and the AI's
+real `wantsDash` / `cornerLift`. "Driven well" = dash anywhere over a quarter bar, straights
+below it, never into the lock; a rider lifts 10 % on a hairpin. Mean heat seconds over the
+six courses, reference riders Good-born C Yellow / B Green / A, S Black:
+
+| class | field avg | field best | fresh, driven well | fresh, cruising | wins field from | beats Teiyo from |
+|---|---|---|---|---|---|---|
+| C | 221.7 -> 213.2 s | 214.2 -> 205.9 | 189.1 (W) | 223.3 (L) | fresh | — |
+| B | 167.3 -> 146.3 | 144.4 -> 139.0 | 154.6 (L) | 183.9 | 25 training | 50 (1.0.18: never on a Green) |
+| A | 132.9 -> 86.8 | 85.5 -> 76.9 | 113.3 (L) | 136.8 | 50 | 75 (1.0.18: 50) |
+| S | 124.9 -> 70.9 | 80.5 -> 63.5 | 125.8 (L) | 150.9 | 90 (1.0.18: 75) | maxed (1.0.18: 75, but Gold Jolo beat a maxed Black) |
+
+A maxed Black cruising loses S; a maxed Gold driven well wins S by ~4 % over Teiyo (who keys
+off it). The B/A/S "field avg" before is dragged down by raw-speed Yellows, so compare the
+field best. `RaceSimTest` pins every line of the ladder, plus "the AI never runs its bar
+into the lock" over every course.
+
+### Needs an in-game look
+
+* Boost-strip line-ups (a C bird swinging 4 blocks for an outside pad), passing on the inside,
+  finished birds parking in the outside lane.
+* The dash now bursts instead of flickering; S birds dash through sweepers when the bar is high.
+* Ridges: the sim charges a climber 5 ticks per block to go over (vanilla climb 0.2 b/t). If
+  climbing is slower, a Green / Black / White gains nothing from a ridge over its detour.
+* Racer `zza` is x0.98 in vanilla `aiStep`, so the AI may run ~2 % under the sim.
+* Exotic wild colours (Flame 0.40, Purple 0.45) are twice a Yellow in C: unchanged, by design?
 
 ## Open
 
