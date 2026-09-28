@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.1 - Fair Odds
+Uploaded 2026-09-28: `chocobosreborn-1.1.1.jar` as file **9004058** ("Chocobos Reborn 1.1.1 - Fair Odds",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.1.md`) via
+`tools/upload_curseforge.py`. Riders bump outside heats too; Rook never pays more than the purse (stake cap purse / odds), duel stakes stop at the course purse, a heat with any finisher settles bets. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.1
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9004058
+SHA-256: `f30fe6450c41c1a32262720694829e7c50557ac0a9041dc3951952de94bd9dfb`.
+
 ## 1.1.0 - Full Grid
 Uploaded 2026-09-28: `chocobosreborn-1.1.0.jar` as file **8999472** ("Chocobos Reborn 1.1.0 - Full Grid",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.0.md`) via
