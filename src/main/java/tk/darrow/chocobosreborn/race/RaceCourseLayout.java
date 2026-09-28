@@ -2642,6 +2642,26 @@ public final class RaceCourseLayout {
 		return out;
 	}
 
+	/**
+	 * {@link #clearChunks} plus the course's whole island slot ({@link RaceTrack#MAX_ISLAND_RADIUS}
+	 * about its centre), for relaying an island an older plan laid: that plan's lap may have been
+	 * three times as long, its road far outside the new island's box. Slots never overlap
+	 * (RaceTrackTest's grid test), and nothing near another island or the village is in the set.
+	 */
+	public Set<Long> slotClearChunks() {
+		Set<Long> out = new HashSet<>(clearChunks());
+		int r = (int) Math.ceil(RaceTrack.MAX_ISLAND_RADIUS);
+		int cx = (int) Math.floor(track.centerX()), cz = (int) Math.floor(track.centerZ());
+		for (int x = (cx - r) >> 4; x <= (cx + r) >> 4; x++) {
+			for (int z = (cz - r) >> 4; z <= (cz + r) >> 4; z++) {
+				if (!nearVillage(x, z) && !nearOtherIsland(x, z)) {
+					out.add(chunkKey(x, z));
+				}
+			}
+		}
+		return out;
+	}
+
 	/** Lowest and highest y the plan uses. */
 	public int minY() {
 		return blocks.keySet().stream().mapToInt(Cell::y).min().orElse(0);

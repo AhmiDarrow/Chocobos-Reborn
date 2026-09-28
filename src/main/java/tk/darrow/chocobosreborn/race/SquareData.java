@@ -27,6 +27,8 @@ public class SquareData extends SavedData {
 	}
 
 	private final java.util.Set<Integer> builtTracks = new java.util.HashSet<>();
+	/** Islands an older course plan laid that have not been relaid since: their old blocks may reach past the new island. */
+	private final java.util.Set<Integer> staleTracks = new java.util.HashSet<>();
 	private boolean paddockBuilt;
 	private int paddockVersion;
 	/** Course plan version the built islands were laid with; a newer plan relays them on next use. */
@@ -51,6 +53,9 @@ public class SquareData extends SavedData {
 		SquareData d = new SquareData();
 		for (int id : tag.getIntArray("BuiltTracks")) {
 			d.builtTracks.add(id);
+		}
+		for (int id : tag.getIntArray("StaleTracks")) {
+			d.staleTracks.add(id);
 		}
 		d.paddockBuilt = tag.getBoolean("PaddockBuilt");
 		d.paddockVersion = tag.getInt("PaddockVersion");
@@ -91,6 +96,7 @@ public class SquareData extends SavedData {
 	@Override
 	public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
 		tag.putIntArray("BuiltTracks", builtTracks.stream().mapToInt(Integer::intValue).toArray());
+		tag.putIntArray("StaleTracks", staleTracks.stream().mapToInt(Integer::intValue).toArray());
 		tag.putBoolean("PaddockBuilt", paddockBuilt);
 		tag.putInt("PaddockVersion", paddockVersion);
 		tag.putInt("CourseVersion", courseVersion);
@@ -206,13 +212,24 @@ public class SquareData extends SavedData {
 
 	public void setBuilt(RaceTrack track) {
 		builtTracks.add(track.ordinal());
+		staleTracks.remove(track.ordinal());
 		setDirty();
 	}
 
-	/** Forget every built course (a world reset); courses are re-laid on first use. */
+	/**
+	 * Forget every built course (a world reset or a new course plan); courses are re-laid on
+	 * first use. What was built stays marked stale until then, so its relay sweeps the whole
+	 * island slot for road an older, bigger plan left behind.
+	 */
 	public void clearBuilt() {
+		staleTracks.addAll(builtTracks);
 		builtTracks.clear();
 		setDirty();
+	}
+
+	/** Laid by an older plan and not relaid since. */
+	public boolean isStale(RaceTrack track) {
+		return staleTracks.contains(track.ordinal());
 	}
 
 	public boolean paddockBuilt() {

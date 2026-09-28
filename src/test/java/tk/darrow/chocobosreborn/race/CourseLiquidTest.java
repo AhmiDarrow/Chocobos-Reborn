@@ -148,4 +148,37 @@ class CourseLiquidTest {
 			assertTrue(clear.size() > layout.chunks().size(), track + " clears a ring for an older, wider plan");
 		}
 	}
+
+	/**
+	 * Relaying an island an older plan laid sweeps its whole slot (a grand prix lap that shrank
+	 * from 1000 to 300 blocks left its old road far outside the new box), but never another
+	 * island or the village.
+	 */
+	@Test
+	void staleIslandSweepCoversItsSlotAndNothingElse() {
+		Map<Long, RaceTrack> owner = new HashMap<>();
+		for (RaceTrack track : RaceTrack.values()) {
+			for (long key : RaceCourseLayout.of(track).chunks()) {
+				owner.put(key, track);
+			}
+		}
+		int r = (int) Math.ceil(RaceTrack.MAX_ISLAND_RADIUS) - 32;
+		for (RaceTrack track : RaceTrack.values()) {
+			RaceCourseLayout layout = RaceCourseLayout.of(track);
+			Set<Long> sweep = layout.slotClearChunks();
+			assertTrue(sweep.containsAll(layout.clearChunks()), track + " sweep holds the ordinary clear");
+			for (long key : sweep) {
+				RaceTrack o = owner.get(key);
+				assertTrue(o == null || o == track, track + " would sweep a chunk of " + o);
+				assertTrue(!RaceCourseLayout.nearVillage((int) (key >> 32), (int) key), track + " would sweep near the village");
+			}
+			// the old plan's reach: well out toward the slot edge on every side
+			int cx = (int) Math.floor(track.centerX()), cz = (int) Math.floor(track.centerZ());
+			for (int[] d : new int[][] {{r, 0}, {-r, 0}, {0, r}, {0, -r}}) {
+				long key = RaceCourseLayout.chunkKey((cx + d[0]) >> 4, (cz + d[1]) >> 4);
+				assertTrue(sweep.contains(key) || RaceCourseLayout.nearVillage((cx + d[0]) >> 4, (cz + d[1]) >> 4),
+						track + " sweep misses " + d[0] + "," + d[1] + " from the centre");
+			}
+		}
+	}
 }

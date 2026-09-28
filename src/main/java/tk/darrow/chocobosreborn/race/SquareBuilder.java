@@ -48,7 +48,7 @@ public final class SquareBuilder {
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 11;
+	public static final int COURSE_VERSION = 12;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/**
@@ -117,7 +117,9 @@ public final class SquareBuilder {
 		}
 		RaceCourseLayout layout = RaceCourseLayout.of(track);
 		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
-		int cleared = clearIsland(level, layout);
+		// an island an older plan laid may have been much bigger (the short grands prix shrank
+		// laps from 1000 to 300 blocks): sweep its whole slot, not just the new island's box
+		int cleared = clearIsland(level, layout, data.isStale(track) ? layout.slotClearChunks() : layout.clearChunks());
 		for (Map.Entry<RaceCourseLayout.Cell, String> e : plan.entrySet()) {
 			RaceCourseLayout.Cell c = e.getKey();
 			level.setBlock(new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()), 2);
@@ -146,14 +148,14 @@ public final class SquareBuilder {
 	 * and empty sections are skipped, so on a sky island this is a scan of the few
 	 * sections the course sits in.
 	 */
-	private static int clearIsland(ServerLevel level, RaceCourseLayout layout) {
+	private static int clearIsland(ServerLevel level, RaceCourseLayout layout, java.util.Set<Long> chunks) {
 		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
 		int lo = Math.max(level.getMinBuildHeight(), layout.minY() - 16);
 		int hi = Math.min(level.getMaxBuildHeight() - 1, layout.maxY() + 32);
 		BlockState air = Blocks.AIR.defaultBlockState();
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 		int cleared = 0;
-		for (long key : layout.clearChunks()) {
+		for (long key : chunks) {
 			int cx = (int) (key >> 32), cz = (int) key;
 			// a chunk no plan ever reached was never generated and holds nothing; asking at
 			// EMPTY reads what is saved without generating it on the server thread

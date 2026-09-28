@@ -529,7 +529,7 @@ class RaceTrackTest {
 		// markers; 11: the 48-course swap (grand prix laps lengthened on six courses, boost
 		// strips and set pieces follow the new format).
 		// Older islands have to be re-laid either way.
-		assertEquals(11, SquareBuilder.COURSE_VERSION);
+		assertEquals(12, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test
