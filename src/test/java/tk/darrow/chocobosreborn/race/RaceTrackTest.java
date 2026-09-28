@@ -221,10 +221,13 @@ class RaceTrackTest {
 			}
 			for (RaceTrack g : RaceTrack.grandsPrixOf(rc)) {
 				assertTrue(g.getLaps() >= 3 && g.getLaps() <= 5, g.name() + " laps " + g.getLaps());
-				assertTrue(g.lapLength() >= 595.0D, g.name() + " lap " + g.lapLength() + " is shorter than the old shortest sprint");
-				assertTrue(g.lapLength() < shortestSprint, g.name() + " lap is not shorter than the class's sprints");
+				// a grand prix is a short circuit: its lap is a fixed share of the class's shortest sprint
+				double share = g.lapLength() / shortestSprint;
+				double[] window = grandPrixLapShare(g.getLaps());
+				assertTrue(share >= window[0] && share <= window[1], g.name() + " (" + g.getLaps() + " laps) lap is " + share
+						+ "x the class's shortest sprint, wants " + window[0] + "-" + window[1]);
 				double heat = g.raceLength() / shortestSprint;
-				assertTrue(heat >= 1.6D && heat <= 3.4D, g.name() + " heat is " + heat + "x the class's shortest sprint");
+				assertTrue(heat >= 1.15D && heat <= 1.6D, g.name() + " heat is " + heat + "x the class's shortest sprint");
 				for (RaceTrack h : RaceTrack.grandsPrixOf(rc)) {
 					if (g.getLaps() > h.getLaps()) {
 						assertTrue(g.lapLength() <= h.lapLength() + 5.0D, g.name() + " (" + g.getLaps() + " laps, " + Math.round(g.lapLength())
@@ -239,6 +242,19 @@ class RaceTrackTest {
 			assertTrue(minLap(RaceTrack.sprintsOf(ladder[c])) > minLap(RaceTrack.sprintsOf(ladder[c - 1])), "sprints get longer up the ladder");
 			assertTrue(minLap(RaceTrack.grandsPrixOf(ladder[c])) > minLap(RaceTrack.grandsPrixOf(ladder[c - 1])), "grand prix laps get longer up the ladder");
 		}
+	}
+
+	/**
+	 * Grand prix lap as a share of the class's shortest sprint lap (Ahmi: "grand prix are supposed to be
+	 * short courses, multiple laps; sprints long one-lap tracks"): C about 5 x 300, 4 x 355, 3 x 440;
+	 * the heat runs about 1.3x a sprint.
+	 */
+	static double[] grandPrixLapShare(int laps) {
+		return switch (laps) {
+			case 5 -> new double[] {0.24D, 0.29D};
+			case 4 -> new double[] {0.28D, 0.34D};
+			default -> new double[] {0.34D, 0.42D};
+		};
 	}
 
 	private static double minLap(List<RaceTrack> tracks) {
