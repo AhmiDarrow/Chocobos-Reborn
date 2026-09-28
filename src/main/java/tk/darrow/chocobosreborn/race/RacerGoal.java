@@ -104,6 +104,11 @@ public class RacerGoal extends Goal {
 		return true;
 	}
 
+	/** The course this goal races. */
+	public RaceTrack track() {
+		return track;
+	}
+
 	public boolean dashing() {
 		return dashing;
 	}

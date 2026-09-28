@@ -1869,6 +1869,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Turn this bird into a Square AI racer: only the racer goal and floating. */
 	public void installRacer(net.minecraft.world.entity.ai.goal.Goal racer) {
+		this.racerTrack = racer instanceof tk.darrow.chocobosreborn.race.RacerGoal g ? g.track() : null;
 		this.moveControl = new tk.darrow.chocobosreborn.race.RacerMoveControl(this);
 		this.goalSelector.removeAllGoals(g -> true);
 		this.targetSelector.removeAllGoals(g -> true);
@@ -2098,13 +2099,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Progress hint for {@link #onRidge}, so a climber pressed on a wall does not scan the whole lap each tick. */
 	private double climbHint = -1.0D;
+	/** The course of the racer goal installed on a field bird ({@link #installRacer}); server side only. */
+	private @org.jetbrains.annotations.Nullable RaceTrack racerTrack;
 
 	/**
-	 * On its course's ridge band. Worked out from synced state (the racing flag, the track,
-	 * the position), so the rider's client and the server agree where a climber may climb.
+	 * On its course's ridge band. A rider's bird reads its synced track (so the rider's client
+	 * and the server agree); a field bird is never given one (RaceSession sets it on the
+	 * riders' birds only), so it reads its racer goal's. byId(-1) is C_MEADOW, which has no
+	 * ridge: reading that left every AI climber (Teioh included) pressed on the ridge face.
+	 * A racing bird with no known course climbs as it always did.
 	 */
 	private boolean onRidge() {
-		RaceTrack track = RaceTrack.byId(raceTrack());
+		RaceTrack track = raceTrack() >= 0 ? RaceTrack.byId(raceTrack()) : racerTrack;
+		if (track == null) {
+			return true;
+		}
 		double t = track.progressAt(getX(), getZ(), climbHint);
 		climbHint = t;
 		return track.ridgeBandAt(t, track.laneAt(t, getX(), getZ()));
