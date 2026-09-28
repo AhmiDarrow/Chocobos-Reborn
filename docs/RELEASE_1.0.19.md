@@ -25,28 +25,14 @@ Minecraft 1.21.1, NeoForge 21.1.249, Java 21, client and server.
   take it straight or should go round the outside, with a chime when it can.
 - Each course picks up its markers the next time a race runs there.
 
-**Points by distance**
-
-- **A win is worth what the heat is long.** A sprint win is 4 points. A
-  grand prix win scores by its length against the class's shortest sprint,
-  so a five-lap heat is worth more than a three-lap one. The course list
-  shows each course's points. 36 points promote: nine sprint wins, or fewer
-  grands prix.
-- **The purse follows.** A sprint pays the class base (6 / 12 / 24 / 48 GP),
-  a grand prix the base scaled by the same ratio. Second and third still take
-  half and a quarter.
-- After a ranked win you're told what it earned: "+10 points (26 of 36)".
-
 **Old birds**
 
 Birds from older versions join the current rules. The first time a bird
 saved by an earlier version loads, it is converted once, and only once.
 
-- **Race progress keeps its share.** Points toward promotion are now out
-  of 36: a bird's points of nine are multiplied by four (5 of 9 becomes 20 of
-  36). First-place marks toward the old three-win promotion go through both
-  steps: one mark is 12 points, two marks are 24. A Class S bird shows the
-  full ladder.
+- **Race progress keeps its share.** First-place marks toward the old
+  three-win promotion become points of nine. One mark is 3 points, two marks
+  are 6. A Class S bird shows the full ladder.
 - **Birds from before bloodlines get born stats.** A bird with no born stats
   at all rolls them from its birth grade, the same roll a wild bird gets
   today. A Wonderful bird starts ahead of a Poor one. Its greens training,
