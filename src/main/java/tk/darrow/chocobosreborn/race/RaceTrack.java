@@ -45,9 +45,9 @@ public enum RaceTrack {
 	// the island, see slotOf), theme, shape, lap length target in blocks, laps (1 = sprint,
 	// 3-5 = grand prix), features
 	// ---- C: meadow, orchard, shore (0-2 grands prix, 3-5 sprints)
-	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 600, 5, boost(0.10), boost(0.56), boost(0.93)),
-	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 660, 4, boost(0.18), boost(0.36), boost(0.93)),
-	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 760, 3, boost(0.19), boost(0.80), boost(0.93)),
+	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 305, 5, boost(0.34), boost(0.54), boost(0.86)),
+	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 355, 4, boost(0.17), boost(0.47), boost(0.88)),
+	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 460, 3, boost(0.18), boost(0.53), boost(0.88)),
 	C_DOWNS(RaceClass.C, 3, Theme.MEADOW, Shape.ROVAL, 1150, 1, boost(0.11), boost(0.47), boost(0.58), boost(0.66), boost(0.93)),
 	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 1, boost(0.42), boost(0.59), boost(0.70), boost(0.85), boost(0.93)),
 	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 1, boost(0.10), boost(0.22), boost(0.46), boost(0.81), boost(0.92)),
@@ -79,9 +79,9 @@ public enum RaceTrack {
 	C_HARVEST(RaceClass.C, 6, Theme.FARMLAND, Shape.SCYTHE, 1200, 1, boost(0.16), boost(0.30), boost(0.57), boost(0.66), boost(0.78)),
 	C_HONEYCOMB(RaceClass.C, 7, Theme.ORCHARD, Shape.HONEYCOMB, 1160, 1, boost(0.14), boost(0.31), boost(0.48), boost(0.64), boost(0.81)),
 	C_SCALLOP(RaceClass.C, 8, Theme.SHORE, Shape.SCALLOP, 1240, 1, boost(0.17), boost(0.32), boost(0.43), boost(0.61), boost(0.76)),
-	C_HEARTFIELD(RaceClass.C, 9, Theme.MEADOW, Shape.HEART, 630, 5, boost(0.36), boost(0.71), boost(0.93)),
-	C_KITE_HILL(RaceClass.C, 10, Theme.MEADOW, Shape.KITE, 700, 4, boost(0.21), boost(0.46), boost(0.93)),
-	C_HORSESHOE(RaceClass.C, 11, Theme.FARMLAND, Shape.HORSESHOE, 800, 3, boost(0.15), boost(0.36), boost(0.76)),
+	C_HEARTFIELD(RaceClass.C, 9, Theme.MEADOW, Shape.HEART, 298, 5, boost(0.30), boost(0.63), boost(0.88)),
+	C_KITE_HILL(RaceClass.C, 10, Theme.MEADOW, Shape.KITE, 388, 4, boost(0.16), boost(0.54), boost(0.88)),
+	C_HORSESHOE(RaceClass.C, 11, Theme.FARMLAND, Shape.HORSESHOE, 480, 3, boost(0.15), boost(0.53), boost(0.88)),
 	// ---- new C courses (phase 2) end ----
 
 	// ---- new B courses (phase 2) begin ----
@@ -205,12 +205,12 @@ public enum RaceTrack {
 	 * never touch another leg at any scale in use.
 	 */
 	public enum Shape {
-		/** A flat-out stadium oval with a chicane on the back straight. */
-		STADIUM(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 1), p(178, 10, 2), p(200, 40, 3), p(178, 70, 2), p(140, 80, 1), p(110, 80, 0), p(96, 68, 0), p(80, 80, 0), p(40, 80, 0), p(0, 80, 0), p(-40, 70, 0), p(-60, 40, 0), p(-40, 10, 0), p(-30, 0, 0)),
-		/** Lightning-bolt switchbacks with a climb through the middle. */
-		ZIGZAG(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(112, 12, 1), p(104, 40, 2), p(64, 52, 3), p(30, 62, 4), p(20, 86, 5), p(40, 106, 5), p(80, 112, 4), p(112, 122, 3), p(118, 148, 2), p(92, 166, 1), p(50, 168, 0), p(14, 162, 0), p(-10, 140, 0), p(-20, 108, 0), p(-24, 70, 0), p(-28, 36, 0), p(-30, 0, 0)),
-		/** Two round lobes joined through a narrow waist. */
-		PEANUT(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(112, 14, 1), p(118, 44, 2), p(104, 70, 2), p(80, 86, 1), p(68, 110, 1), p(78, 134, 2), p(102, 152, 3), p(108, 180, 3), p(88, 206, 2), p(50, 214, 1), p(14, 202, 0), p(-6, 174, 0), p(0, 146, 0), p(20, 128, 0), p(26, 104, 0), p(10, 84, 0), p(-6, 58, 0), p(-10, 30, 0), p(-30, 0, 0)),
+		/** A short stadium oval: a crest through turn one, a bus-stop chicane kinking out of the back straight, and a long tightening final sweeper onto the line. */
+		STADIUM(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(82, 0, 1), p(98, 8, 2), p(106, 24, 4), p(100, 40, 3), p(84, 46, 1), p(66, 46, 0), p(46, 46, 0), p(38, 56, 0), p(24, 56, 0), p(16, 46, 0), p(0, 46, 0), p(-16, 46, 0), p(-34, 44, 0), p(-48, 34, 0), p(-53, 20, 0), p(-46, 6, 0), p(-30, 0, 0)),
+		/** A lightning bolt: esses stepping out and up the right side, a plateau across the top, and a zig back down the far side. */
+		ZIGZAG(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(88, 0, 0), p(102, 10, 1), p(104, 30, 2), p(112, 46, 3), p(130, 56, 3), p(140, 74, 4), p(138, 96, 5), p(124, 106, 5), p(102, 104, 5), p(84, 98, 5), p(70, 84, 4), p(58, 66, 3), p(40, 56, 2), p(16, 54, 1), p(-10, 54, 0), p(-30, 46, 0), p(-40, 28, 0), p(-40, 10, 0), p(-30, 0, 0)),
+		/** Two lobes through a narrow waist: the climb through the waist, a round top lobe at the crest, down through the waist again and a harbour chicane before the line. */
+		PEANUT(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(77, 0, 0), p(94, 0, 0), p(108, 9, 1), p(115, 25, 1), p(120, 41, 1), p(113, 56, 2), p(102, 68, 2), p(94, 83, 3), p(98, 99, 3), p(107, 114, 4), p(113, 129, 4), p(106, 144, 5), p(94, 157, 5), p(82, 168, 5), p(66, 168, 5), p(53, 158, 5), p(39, 148, 4), p(30, 134, 3), p(32, 118, 1), p(37, 101, 0), p(38, 85, 0), p(28, 71, 0), p(15, 60, 0), p(-1, 61, 0), p(-17, 67, 0), p(-34, 71, 0), p(-48, 63, 0), p(-60, 51, 0), p(-63, 34, 0), p(-60, 18, 0), p(-51, 4, 0), p(-30, 0, 0)),
 		/** Three long straights and three tight corners: a triangle. */
 		DELTA(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(180, 0, 0), p(212, 6, 1), p(220, 28, 2), p(200, 54, 3), p(160, 90, 4), p(120, 126, 4), p(80, 160, 3), p(46, 180, 2), p(16, 176, 1), p(0, 156, 0), p(-4, 120, 0), p(-8, 80, 0), p(-14, 40, 0), p(-30, 0, 0)),
 		/** A drag strip out to a round loop and the same strip back. */
@@ -260,16 +260,16 @@ public enum RaceTrack {
 		// ---- new C shapes (phase 2) begin ----
 		/** A scythe: the handle is the start straight, the blade sweeps up and back over rolling hills to its tip. */
 		SCYTHE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 1), p(170, 0, 2), p(208, 12, 3), p(230, 45, 5), p(238, 95, 6), p(226, 145, 5), p(192, 190, 7), p(140, 220, 8), p(80, 232, 6), p(20, 226, 7), p(-24, 206, 8), p(-40, 176, 8), p(-18, 150, 7), p(30, 152, 5), p(84, 150, 6), p(128, 136, 4), p(158, 108, 3), p(164, 76, 2), p(140, 56, 1), p(90, 52, 1), p(30, 52, 0), p(-20, 50, 0), p(-46, 30, 0), p(-30, 0, 0)),
-		/** A kite: a diamond climbing to its tip, and its tail of bows swinging back to the line. */
-		KITE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 1), p(160, 2, 2), p(186, 28, 3), p(198, 90, 4), p(210, 150, 5), p(222, 190, 5), p(212, 214, 5), p(190, 222, 5), p(150, 210, 4), p(90, 198, 3), p(28, 186, 2), p(2, 160, 1), p(-14, 126, 1), p(10, 94, 0), p(-18, 62, 0), p(-40, 30, 0), p(-30, 0, 0)),
+		/** A kite: a long diamond whose far corner is the tip over the crest, and its tail streaming in an S down the run back to the point. */
+		KITE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(76, 0, 0), p(93, 3, 0), p(104, 15, 1), p(107, 32, 1), p(108, 48, 2), p(110, 64, 3), p(111, 80, 4), p(112, 96, 4), p(103, 111, 5), p(88, 117, 6), p(73, 123, 6), p(58, 128, 6), p(42, 134, 6), p(26, 137, 6), p(11, 129, 5), p(5, 114, 4), p(1, 98, 4), p(-8, 84, 3), p(-21, 74, 2), p(-33, 63, 2), p(-44, 51, 1), p(-48, 35, 1), p(-52, 19, 0), p(-45, 4, 0), p(-30, 0, 0)),
 		/** A scallop shell: the hinge and its two ears along the bottom, a ribbed rim rolling over the top. */
 		SCALLOP(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(132, 6, 1), p(146, 30, 1), p(124, 52, 2), p(150, 84, 2), p(196, 110, 3), p(224, 150, 4), p(206, 176, 4), p(196, 214, 5), p(164, 234, 5), p(140, 262, 6), p(100, 266, 6), p(70, 282, 6), p(30, 282, 6), p(0, 266, 5), p(-40, 262, 5), p(-64, 234, 4), p(-96, 214, 4), p(-106, 176, 3), p(-124, 150, 3), p(-96, 110, 2), p(-50, 84, 1), p(-24, 52, 1), p(-46, 30, 0), p(-40, 6, 0), p(-30, 0, 0)),
-		/** A heart: the point on the start line, two round lobes and the dip between them. */
-		HEART(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 1), p(190, 10, 2), p(224, 44, 3), p(232, 90, 4), p(214, 132, 4), p(170, 150, 3), p(150, 170, 3), p(132, 214, 4), p(90, 232, 4), p(44, 224, 3), p(10, 190, 2), p(-4, 140, 1), p(-12, 100, 0), p(-22, 60, 0), p(-44, 20, 0), p(-30, 0, 0)),
+		/** A heart: a long lobe up to the crest, a flick through the dip at the top, the second lobe and the point onto the start straight. */
+		HEART(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(96, 1, 1), p(110, 10, 2), p(118, 26, 3), p(114, 44, 4), p(100, 56, 4), p(84, 60, 5), p(72, 60, 5), p(62, 70, 5), p(49, 86, 5), p(30, 96, 4), p(10, 96, 3), p(-10, 88, 2), p(-24, 72, 1), p(-32, 54, 0), p(-38, 34, 0), p(-44, 18, 0), p(-40, 6, 0), p(-30, 0, 0)),
 		/** Three honeycomb cells: twelve short sides and gentle corners, climbing cell to cell. */
 		HONEYCOMB(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(120, 0, 0), p(135, 52, 0), p(150, 104, 1), p(210, 104, 2), p(270, 104, 3), p(300, 156, 3), p(330, 208, 4), p(300, 260, 4), p(270, 312, 5), p(210, 312, 5), p(150, 312, 5), p(120, 364, 6), p(90, 416, 6), p(30, 416, 6), p(-30, 416, 5), p(-60, 364, 5), p(-90, 312, 4), p(-60, 260, 3), p(-30, 208, 3), p(-60, 156, 2), p(-90, 104, 1), p(-60, 52, 0), p(-30, 0, 0)),
-		/** A horseshoe, heels up: round the toe, over one heel, down the inside and over the other. */
-		HORSESHOE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(98, 8, 1), p(122, 34, 2), p(130, 70, 3), p(130, 110, 4), p(136, 146, 5), p(126, 170, 5), p(100, 174, 5), p(84, 150, 4), p(82, 112, 3), p(78, 80, 2), p(60, 56, 1), p(35, 48, 1), p(10, 56, 1), p(-8, 80, 2), p(-12, 112, 3), p(-14, 150, 4), p(-30, 174, 4), p(-56, 170, 4), p(-66, 146, 3), p(-60, 110, 2), p(-60, 70, 1), p(-50, 30, 0), p(-30, 0, 0)),
+		/** A horseshoe, heels up: a fast toe (the start straight), over one heel, down into the notch and a compression at its foot, up over the other heel. */
+		HORSESHOE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(77, 0, 0), p(94, 2, 0), p(107, 13, 1), p(112, 29, 1), p(112, 46, 2), p(112, 63, 3), p(112, 80, 3), p(112, 97, 4), p(105, 112, 5), p(90, 118, 5), p(74, 113, 5), p(65, 99, 5), p(65, 82, 5), p(56, 68, 3), p(40, 64, 1), p(23, 64, 1), p(9, 73, 1), p(5, 89, 2), p(2, 106, 3), p(-10, 117, 4), p(-27, 118, 5), p(-43, 114, 5), p(-52, 99, 5), p(-53, 82, 4), p(-54, 65, 3), p(-56, 48, 2), p(-57, 32, 1), p(-53, 15, 0), p(-41, 4, 0), p(-30, 0, 0)),
 		// ---- new C shapes (phase 2) end ----
 
 		// ---- new B shapes (phase 2) begin ----

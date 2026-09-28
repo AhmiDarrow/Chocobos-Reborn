@@ -1893,3 +1893,58 @@ a sprint; points never fall as the heat grows; the formula over ratios 1.15-3.4;
 promote (eight do not); grand prix wins to promote = ceil(36 / points), fewer than nine; Class S
 stays; purse = base x points / 4 and places half / quarter; plus the table. `RaceScoringTest` and
 `OldSaveConversionTest` moved to the 36 ladder.
+
+### Short grands prix: class C
+
+Ahmi: "Grand prix are supposed to be short courses, multiple laps; sprints long one-lap tracks" (a C
+grand prix was 5 x 630 = 3150 blocks, about five minutes). The six C grands prix are rebuilt to the
+lap-share rule in `RaceTrackTest.grandPrixLapShare` against C's shortest sprint (C_DOWNS, 1150): all
+six new shapes, laps 298-480, heats 1380-1552 blocks (1.20-1.35x a sprint). Sprints untouched. Every
+id, ordinal, index, theme, lap count, course name, shape name and set piece is unchanged (the set
+pieces still stand at t = 0.5 on the outside, and every one still fits beside the smaller road).
+
+| id | name | laps x lap | heat (x sprint) | shape | features | landmark | borrows from |
+|---|---|---|---|---|---|---|---|
+| c_meadow | Meadow Circuit | 5 x 305 | 1525 (1.33x) | STADIUM: short oval, crest in turn 1 (hill 3), bus-stop chicane kinking out of the back straight, one long constant sweeper onto the line | 3 boosts (0.34, 0.54, 0.86) | lone oak, beside the chicane | Baby Park's tiny oval; the chicane is a Monza-style braking chicane on a straight (Variante / the old Spa Bus Stop), the final sweeper a gentler Parabolica |
+| c_orchard | Orchard Loop | 4 x 355 | 1420 (1.23x) | ZIGZAG: a lightning bolt; the right side steps out and up (hill 5), a plateau across the top, a zig back down the far side | 3 boosts (0.17, 0.47, 0.88) | great cherry | Suzuka's uphill S-curves on the right-side steps; the zig down is a downhill esses (Becketts in reverse) |
+| c_shore | Shore Grand Prix | 3 x 460 | 1380 (1.20x) | PEANUT: two lobes through a narrow waist; up through the waist to a round top lobe at the crest (hill 5), back down through the waist, a harbour chicane before the final corner | 3 boosts (0.18, 0.53, 0.88) | striped lighthouse | Monaco: Sainte-Devote-style turn 1, the climb to a Casino-square loop, the waist as the squeeze past the harbour, the Nouvelle-chicane / Piscine flick on the waterfront before the line |
+| c_heartfield | Heartfield Grand Prix | 5 x 298 | 1490 (1.30x) | HEART: long lobe up to the crest, the dip flicked at the top (hill 5), second lobe, down the far side to the point onto the line | 3 boosts (0.30, 0.63, 0.88) | hot-air balloon | COTA turn 1 (a climb into a tight crest corner) for the dip; the point is a Rascasse-style last corner onto the straight |
+| c_kite_hill | Kite Hill | 4 x 388 | 1552 (1.35x) | KITE: a long diamond, climbing the right side to the tip over the crest (hill 6), a fast top edge, the tail streaming in an S down to the point | 3 boosts (0.16, 0.54, 0.88) | kite on a chain | Spa's Raidillon (the long climb to a blind crest), Maggotts-Becketts for the tail S, Luigi Circuit's long straight into turn 1 |
+| c_horseshoe | Horseshoe Farm | 3 x 480 | 1440 (1.25x) | HORSESHOE: heels up; a fast toe (the start straight), up and over one heel (hill 5), down into the notch and a compression at its foot (hill 1), up over the other heel | 3 boosts (0.15, 0.53, 0.88) | red barn and silo, standing in the notch | Eau Rouge / Raidillon: down into the dip and straight back up, twice over the two heels; Mario Circuit's U-turns |
+
+Numbers held: every C grand prix lap share in the window (5 laps 0.259-0.265, 4 laps 0.309-0.337,
+3 laps 0.400-0.417), more laps never a longer lap (5: 298-305 <= 4: 355-388 <= 3: 460-480), heats
+1.20-1.35x. The shortest C lap (298) stays under the least a B grand prix can be (0.24 x 1280 =
+307), so "grand prix laps get longer up the ladder" holds whatever B lands with. Open road, three
+boosts each on corner exits (`turnAhead(45) < 0.7`), start straight turns 0.041-0.100 rad over 40
+blocks, closest legs 36.5-52 blocks (need 30), hills 3-6, three stands each (2 in, 1 out), 36-43 fans.
+
+**How the shapes were made**: a lap this short scales every silhouette down, and the rules fight
+it: the grid needs ~70 blocks of straight (40 blocks past t = 0), any two points 80 blocks apart
+along the lap must be 30 apart, and a C corner should not go under about 11 blocks of radius. The
+old shapes shrunk to size fail all three, so each was redrawn (scratch Python mirror of
+`TrackSpline`, not committed): tightest corners are the Meadow chicane (~10), the Heart point and
+the Orchard last corner (~11), the Kite and Shore (~13), Horseshoe (~15). No crossover: the legs
+test is 2D, so a figure-eight cannot pass. Two things the layout tests caught on the way and the
+shapes now avoid: a height change right next to a fold (Heartfield's dip was on a slope, so the
+margin grass of the upper leg stood over the lower road) and a SHORE pool on a hill step near the
+chicane (its water ran down onto the road); both stretches are now level.
+
+**Ladder** (`RaceSimTest`, every line green, no expectation moved): C field average 202.0 -> 136.6 s,
+field best 195.1 -> 131.8 s, fresh Good Yellow driven well 178.8 -> 118.2 s (wins by 10.3 %, was
+8.4 %), cruising 211.7 -> 141.5 s (loses to the field average by 3.6 %, was 4.8 %). The heats are
+about a third shorter, so the means drop; the ratios barely move.
+
+**GameTest** `squareBuildsCourseAndRunsHeat` (course 0, C_MEADOW): at tick 2100 it now asks for three
+racers with **two** laps done (`lapsDone(2) >= 3`, was one). Two laps are 610 blocks, the same
+distance the old single 600-block lap asked for in the same ~92 s (about 70 % of the C field's ~9.7
+blocks a second). Not run here; if it is flaky in-game, going back to `lapsDone(1)` is the safe
+fallback. `twoAiBirdsInOneLaneNeverOverlapAndBothLap` (C_MEADOW, one lap in 3500 ticks) and
+`duelIsOneOnOne` (C_SHORE stalls) only get easier.
+
+**For the merge**: six existing islands changed shape, so `COURSE_VERSION` should go 11 -> 12 (and
+`RaceTrackTest.courseVersionElevenRelaysTheIslands` with it); left alone here as the phase-2 rules
+say. Full `test` on this branch: 244 tests, 1 skipped, 1 failure, `sprintsAreOneLongLapGrandsPrix...`
+on B_CANYON's lap share (class B not landed yet); every class C line of it passes. Needs an in-game
+look: the Meadow chicane at five-lap pace with bumping, the Heart dip and point, the Horseshoe notch
+compression, and whether three boosts on a 300-block lap feel like too many.
