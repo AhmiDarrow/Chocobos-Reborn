@@ -265,6 +265,10 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return InteractionResult.CONSUME;
 		}
+		if (!RaceScoring.mayRace(bird.color())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
+			return InteractionResult.CONSUME;
+		}
 		if (player.isSecondaryUseActive() && tk.darrow.chocobosreborn.race.HeatSchedule.entered(player.getUUID())) {
 			tk.darrow.chocobosreborn.race.HeatSchedule.drop(player);
 			tk.darrow.chocobosreborn.race.RaceManager.refundPendingBet(player);
@@ -304,6 +308,10 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		}
 		if (bird.armor() != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
+			return InteractionResult.CONSUME;
+		}
+		if (!RaceScoring.mayRace(bird.color())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
 			return InteractionResult.CONSUME;
 		}
 		if (DuelDesk.accept(player, bird)) {

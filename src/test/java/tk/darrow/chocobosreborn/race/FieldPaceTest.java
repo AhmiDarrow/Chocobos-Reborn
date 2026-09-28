@@ -93,4 +93,18 @@ class FieldPaceTest {
 			assertTrue(c == ChocoboColor.YELLOW || c == ChocoboColor.GREEN || c == ChocoboColor.BLUE, e.name() + " " + c);
 		}
 	}
+
+	@Test
+	void flameAndPurpleDoNotRaceAndNeverAppearInAField() {
+		for (ChocoboColor c : ChocoboColor.values()) {
+			boolean expected = c != ChocoboColor.FLAME && c != ChocoboColor.PURPLE;
+			assertEquals(expected, RaceScoring.mayRace(c), c.name());
+		}
+		for (FieldRoster.Entry e : FieldRoster.all()) {
+			assertTrue(RaceScoring.mayRace(e.color()), e.name() + " rides a breed that cannot race");
+		}
+		for (RaceClass rc : RaceClass.values()) {
+			assertTrue(RaceScoring.mayRace(RaceScoring.joloColor(rc)));
+		}
+	}
 }

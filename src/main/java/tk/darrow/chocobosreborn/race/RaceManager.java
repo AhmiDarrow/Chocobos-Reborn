@@ -244,6 +244,10 @@ public final class RaceManager {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			return false;
 		}
+		if (!RaceScoring.mayRace(bird.color())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
+			return false;
+		}
 		if (ranked && !RaceScoring.mayEnterCourse(bird.raceClass().getId(), track.getRaceClass().getId())) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.wrong_class"), true);
 			return false;
@@ -264,6 +268,11 @@ public final class RaceManager {
 		if (birdA.armor() != null || birdB.armor() != null) {
 			a.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
 			b.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
+			return false;
+		}
+		if (!RaceScoring.mayRace(birdA.color()) || !RaceScoring.mayRace(birdB.color())) {
+			a.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
+			b.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
 			return false;
 		}
 		if (!birdA.saddled() || !birdB.saddled() || birdA.isBaby() || birdB.isBaby()
@@ -312,6 +321,10 @@ public final class RaceManager {
 		}
 		if (bird.armor() != null) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_armor"), true);
+			return;
+		}
+		if (!RaceScoring.mayRace(bird.color())) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.no_breed"), true);
 			return;
 		}
 		if (!RaceScoring.mayEnterCourse(bird.raceClass().getId(), track.getRaceClass().getId())) {

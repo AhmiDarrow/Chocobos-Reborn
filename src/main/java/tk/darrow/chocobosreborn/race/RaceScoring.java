@@ -452,6 +452,15 @@ public final class RaceScoring {
 	}
 
 	/** Ranked: class or below. Same rule for posting or accepting a duel. */
+	/**
+	 * The Nether bird (Flame) and the End bird (Purple) do not race (Ahmi). Every
+	 * other breed may enter a heat or a duel.
+	 */
+	public static boolean mayRace(tk.darrow.chocobosreborn.breed.ChocoboColor color) {
+		return color != tk.darrow.chocobosreborn.breed.ChocoboColor.FLAME
+				&& color != tk.darrow.chocobosreborn.breed.ChocoboColor.PURPLE;
+	}
+
 	public static boolean mayEnterCourse(int birdClassId, int trackClassId) {
 		return trackClassId <= birdClassId;
 	}
