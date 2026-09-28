@@ -1,6 +1,6 @@
-# Current release: 1.0.19 - Back on track
+# Current release: 1.1.0 - Full Grid
 
-A wide line keeps the lap. A real shortcut sets the rider back on the road and holds them for a second. Every fork is marked, and the HUD says whether this bird can take it. Older birds convert once: old promotion marks become points of nine, and a bird with no born stats rolls a bloodline from its grade. See [release notes](docs/RELEASE_1.0.19.md). Server and every rider need this jar. Publication records are in docs/curseforge.md. The 1.0.18 notes remain in docs/RELEASE_1.0.18.md.
+Forty-eight courses (twelve a class): sprints one long lap, grands prix short 3-5 lap circuits about 1.3x a sprint. Racers bump (kart style). Win points and purses scale with the heat (sprint 4, promote 36; old points convert once, SAVE_FORMAT 3). AI rebuilt: honest rival pace, gap picking, detour and ridge fixes. Courses: no solids in the lanes, climbers climb only ridges in a race, race step 1.1, flared detour exits, rider/server landing agreement (COURSE_VERSION 15). Flame and Purple birds do not race. Verified by the hub harness (3 real clients, dedicated server on the hub PC): 24 grands prix, 0 stuck, analyzer clean. See [release notes](docs/RELEASE_1.1.0.md). Server and every rider need this jar. Publication records are in docs/curseforge.md.
 
 # Chocobos Reborn — session handoff (internal)
 
@@ -2539,3 +2539,13 @@ and logs `FIELD-HEAT` lap times. The sweep's rescue now uses `RaceSession.setBac
   bird is still braked on the way in.
 - The rerun of the hub harness: the bots on B_KOPJE and A_MACHETE, S_SKYWAY's first ridge, and AI pace against the
   bots on A_CANOPY and A_GROTTO. The `ai` block in `field.jsonl` now says where any stuck bird is.
+
+### Open after 1.1.0
+
+* `glacierAiUsesTheDetourOpening` (GameTest) is flaky: on the 1.1.0 release gate it failed once
+  ("the racer actually used the dry detour") and passed on the immediate rerun (71/71). A
+  non-water AI bird on B_GLACIER sometimes takes another line past the water instead of the dry
+  detour; it costs time, never a stall. Make the test deterministic (seed / start lane) or find
+  the steering branch that skips the opening.
+* In-game look still wanted: bump feel, the tightest short-GP corners, flared detour exits,
+  climbers up a ridge's side, three boost strips on a ~300-block lap.
