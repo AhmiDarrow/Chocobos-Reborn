@@ -69,14 +69,33 @@ public final class RaceCourseLayout {
 	private int decoSeed;
 	/** Set while stamping scenery: {@link #put} then refuses to touch a road tile. */
 	private boolean sparingRoad;
+	/** Stand the theme's own set piece instead of the course's ({@link #dressedAs}). */
+	private final boolean themePiece;
+	/** Set while the set piece is stamped: {@link #put} records its cells in {@link #landmarkCells}. */
+	private boolean landmarking;
+	private final Map<Cell, String> landmarkCells = new HashMap<>();
 
 	public static synchronized RaceCourseLayout of(RaceTrack track) {
 		return CACHE.computeIfAbsent(track, RaceCourseLayout::new);
 	}
 
+	/**
+	 * The course dressed in another theme, with that theme's own set piece at the far side
+	 * ({@link #themeLandmark}); never cached. For tests and previews of a theme no course
+	 * wears yet (the 48-course themes before phase 2 lays their courses).
+	 */
+	static RaceCourseLayout dressedAs(RaceTrack track, RaceTrack.Theme theme) {
+		return new RaceCourseLayout(track, theme, true);
+	}
+
 	private RaceCourseLayout(RaceTrack track) {
+		this(track, track.theme(), false);
+	}
+
+	private RaceCourseLayout(RaceTrack track, RaceTrack.Theme theme, boolean themePiece) {
 		this.track = track;
-		this.theme = track.theme();
+		this.theme = theme;
+		this.themePiece = themePiece;
 		double lap = track.lapLength();
 		int steps = (int) Math.ceil(lap * 2.0D);   // 0.5 blocks between stamps
 		boolean sky = theme == RaceTrack.Theme.SKYWAY;
@@ -156,7 +175,9 @@ public final class RaceCourseLayout {
 		}
 		standing = false;
 		sparingRoad = false;
+		landmarking = true;
 		landmark();
+		landmarking = false;
 		plugHoles();
 		for (Cell c : blocks.keySet()) {
 			chunks.add(chunkKey(c.x() >> 4, c.z() >> 4));
@@ -816,6 +837,9 @@ public final class RaceCourseLayout {
 		String wood = switch (theme) {
 			case ORCHARD -> "cherry";
 			case SHORE -> "bamboo";
+			case FARMLAND -> "birch";
+			case SAVANNA -> "acacia";
+			case MUSHROOM -> "mangrove";
 			default -> "oak";
 		};
 		// the seat rows, exactly as CourseStands placed the fans on them
@@ -967,6 +991,10 @@ public final class RaceCourseLayout {
 			case SKYWAY -> "air";
 			case KEEP -> pick == 0 ? "polished_blackstone_wall" : pick == 1 ? "magma_block" : pick == 2 ? "soul_fire" : "blackstone_wall";
 			case END -> pick == 0 ? "end_rod" : pick == 1 ? "chorus_flower" : pick == 2 ? "end_stone_brick_wall" : "purpur_slab[type=bottom]";
+			case FARMLAND -> pick == 0 ? "short_grass" : pick == 1 ? "dandelion" : pick == 2 ? "hay_block" : "cornflower";
+			case SAVANNA -> pick == 0 ? "short_grass" : pick == 1 ? "dead_bush" : pick == 2 ? "coarse_dirt" : "short_grass";
+			case MUSHROOM -> pick == 0 ? "crimson_roots" : pick == 1 ? "warped_roots" : pick == 2 ? "brown_mushroom_block" : "glow_lichen[down=true]";
+			case DEEP_DARK -> pick == 0 ? "sculk_vein[down=true]" : pick == 1 ? "gray_carpet" : pick == 2 ? "cobbled_deepslate_wall" : "black_candle[candles=2,lit=true]";
 		};
 		if (block.equals("air")) {
 			return;
@@ -980,28 +1008,46 @@ public final class RaceCourseLayout {
 		put(x, surf + 1, z, block);
 	}
 
-	/** A themed monument at the far side of the circuit (t = 0.5), beside the road, and an arch over it for a few themes. */
+	/**
+	 * Every course has its own set piece at the far side of the circuit (about t = 0.5, off
+	 * any feature), so no two look alike from the saddle ({@code CourseIdentityTest}). The
+	 * dispatch is per course, one method per class ({@link #landmarkC} .. {@link #landmarkS}),
+	 * each followed by that class's set pieces: a new course adds one case line in its
+	 * class's method and, if it needs one, a new set-piece method in its class's region. A
+	 * course without a case of its own gets its theme's set piece ({@link #themeLandmark}).
+	 */
 	private void landmark() {
 		double t = landmarkT(track);
 		int surf = (int) track.groundY(t) - 1;
-		// the two courses that share a theme get different set pieces, so no two of the
-		// twenty-four look the same from the saddle
-		if (theme == RaceTrack.Theme.SKYWAY) {
-			if (track.isShort()) {
-				archOver(t, surf, "magenta_stained_glass", "end_rod");
-			} else {
-				halo(t, surf);
-			}
+		if (themePiece) {
+			onPlinth(t, surf, this::themeLandmark);
+			sparingRoad = false;
 			return;
 		}
-		if (theme == RaceTrack.Theme.KEEP && track.isShort()) {
-			archOver(t, surf, "polished_blackstone_bricks", "soul_lantern[hanging=true]");
-			return;
+		switch (track.getRaceClass()) {
+			case C -> landmarkC(t, surf);
+			case B -> landmarkB(t, surf);
+			case A -> landmarkA(t, surf);
+			case S -> landmarkS(t, surf);
 		}
-		sparingRoad = true;   // a fold of the course must not end up wearing the landmark
+		sparingRoad = false;
+	}
+
+	/** A set piece standing on a plinth beside the road: {@code at(x, y, z)} with y the plinth top + 1. */
+	@FunctionalInterface
+	private interface SetPiece {
+		void at(int x, int y, int z);
+	}
+
+	/**
+	 * Beside the road on the outside (ROAD_HALF + 6 out): a 7x7 plinth of the theme wall on
+	 * five blocks of island rock, then the set piece on it. Stamped sparing the road, so a
+	 * fold of the course never ends up wearing a landmark.
+	 */
+	private void onPlinth(double t, int surf, SetPiece piece) {
+		sparingRoad = true;
 		RacePoint q = track.pointAtLane(t, -(RaceTrack.ROAD_HALF + 6.0D));
 		int x = floor(q.x()), z = floor(q.z());
-		int y = surf + 1;
 		for (int dx = -3; dx <= 3; dx++) {
 			for (int dz = -3; dz <= 3; dz++) {
 				for (int d = 0; d <= 4; d++) {
@@ -1010,137 +1056,71 @@ public final class RaceCourseLayout {
 				put(x + dx, surf, z + dz, theme.wall);
 			}
 		}
-		if (!track.isShort()) {
-			grandPrixLandmark(x, y, z);
-			sparingRoad = false;
-			return;
-		}
-		switch (theme) {
-			case MEADOW -> tree(x, y, z, "oak_log", "oak_leaves[persistent=true]", 7);
-			case ORCHARD -> tree(x, y, z, "cherry_log", "cherry_leaves[persistent=true]", 8);
-			case SHORE -> {   // a lighthouse
-				for (int h = 0; h < 12; h++) {
-					put(x, y + h, z, (h / 2) % 2 == 0 ? "white_concrete" : "red_concrete");
-					put(x + 1, y + h, z, (h / 2) % 2 == 0 ? "white_concrete" : "red_concrete");
-					put(x, y + h, z + 1, (h / 2) % 2 == 0 ? "white_concrete" : "red_concrete");
-					put(x + 1, y + h, z + 1, (h / 2) % 2 == 0 ? "white_concrete" : "red_concrete");
-				}
-				for (int dx = 0; dx <= 1; dx++) {
-					for (int dz = 0; dz <= 1; dz++) {
-						put(x + dx, y + 12, z + dz, "sea_lantern");
-						put(x + dx, y + 13, z + dz, "red_concrete");
-					}
-				}
-			}
-			case CANYON -> {   // a hoodoo
-				pillar(x, y, z, "orange_terracotta", "red_terracotta", "terracotta", 9);
-				pillar(x + 1, y, z, "yellow_terracotta", "orange_terracotta", "brown_terracotta", 7);
-				pillar(x, y, z + 1, "red_terracotta", "brown_terracotta", "terracotta", 8);
-				pillar(x + 1, y, z + 1, "orange_terracotta", "yellow_terracotta", "terracotta", 6);
-				put(x, y + 10, z, "terracotta");
-				put(x + 1, y + 10, z, "terracotta");
-			}
-			case RIVER -> {   // a mossy cairn with a spring in a basin on top
-				for (int h = 0; h < 3; h++) {
-					int r = 3 - h;
-					for (int dx = -r; dx <= r; dx++) {
-						for (int dz = -r; dz <= r; dz++) {
-							put(x + dx, y + h, z + dz, (dx + dz + h) % 3 == 0 ? "mossy_cobblestone" : "cobblestone");
-						}
-					}
-				}
-				// sunk into the top step and ringed by it: a source set on the peak ran down
-				// the cairn and over the road the first time anything touched it
-				put(x, y + 2, z, "water");
-			}
-			case SNOW -> {   // an ice spire
-				for (int h = 0; h < 10; h++) {
-					int r = h < 3 ? 2 : h < 7 ? 1 : 0;
-					for (int dx = -r; dx <= r; dx++) {
-						for (int dz = -r; dz <= r; dz++) {
-							put(x + dx, y + h, z + dz, h % 3 == 0 ? "blue_ice" : "packed_ice");
-						}
-					}
-				}
-				put(x, y + 10, z, "sea_lantern");
-			}
-			case CAVERN -> {   // a geode
-				for (int dx = -3; dx <= 3; dx++) {
-					for (int dz = -3; dz <= 3; dz++) {
-						for (int dy = 0; dy <= 6; dy++) {
-							double r = Math.sqrt(dx * dx + dz * dz + (dy - 3) * (dy - 3));
-							if (r <= 3.4D && r > 2.4D && !(dz > 1 && dy > 1 && dy < 5)) {
-								put(x + dx, y + dy, z + dz, "budding_amethyst");
-							} else if (r <= 2.4D) {
-								put(x + dx, y + dy, z + dz, (dx + dz + dy) % 2 == 0 ? "amethyst_block" : "air");
-							}
-						}
-					}
-				}
-				put(x, y + 3, z, "amethyst_cluster[facing=up]");
-			}
-			case JUNGLE -> {   // a mossy step pyramid
-				for (int h = 0; h < 5; h++) {
-					int r = 4 - h;
-					for (int dx = -r; dx <= r; dx++) {
-						for (int dz = -r; dz <= r; dz++) {
-							put(x + dx, y + h, z + dz, (dx * dz + h) % 4 == 0 ? "mossy_cobblestone" : "mossy_stone_bricks");
-						}
-					}
-				}
-				put(x, y + 5, z, "gold_block");
-				put(x - 1, y + 5, z, "vine[east=true]");
-			}
-			case NETHER -> {   // a fortress tower with a lava fall
-				for (int h = 0; h < 11; h++) {
-					for (int dx = -2; dx <= 2; dx++) {
-						for (int dz = -2; dz <= 2; dz++) {
-							boolean edge = Math.abs(dx) == 2 || Math.abs(dz) == 2;
-							put(x + dx, y + h, z + dz, edge ? "nether_bricks" : h == 10 ? "lava" : "air");
-						}
-					}
-				}
-				put(x, y + 10, z + 2, "lava");
-				put(x, y + 9, z + 2, "air");
-				for (int dx = -2; dx <= 2; dx += 2) {
-					put(x + dx, y + 11, z - 2, "nether_brick_wall");
-					put(x + dx, y + 11, z + 2, "nether_brick_wall");
-				}
-				put(x, y + 12, z, "glowstone");
-			}
-			case END -> {
-				for (int h = 0; h < 14; h++) {
-					put(x, y + h, z, "obsidian");
-					put(x + 1, y + h, z, "obsidian");
-					put(x, y + h, z + 1, "obsidian");
-					put(x + 1, y + h, z + 1, "obsidian");
-				}
-				put(x, y + 14, z, "bedrock");
-				put(x + 1, y + 14, z + 1, "end_rod");
-				put(x + 1, y + 14, z, "end_rod");
-				put(x, y + 14, z + 1, "end_rod");
-			}
-			default -> {
-			}
-		}
+		piece.at(x, surf + 1, z);
 		sparingRoad = false;
 	}
 
-	/** The set piece that belongs to a grand prix course, one per theme, never the sprint's. */
-	private void grandPrixLandmark(int x, int y, int z) {
+	/** The theme's own set piece: what a course of that theme stands by unless it has its own. */
+	private void themeLandmark(int x, int y, int z) {
 		switch (theme) {
-			case MEADOW -> windmill(x, y, z);
-			case ORCHARD -> ciderBarn(x, y, z);
-			case SHORE -> shipwreck(x, y, z);
-			case CANYON -> mesaArch(x, y, z);
-			case RIVER -> millWheel(x, y, z);
-			case SNOW -> frozenFall(x, y, z);
-			case CAVERN -> dripstoneHall(x, y, z);
-			case JUNGLE -> idol(x, y, z);
-			case NETHER -> boneArch(x, y, z);
-			case KEEP -> gatehouse(x, y, z);
-			case END -> crystalCage(x, y, z);
-			default -> {
+			case MEADOW -> oakTree(x, y, z);
+			case ORCHARD -> cherryTree(x, y, z);
+			case SHORE -> lighthouse(x, y, z);
+			case CANYON -> hoodoo(x, y, z);
+			case RIVER -> cairn(x, y, z);
+			case SNOW -> iceSpire(x, y, z);
+			case CAVERN -> geode(x, y, z);
+			case JUNGLE -> stepPyramid(x, y, z);
+			case NETHER -> fortressTower(x, y, z);
+			case SKYWAY -> prismSpire(x, y, z);
+			case KEEP -> obelisk(x, y, z);
+			case END -> obsidianSpire(x, y, z);
+			case FARMLAND -> scarecrow(x, y, z);
+			case SAVANNA -> greatAcacia(x, y, z);
+			case MUSHROOM -> giantMushroom(x, y, z);
+			case DEEP_DARK -> wardenFrame(x, y, z);
+		}
+	}
+
+	// ================================================================ C landmarks
+
+	private void landmarkC(double t, int surf) {
+		switch (track) {
+			case C_MEADOW -> onPlinth(t, surf, this::oakTree);
+			case C_ORCHARD -> onPlinth(t, surf, this::cherryTree);
+			case C_SHORE -> onPlinth(t, surf, this::lighthouse);
+			case C_DOWNS -> onPlinth(t, surf, this::windmill);
+			case C_CIDER -> onPlinth(t, surf, this::ciderBarn);
+			case C_LAGOON -> onPlinth(t, surf, this::shipwreck);
+			// ---- new C landmarks (phase 2) begin ----
+			// ---- new C landmarks (phase 2) end ----
+			default -> onPlinth(t, surf, this::themeLandmark);
+		}
+	}
+
+	/** C_MEADOW: a lone oak. */
+	private void oakTree(int x, int y, int z) {
+		tree(x, y, z, "oak_log", "oak_leaves[persistent=true]", 7);
+	}
+
+	/** C_ORCHARD: a great cherry. */
+	private void cherryTree(int x, int y, int z) {
+		tree(x, y, z, "cherry_log", "cherry_leaves[persistent=true]", 8);
+	}
+
+	/** C_SHORE: a striped lighthouse. */
+	private void lighthouse(int x, int y, int z) {
+		for (int h = 0; h < 12; h++) {
+			String band = (h / 2) % 2 == 0 ? "white_concrete" : "red_concrete";
+			put(x, y + h, z, band);
+			put(x + 1, y + h, z, band);
+			put(x, y + h, z + 1, band);
+			put(x + 1, y + h, z + 1, band);
+		}
+		for (int dx = 0; dx <= 1; dx++) {
+			for (int dz = 0; dz <= 1; dz++) {
+				put(x + dx, y + 12, z + dz, "sea_lantern");
+				put(x + dx, y + 13, z + dz, "red_concrete");
 			}
 		}
 	}
@@ -1210,6 +1190,81 @@ public final class RaceCourseLayout {
 		put(x, y + 9, z, "oak_fence");
 	}
 
+	/** FARMLAND: a scarecrow in a pumpkin hat over a haystack. */
+	private void scarecrow(int x, int y, int z) {
+		for (int h = 0; h < 3; h++) {
+			put(x, y + h, z, "birch_fence");
+		}
+		put(x, y + 3, z, "hay_block[axis=y]");
+		put(x, y + 4, z, "carved_pumpkin[facing=north]");
+		put(x - 1, y + 3, z, "birch_fence");
+		put(x + 1, y + 3, z, "birch_fence");
+		for (int dx = -2; dx <= 2; dx++) {
+			put(x + dx, y, z + 2, "hay_block[axis=x]");
+			if (Math.abs(dx) < 2) {
+				put(x + dx, y + 1, z + 2, "hay_block[axis=x]");
+			}
+		}
+		put(x, y + 2, z + 2, "hay_block[axis=z]");
+	}
+
+	// ---- new C set pieces (phase 2): private methods, begin ----
+	// ---- new C set pieces (phase 2) end ----
+
+	// ================================================================ B landmarks
+
+	private void landmarkB(double t, int surf) {
+		switch (track) {
+			case B_CANYON -> onPlinth(t, surf, this::hoodoo);
+			case B_FORD -> onPlinth(t, surf, this::cairn);
+			case B_FROST -> onPlinth(t, surf, this::iceSpire);
+			case B_MESA -> onPlinth(t, surf, this::mesaArch);
+			case B_RAPIDS -> onPlinth(t, surf, this::millWheel);
+			case B_GLACIER -> onPlinth(t, surf, this::frozenFall);
+			// ---- new B landmarks (phase 2) begin ----
+			// ---- new B landmarks (phase 2) end ----
+			default -> onPlinth(t, surf, this::themeLandmark);
+		}
+	}
+
+	/** B_CANYON: a banded hoodoo. */
+	private void hoodoo(int x, int y, int z) {
+		pillar(x, y, z, "orange_terracotta", "red_terracotta", "terracotta", 9);
+		pillar(x + 1, y, z, "yellow_terracotta", "orange_terracotta", "brown_terracotta", 7);
+		pillar(x, y, z + 1, "red_terracotta", "brown_terracotta", "terracotta", 8);
+		pillar(x + 1, y, z + 1, "orange_terracotta", "yellow_terracotta", "terracotta", 6);
+		put(x, y + 10, z, "terracotta");
+		put(x + 1, y + 10, z, "terracotta");
+	}
+
+	/** B_FORD: a mossy cairn with a spring in a basin on top. */
+	private void cairn(int x, int y, int z) {
+		for (int h = 0; h < 3; h++) {
+			int r = 3 - h;
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					put(x + dx, y + h, z + dz, (dx + dz + h) % 3 == 0 ? "mossy_cobblestone" : "cobblestone");
+				}
+			}
+		}
+		// sunk into the top step and ringed by it: a source set on the peak ran down
+		// the cairn and over the road the first time anything touched it
+		put(x, y + 2, z, "water");
+	}
+
+	/** B_FROST: an ice spire. */
+	private void iceSpire(int x, int y, int z) {
+		for (int h = 0; h < 10; h++) {
+			int r = h < 3 ? 2 : h < 7 ? 1 : 0;
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					put(x + dx, y + h, z + dz, h % 3 == 0 ? "blue_ice" : "packed_ice");
+				}
+			}
+		}
+		put(x, y + 10, z, "sea_lantern");
+	}
+
 	/** B_MESA: a terracotta arch standing off the canyon rim. */
 	private void mesaArch(int x, int y, int z) {
 		for (int h = 0; h < 8; h++) {
@@ -1259,6 +1314,100 @@ public final class RaceCourseLayout {
 		put(x - 2, y, z, "blue_ice");
 		put(x - 2, y, z + 1, "packed_ice");
 		put(x - 2, y + 1, z, "ice");
+	}
+
+	/** SAVANNA: a great flat-crowned acacia, its trunk leaning out of a termite mound. */
+	private void greatAcacia(int x, int y, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y, z + dz, "packed_mud");
+			}
+		}
+		put(x, y + 1, z, "packed_mud");
+		for (int h = 1; h < 8; h++) {
+			put(x + (h >= 4 ? 1 : 0), y + h, z, "acacia_wood");
+		}
+		for (int dx = -2; dx <= 4; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				if (Math.abs(dx - 1) + Math.abs(dz) <= 4) {
+					put(x + dx, y + 8, z + dz, "acacia_leaves[persistent=true]");
+				}
+			}
+		}
+		for (int dx = 0; dx <= 2; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y + 9, z + dz, "acacia_leaves[persistent=true]");
+			}
+		}
+	}
+
+	// ---- new B set pieces (phase 2): private methods, begin ----
+	// ---- new B set pieces (phase 2) end ----
+
+	// ================================================================ A landmarks
+
+	private void landmarkA(double t, int surf) {
+		switch (track) {
+			case A_CRYSTAL -> onPlinth(t, surf, this::geode);
+			case A_CANOPY -> onPlinth(t, surf, this::stepPyramid);
+			case A_EMBER -> onPlinth(t, surf, this::fortressTower);
+			case A_DEEPS -> onPlinth(t, surf, this::dripstoneHall);
+			case A_TEMPLE -> onPlinth(t, surf, this::idol);
+			case A_INFERNO -> onPlinth(t, surf, this::boneArch);
+			// ---- new A landmarks (phase 2) begin ----
+			// ---- new A landmarks (phase 2) end ----
+			default -> onPlinth(t, surf, this::themeLandmark);
+		}
+	}
+
+	/** A_CRYSTAL: an amethyst geode, split open on one side. */
+	private void geode(int x, int y, int z) {
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				for (int dy = 0; dy <= 6; dy++) {
+					double r = Math.sqrt(dx * dx + dz * dz + (dy - 3) * (dy - 3));
+					if (r <= 3.4D && r > 2.4D && !(dz > 1 && dy > 1 && dy < 5)) {
+						put(x + dx, y + dy, z + dz, "budding_amethyst");
+					} else if (r <= 2.4D) {
+						put(x + dx, y + dy, z + dz, (dx + dz + dy) % 2 == 0 ? "amethyst_block" : "air");
+					}
+				}
+			}
+		}
+		put(x, y + 3, z, "amethyst_cluster[facing=up]");
+	}
+
+	/** A_CANOPY: a mossy step pyramid with a gold cap and a vine. */
+	private void stepPyramid(int x, int y, int z) {
+		for (int h = 0; h < 5; h++) {
+			int r = 4 - h;
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					put(x + dx, y + h, z + dz, (dx * dz + h) % 4 == 0 ? "mossy_cobblestone" : "mossy_stone_bricks");
+				}
+			}
+		}
+		put(x, y + 5, z, "gold_block");
+		put(x - 1, y + 5, z, "vine[east=true]");
+	}
+
+	/** A_EMBER: a fortress tower with a lava fall. */
+	private void fortressTower(int x, int y, int z) {
+		for (int h = 0; h < 11; h++) {
+			for (int dx = -2; dx <= 2; dx++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					boolean edge = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+					put(x + dx, y + h, z + dz, edge ? "nether_bricks" : h == 10 ? "lava" : "air");
+				}
+			}
+		}
+		put(x, y + 10, z + 2, "lava");
+		put(x, y + 9, z + 2, "air");
+		for (int dx = -2; dx <= 2; dx += 2) {
+			put(x + dx, y + 11, z - 2, "nether_brick_wall");
+			put(x + dx, y + 11, z + 2, "nether_brick_wall");
+		}
+		put(x, y + 12, z, "glowstone");
 	}
 
 	/** A_DEEPS: a hall of dripstone columns under a tiled roof. */
@@ -1318,6 +1467,63 @@ public final class RaceCourseLayout {
 		put(x - 1, y, z - 1, "bone_block[axis=x]");
 	}
 
+	/** MUSHROOM: a giant red mushroom, froglights glowing under the cap. */
+	private void giantMushroom(int x, int y, int z) {
+		for (int h = 0; h < 8; h++) {
+			put(x, y + h, z, "mushroom_stem");
+		}
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				int r = Math.abs(dx) + Math.abs(dz);
+				if (r <= 4) {
+					put(x + dx, y + 8, z + dz, "red_mushroom_block");
+				}
+				if (r <= 2) {
+					put(x + dx, y + 9, z + dz, "red_mushroom_block");
+				}
+				if (r == 5 && Math.abs(dx) < 3 && Math.abs(dz) < 3) {
+					put(x + dx, y + 7, z + dz, "red_mushroom_block");
+				}
+			}
+		}
+		put(x + 1, y + 7, z, "ochre_froglight");
+		put(x - 1, y + 7, z, "ochre_froglight");
+	}
+
+	// ---- new A set pieces (phase 2): private methods, begin ----
+	// ---- new A set pieces (phase 2) end ----
+
+	// ================================================================ S landmarks
+
+	private void landmarkS(double t, int surf) {
+		switch (track) {
+			// over the road, not on a plinth
+			case S_SKYWAY -> archOver(t, surf, "magenta_stained_glass", "end_rod");
+			case S_KEEP -> archOver(t, surf, "polished_blackstone_bricks", "soul_lantern[hanging=true]");
+			case S_STARFALL -> halo(t, surf);
+			case S_VOID -> onPlinth(t, surf, this::obsidianSpire);
+			case S_CITADEL -> onPlinth(t, surf, this::gatehouse);
+			case S_MAELSTROM -> onPlinth(t, surf, this::crystalCage);
+			// ---- new S landmarks (phase 2) begin ----
+			// ---- new S landmarks (phase 2) end ----
+			default -> onPlinth(t, surf, this::themeLandmark);
+		}
+	}
+
+	/** S_VOID: an obsidian spire with a bedrock cap and end rods. */
+	private void obsidianSpire(int x, int y, int z) {
+		for (int h = 0; h < 14; h++) {
+			put(x, y + h, z, "obsidian");
+			put(x + 1, y + h, z, "obsidian");
+			put(x, y + h, z + 1, "obsidian");
+			put(x + 1, y + h, z + 1, "obsidian");
+		}
+		put(x, y + 14, z, "bedrock");
+		put(x + 1, y + 14, z + 1, "end_rod");
+		put(x + 1, y + 14, z, "end_rod");
+		put(x, y + 14, z + 1, "end_rod");
+	}
+
 	/** S_CITADEL: a gatehouse flying the house colours. */
 	private void gatehouse(int x, int y, int z) {
 		for (int dz = -3; dz <= 3; dz += 6) {
@@ -1359,6 +1565,54 @@ public final class RaceCourseLayout {
 		put(x, y + 3, z, "magenta_stained_glass");
 		put(x, y + 4, z, "end_rod");
 	}
+
+	/** SKYWAY (a course without its own): three rainbow glass spires round an end rod. */
+	private void prismSpire(int x, int y, int z) {
+		for (int i = 0; i < 3; i++) {
+			int dx = i == 0 ? -1 : i == 1 ? 1 : 0, dz = i == 2 ? 1 : -1;
+			for (int h = 0; h < 7 + i * 2; h++) {
+				put(x + dx, y + h, z + dz, RAINBOW[(h + i * 2) % RAINBOW.length] + "_stained_glass");
+			}
+		}
+		put(x, y, z, "sea_lantern");
+		put(x, y + 1, z, "end_rod");
+	}
+
+	/** KEEP (a course without its own): a blackstone obelisk over a soul fire. */
+	private void obelisk(int x, int y, int z) {
+		for (int h = 0; h < 11; h++) {
+			int r = h < 2 ? 1 : 0;
+			for (int dx = -r; dx <= r; dx++) {
+				for (int dz = -r; dz <= r; dz++) {
+					put(x + dx, y + h, z + dz, h % 4 == 1 ? "gilded_blackstone" : "polished_blackstone_bricks");
+				}
+			}
+		}
+		put(x, y + 11, z, "crying_obsidian");
+		put(x + 2, y - 1, z, "soul_soil");
+		put(x + 2, y, z, "soul_fire");
+	}
+
+	/** DEEP_DARK: a warden's frame of reinforced deepslate, sculk creeping over the sill. */
+	private void wardenFrame(int x, int y, int z) {
+		for (int dz = -3; dz <= 3; dz++) {
+			boolean post = Math.abs(dz) == 3;
+			for (int h = 0; h < 7; h++) {
+				if (post || h == 0 || h == 6) {
+					put(x, y + h, z + dz, "reinforced_deepslate");
+				}
+			}
+			put(x - 1, y, z + dz, "sculk");
+			put(x + 1, y, z + dz, "sculk");
+		}
+		put(x, y + 7, z, "chiseled_deepslate");
+		put(x, y + 5, z - 2, "soul_lantern[hanging=true]");
+		put(x, y + 5, z + 2, "soul_lantern[hanging=true]");
+		put(x - 1, y + 1, z, "sculk_catalyst");
+	}
+
+	// ---- new S set pieces (phase 2): private methods, begin ----
+	// ---- new S set pieces (phase 2) end ----
 
 	/** S_STARFALL: a ring hung over the road where the skyway sprint has its arch. */
 	private void halo(double t, int surf) {
@@ -1570,6 +1824,110 @@ public final class RaceCourseLayout {
 					default -> put(x, y, z, "end_stone_brick_wall");
 				}
 			}
+			case FARMLAND -> {
+				switch (pick) {
+					case 0 -> {   // a round of hay bales
+						put(x, y, z, "hay_block");
+						put(x + 1, y, z, "hay_block");
+						put(x, y, z + 1, "hay_block");
+						put(x, y + 1, z, "hay_block[axis=z]");
+					}
+					case 1 -> tree(x, y, z, "birch_log", "birch_leaves[persistent=true]", 4);
+					case 2 -> {   // the pumpkin patch
+						put(x, y, z, "pumpkin");
+						put(x + 1, y, z + 1, "pumpkin");
+						put(x - 1, y, z, "carved_pumpkin[facing=south]");
+					}
+					case 3 -> flowers(x, y, z, "cornflower", "dandelion", "oxeye_daisy");
+					default -> fenceRun(x, y, z, "birch_fence");
+				}
+			}
+			case SAVANNA -> {
+				switch (pick) {
+					case 0, 1 -> {   // an acacia: bent trunk, flat crown
+						for (int h = 0; h < 4; h++) {
+							put(x + (h >= 3 ? 1 : 0), y + h, z, "acacia_log");
+						}
+						for (int dx = -1; dx <= 3; dx++) {
+							for (int dz = -2; dz <= 2; dz++) {
+								if (Math.abs(dx - 1) + Math.abs(dz) <= 3) {
+									put(x + dx, y + 4, z + dz, "acacia_leaves[persistent=true]");
+								}
+							}
+						}
+					}
+					case 2 -> pillar(x, y, z, "orange_terracotta", "white_terracotta", "red_terracotta", 5);   // a mesa stack
+					case 3 -> {   // a termite mound
+						put(x, y, z, "packed_mud");
+						put(x, y + 1, z, "packed_mud");
+						put(x + 1, y, z, "packed_mud");
+						put(x, y + 2, z, "mud_brick_wall");
+					}
+					default -> {
+						put(x, y - 1, z, "coarse_dirt");
+						put(x, y, z, "dead_bush");
+					}
+				}
+			}
+			case MUSHROOM -> {
+				switch (pick) {
+					case 0, 1 -> {   // a huge red mushroom
+						for (int h = 0; h < 3; h++) {
+							put(x, y + h, z, "mushroom_stem");
+						}
+						cross(x, y + 3, z, "red_mushroom_block");
+						for (int dx = -1; dx <= 1; dx += 2) {
+							for (int dz = -1; dz <= 1; dz += 2) {
+								put(x + dx, y + 3, z + dz, "red_mushroom_block");
+							}
+						}
+						put(x, y + 4, z, "red_mushroom_block");
+					}
+					case 2 -> {   // a huge brown mushroom, flat
+						for (int h = 0; h < 4; h++) {
+							put(x, y + h, z, "mushroom_stem");
+						}
+						for (int dx = -2; dx <= 2; dx++) {
+							for (int dz = -2; dz <= 2; dz++) {
+								if (Math.abs(dx) + Math.abs(dz) < 4) {
+									put(x + dx, y + 4, z + dz, "brown_mushroom_block");
+								}
+							}
+						}
+					}
+					case 3 -> {
+						put(x, y, z, "tuff_bricks");
+						put(x, y + 1, z, "pearlescent_froglight");
+					}
+					default -> {
+						put(x, y, z, "mushroom_stem");
+						put(x, y + 1, z, "brown_mushroom_block");
+					}
+				}
+			}
+			case DEEP_DARK -> {
+				switch (pick) {
+					case 0 -> {   // a sculk catalyst in a sculk patch
+						cross(x, y - 1, z, "sculk");
+						put(x, y, z, "sculk_catalyst");
+					}
+					case 1, 2 -> {   // an ancient city pillar with a soul lantern
+						for (int h = 0; h < 4; h++) {
+							put(x, y + h, z, h == 3 ? "chiseled_deepslate" : "deepslate_tiles");
+						}
+						put(x, y + 4, z, "soul_lantern[hanging=false]");
+					}
+					case 3 -> {
+						put(x, y, z, "gray_wool");
+						put(x + 1, y, z, "gray_carpet");
+						put(x, y + 1, z, "black_candle[candles=3,lit=true]");
+					}
+					default -> {
+						put(x, y, z, "cobbled_deepslate_wall");
+						put(x, y + 1, z, "sculk_vein[down=true]");
+					}
+				}
+			}
 		}
 	}
 
@@ -1654,7 +2012,34 @@ public final class RaceCourseLayout {
 		if (standing) {
 			standTiles.add(new Tile(x, z));
 		}
+		if (landmarking) {
+			landmarkCells.put(new Cell(x, y, z), block);
+		}
 		blocks.put(new Cell(x, y, z), block);
+	}
+
+	/** Every block the course's set piece laid (plinth included). */
+	Set<String> landmarkBlocks() {
+		return new HashSet<>(landmarkCells.values());
+	}
+
+	/**
+	 * The set piece as built, moved to the origin ("dx,dy,dz=block" per cell): two courses
+	 * with the same set piece have the same shape here wherever they stand.
+	 */
+	Set<String> landmarkShape() {
+		int x0 = Integer.MAX_VALUE, y0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE;
+		for (Cell c : landmarkCells.keySet()) {
+			x0 = Math.min(x0, c.x());
+			y0 = Math.min(y0, c.y());
+			z0 = Math.min(z0, c.z());
+		}
+		Set<String> out = new HashSet<>();
+		for (Map.Entry<Cell, String> e : landmarkCells.entrySet()) {
+			Cell c = e.getKey();
+			out.add((c.x() - x0) + "," + (c.y() - y0) + "," + (c.z() - z0) + "=" + e.getValue());
+		}
+		return out;
 	}
 
 	public static long chunkKey(int cx, int cz) {
@@ -1678,14 +2063,21 @@ public final class RaceCourseLayout {
 	 */
 	public Set<Long> clearChunks() {
 		Set<Long> out = new HashSet<>();
+		// the whole box of the island, infield included, and a ring round it: a course whose
+		// lap grew (the 48-course swap lengthened grands prix) was laid smaller about the same
+		// centre, so the old road can sit in what is now the infield
+		int x0 = Integer.MAX_VALUE, z0 = Integer.MAX_VALUE, x1 = Integer.MIN_VALUE, z1 = Integer.MIN_VALUE;
 		for (long key : chunks) {
 			int cx = (int) (key >> 32), cz = (int) key;
-			for (int dx = -1; dx <= 1; dx++) {
-				for (int dz = -1; dz <= 1; dz++) {
-					int x = cx + dx, z = cz + dz;
-					if (!nearVillage(x, z) && !nearOtherIsland(x, z)) {
-						out.add(chunkKey(x, z));
-					}
+			x0 = Math.min(x0, cx);
+			x1 = Math.max(x1, cx);
+			z0 = Math.min(z0, cz);
+			z1 = Math.max(z1, cz);
+		}
+		for (int x = x0 - 1; x <= x1 + 1; x++) {
+			for (int z = z0 - 1; z <= z1 + 1; z++) {
+				if (!nearVillage(x, z) && !nearOtherIsland(x, z)) {
+					out.add(chunkKey(x, z));
 				}
 			}
 		}

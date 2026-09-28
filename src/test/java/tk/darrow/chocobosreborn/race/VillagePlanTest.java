@@ -155,8 +155,11 @@ class VillagePlanTest {
 
 	@Test
 	void funGatesStillMapToSprintAndFirstGrandPrix() {
-		assertEquals(0, RaceScoring.funGateCourse(false));
-		assertEquals(3, RaceScoring.funGateCourse(true));
+		// since the swap courses 0-2 are grands prix and 3-5 sprints: the short gate runs a sprint
+		assertEquals(3, RaceScoring.funGateCourse(false));
+		assertEquals(0, RaceScoring.funGateCourse(true));
+		assertTrue(RaceTrack.forClass(RaceClass.C, RaceScoring.funGateCourse(false)).isSprint());
+		assertTrue(RaceTrack.forClass(RaceClass.C, RaceScoring.funGateCourse(true)).isGrandPrix());
 	}
 
 	private static TownPosts.KeeperPost post(TownRole role) {

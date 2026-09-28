@@ -48,7 +48,7 @@ public final class SquareBuilder {
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 10;
+	public static final int COURSE_VERSION = 11;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/**
@@ -132,7 +132,7 @@ public final class SquareBuilder {
 		RaceCourseLayout.BoardPost board = layout.courseBoard();
 		if (board != null) {
 			sign(level, board.x(), board.y(), board.z(), board.facing(), "chocobosreborn.track." + track.id(),
-					track.isShort() ? "chocobosreborn.select.short" : "chocobosreborn.select.long",
+					track.isSprint() ? "chocobosreborn.select.short" : "chocobosreborn.select.long",
 					"chocobosreborn.sign.course.go");
 		}
 		data.setBuilt(track);

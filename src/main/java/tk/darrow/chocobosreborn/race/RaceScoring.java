@@ -331,9 +331,13 @@ public final class RaceScoring {
 		return Math.max(finishCount + 1, runningPlace);
 	}
 
-	/** Fun gates: sprint is course 0, long is the first grand prix (course 3). */
+	/**
+	 * Fun gates: the short gate runs the class's first sprint (course 3, one long lap), the
+	 * long gate its first grand prix (course 0, five laps). Since the 48-course swap courses
+	 * 0-2 of every class are grands prix and 3-5 sprints.
+	 */
 	public static int funGateCourse(boolean longCourse) {
-		return longCourse ? 3 : 0;
+		return longCourse ? 0 : 3;
 	}
 
 	/**
@@ -756,13 +760,25 @@ public final class RaceScoring {
 		if (trackName == null) {
 			return "chocobo_dash";
 		}
-		return switch (trackName) {
-			case "c_shore", "c_lagoon" -> "chocobo_race_gallop";
-			case "b_ford", "b_rapids" -> "rune_dash";
-			case "b_canyon", "b_frost", "b_mesa", "b_glacier" -> "gallop_of_adventure";
-			case "a_crystal", "a_canopy", "a_ember", "a_deeps", "a_temple", "a_inferno", "s_void", "s_maelstrom" -> "gallop_of_heroes";
-			case "s_skyway", "s_keep", "s_starfall", "s_citadel" -> "speed_of_the_dragon";
-			default -> "chocobo_dash";
+		RaceTrack track = null;
+		for (RaceTrack t : RaceTrack.values()) {
+			if (t.id().equals(trackName)) {
+				track = t;
+				break;
+			}
+		}
+		return track == null ? "chocobo_dash" : raceLoopKey(track.theme());
+	}
+
+	/** The course loop by theme, so every course of a theme (a new one too) gets the same music. */
+	public static String raceLoopKey(RaceTrack.Theme theme) {
+		return switch (theme) {
+			case SHORE -> "chocobo_race_gallop";
+			case RIVER, SAVANNA -> "rune_dash";
+			case CANYON, SNOW -> "gallop_of_adventure";
+			case CAVERN, JUNGLE, NETHER, END, MUSHROOM -> "gallop_of_heroes";
+			case SKYWAY, KEEP, DEEP_DARK -> "speed_of_the_dragon";
+			case MEADOW, ORCHARD, FARMLAND -> "chocobo_dash";
 		};
 	}
 

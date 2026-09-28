@@ -33,7 +33,8 @@ class CourseLiquidTest {
 				"lantern", "poppy", "dandelion", "daisy", "bush", "pickle", "campfire", "cluster", "pointed_dripstone",
 				"rail", "button", "sign", "sapling", "grass", "fern", "vine", "coral", "leaves", "chain", "ladder",
 				"lever", "boost_pad", "flower", "tulip", "orchid", "allium", "bluet", "cornflower", "lily", "kelp",
-				"seagrass", "candle", "pressure_plate", "trapdoor", "door", "gate", "composter", "scaffolding"}) {
+				"seagrass", "candle", "pressure_plate", "trapdoor", "door", "gate", "composter", "scaffolding",
+				"vein", "lichen", "roots"}) {
 			if (id.contains(part)) {
 				return true;
 			}
@@ -47,7 +48,11 @@ class CourseLiquidTest {
 
 	/** Where each course's liquid would get to that it must not: road tiles outside its own sources. */
 	static List<String> leaks(RaceTrack track) {
-		RaceCourseLayout layout = RaceCourseLayout.of(track);
+		return leaks(track, RaceCourseLayout.of(track));
+	}
+
+	/** {@link #leaks(RaceTrack)} for a given plan of the course (a theme preview, {@code RaceCourseLayout.dressedAs}). */
+	static List<String> leaks(RaceTrack track, RaceCourseLayout layout) {
 		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
 		Set<RaceCourseLayout.Tile> road = layout.road();
 		Map<RaceCourseLayout.Cell, Integer> reach = new HashMap<>();

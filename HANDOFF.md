@@ -1315,6 +1315,159 @@ into the lock" over every course.
 * Racer `zza` is x0.98 in vanilla `aiStep`, so the AI may run ~2 % under the sim.
 * Exotic wild colours (Flame 0.40, Purple 0.45) are twice a Yellow in C: unchanged, by design?
 
+## 48 courses, phase 1 (2026-09-27, unreleased; Ahmi: "Double the amount of tracks for all classes, and the grand prix and sprint size need to be swapped. Sprints are long tracks, 1 time. Grand prix are shorter tracks with more laps"; "some tracks are 3, 4 or 5 laps with more laps likely being shortest. No track should be shorter than current class C sprints")
+
+Phase 1 is the framework and the swap; phase 2 (four class agents in parallel) adds 6
+courses per class on top of it. Nothing about course counts is hard-coded any more: a class
+has however many rows of the `RaceTrack` table carry it (`ofClass`, `courseCount`,
+`sprintsOf`, `grandsPrixOf`, `forClass` clamps to what exists), and sprint or grand prix is
+the lap count alone (`isSprint` = 1 lap, `isGrandPrix` = 3-5; `isShort` is gone). Prizes,
+points and purses already keyed off `getLaps() > 1` (`RaceSession`, `RacePrizes`,
+`RaceScoring.purse`); the fun gates now run course 3 (a sprint) for SHORT and course 0 (a
+five-lap grand prix) for LONG (`RaceScoring.funGateCourse`).
+
+### The swap (ordinals unchanged; lap targets in blocks)
+
+| course | before | after | heat | notes |
+|---|---|---|---|---|
+| C_MEADOW | sprint 600 x 1 | GP 600 x 5 | 3000 | |
+| C_ORCHARD | sprint 612 x 1 | GP 660 x 4 | 2640 | lap lengthened |
+| C_SHORE | sprint 624 x 1 | GP 760 x 3 | 2280 | lap lengthened; renamed Shore Sprint -> **Shore Grand Prix** |
+| C_DOWNS / C_CIDER / C_LAGOON | GP 1150 / 1170 / 1190 x 3 | sprint x 1 | 1150-1190 | |
+| B_CANYON | sprint 650 x 1 | GP 650 x 5 | 3250 | |
+| B_FORD | sprint 662 x 1 | GP 715 x 4 | 2860 | lap lengthened |
+| B_FROST | sprint 674 x 1 | GP 825 x 3 | 2475 | lap lengthened; ridge 0.47-0.51 -> 0.55-0.59 |
+| B_MESA / B_RAPIDS / B_GLACIER | GP 1280 / 1300 / 1320 x 3 | sprint x 1 | 1280-1320 | B_MESA renamed Mesa Grand Prix -> **Mesa Dash** |
+| A_CRYSTAL | sprint 700 x 1 | GP 700 x 5 | 3500 | |
+| A_CANOPY | sprint 712 x 1 | GP 770 x 4 | 3080 | lap lengthened |
+| A_EMBER | sprint 724 x 1 | GP 890 x 3 | 2670 | lap lengthened; lava 0.31-0.36 -> 0.27-0.32 |
+| A_DEEPS / A_TEMPLE / A_INFERNO | GP 1420 / 1440 / 1460 x 3 | sprint x 1 | 1420-1460 | |
+| S_SKYWAY | sprint 750 x 1 | GP 750 x 5 | 3750 | |
+| S_KEEP | sprint 762 x 1 | GP 825 x 4 | 3300 | lap lengthened |
+| S_VOID | sprint 774 x 1 | GP 950 x 3 | 2850 | lap lengthened |
+| S_STARFALL / S_CITADEL / S_MAELSTROM | GP 1560 / 1580 / 1600 x 3 | sprint x 1 | 1560-1600 | |
+
+Every changed course passes `CourseBalanceTest` as it stands (detours 0.55-1.3x target, bog
+cheapest, boosts on corner exits clear of connectors). Boost strips go by lap length: **five on
+a sprint's long lap, three on a grand prix's short one** — the swap left every course with the
+right count, so no strip moved. A grand-prix heat is 2.0-2.6x the class's shortest sprint:
+the "up to ~1.6x" in the brief cannot hold with five laps of at least 600 blocks against a
+1150-block C sprint, so the heats sit under the old 3-lap grands prix (3450-4800) instead.
+
+**Balance shift to look at** (`RaceSimTest`, `build/race_sim.txt`): a maxed Gold driven well
+now beats S Teiyo by ~8.2 % (was ~4 %; the test bound went 6 % -> 9 %), and a 90-trained Black
+now beats Teiyo in S (was: maxed only). Every other ladder line holds: C won fresh; B field
+from 25 training, Teiyo from 50; A field from 50, Teiyo from 75; S field from 90. Not retuned.
+
+**`COURSE_VERSION` 10 -> 11** (six laps grew, set pieces re-dispatched). `clearChunks` now clears
+the whole bounding box of the island (+1 chunk), infield included: a lap that grew was laid
+smaller about the same centre, so its old road sits inside the new one.
+
+### Framework
+
+* **Island grid** (`RaceTrack.columnOf` / `slotX` / `slotZ`): class rows stay at z 700 + 900 per
+  class; courses 0-5 keep their columns (x = (col - 2.5) x 820, -2050 .. +2050); course 6 goes
+  west of column 0 (x -2870), 7 east of column 5 (+2870), 8 at -3690, 9 at +3690, 10 at -4510,
+  11 at +4510. `MAX_ISLAND_RADIUS` 385 (half extent, detour and margins included) and
+  `MAX_COURSES_PER_CLASS` 12; `RaceTrackTest.theIslandGridHoldsTwelveCoursesPerClass` checks all
+  48 slots at the maximum size and every course against it. No existing island moved.
+* **Themes**: four new, one per class, each with a palette, verge detail, margin decoration,
+  stand wood, music and a set piece (`themeLandmark`): **FARMLAND** (C: coarse-dirt road,
+  lime / white kerbs, birch fences, hay rounds, pumpkin patches, birch trees; a scarecrow in a
+  pumpkin hat), **SAVANNA** (B: smooth red sandstone road, acacias, terracotta stacks, termite
+  mounds; a great flat-crowned acacia), **MUSHROOM** (A: podzol road, mushroom-block kerbs,
+  mycelium, huge red and brown mushrooms, froglights; a giant mushroom), **DEEP_DARK** (S:
+  deepslate-tile road, sculk, ancient-city pillars with soul lanterns, candles; a warden's frame
+  of reinforced deepslate). Music: FARMLAND chocobo_dash, SAVANNA rune_dash, MUSHROOM
+  gallop_of_heroes, DEEP_DARK speed_of_the_dragon (`RaceScoring.raceLoopKey(Theme)`, by theme
+  now). No course wears them yet: `CourseThemeTest` lays each over two courses of its class that
+  between them carry every terrain feature the class races (`RaceCourseLayout.dressedAs`) and
+  checks a sealed, dressed island with its set piece; `CourseMapDumpTest` writes those previews
+  to `build/track_maps/themes/`.
+* **Landmarks** are dispatched per course: `landmark()` -> `landmarkC/B/A/S` (one `case` per
+  course, `default` = the theme's set piece), each class followed by its own set-piece methods.
+  The original 24 keep exactly the pieces they had. `RaceCourseLayout.landmarkBlocks()` /
+  `landmarkShape()` record what the set piece laid; `CourseIdentityTest` now checks every
+  signature is laid by the set piece itself, no two courses share a signature or build the
+  same set piece, and courses of a theme differ in shape and palette.
+* **Course picker** (`client/CourseSelectScreen`, also the duel picker): a tab per class (the
+  bird's and below), sprints left and grands prix right, up to six rows each, every button
+  "Name · 1 lap · 1150 m" / "Name · 5 laps × 600 m" with the old tooltip (theme, features,
+  lower-class note). Fits 640 x 360 (1080p, GUI scale 3) and 480 x 270 with room; anything
+  taller scrolls.
+* **Words**: almanac Whiskerwind page ("a sprint (one long lap, two minutes or more) or a
+  grand prix (three, four or five laps of a shorter circuit ...)"), README, store description
+  (+ rendered html), SPEC. The count stays "Twenty-four" until phase 2 lands.
+* **Tools**: `tools/track_sheet.py` lays one band per class (sprints row, grands prix row, table
+  order, six to a row) plus a theme-preview row; the enum regex takes themes with underscores.
+* **GameTest** `squareBuildsCourseAndRunsHeat` runs course 0 (now a 5-lap GP of 600-block laps):
+  it asserts three racers have a lap done at tick 2100 (`RaceSession.lapsDone`) instead of three
+  finishers. Not run here (GameTests are Ahmi's after merge).
+* **Tests**: `RaceTrackTest` (`everyClassHasAsManySprintsAsGrandsPrix`,
+  `theOriginalCoursesSwappedFormat`, `sprintsAreOneLongLapGrandsPrixShortLapsMoreLapsShorter`,
+  the grid test, and `twelveCoursesPerClass` **@Disabled until phase 2**), `CourseBalanceTest`
+  (boosts by format), `CourseIdentityTest`, new `CourseThemeTest` (themes + lang keys for every
+  course and theme). 223 unit tests (2 skipped), `build` green.
+
+### How to add a course (phase 2 class agents)
+
+Work only inside your own class's marker regions (`// ---- new X ... (phase 2) begin ----` /
+`end ----`); never edit, reorder or rename an existing row, and leave README / store / SPEC
+counts, `COURSE_VERSION` and the top of this file to the merge (a new course builds on first
+use; nothing existing changes).
+
+1. **Enum row** (`RaceTrack`, your class's block at the end of the table, every row ending in a
+   comma): `X_NAME(RaceClass.X, index, Theme.T, Shape.S, lapTarget, laps, features...)`. Indices
+   continue 6, 7, 8 = the three sprints (laps 1), then 9, 10, 11 = the three grands prix (5, 4
+   and 3 laps, like 0-2). The index is the row's place among the class's rows and places the
+   island; a wrong one fails `everyClassHasAsManySprintsAsGrandsPrix`.
+2. **Lengths** (`sprintsAreOneLongLapGrandsPrixShortLapsMoreLapsShorter`):
+   * sprint lap at least C 1100 / B 1220 / A 1360 / S 1500 (aim C 1150-1250, B 1280-1380,
+     A 1420-1520, S 1560-1660) and the island half extent at most 385 (`getRadiusX/Z`);
+   * grand prix lap at least 600 and shorter than the class's shortest sprint; within the class a
+     GP with more laps never has a longer lap (5 laps <= every 4 <= every 3, +5 slack) against
+     the existing ones: C 5-lap 600-660, 4-lap 600-760, 3-lap >= 660; B 5 <= 715, 4 in
+     650-825, 3 >= 715; A 5 <= 770, 4 in 700-890, 3 >= 770; S 5 <= 825, 4 in 750-950, 3 >= 825
+     (and consistent with each other); the heat (lap x laps) 1.6-3.4x the class's shortest sprint.
+3. **Shape** (your class's shape region, one per course, unique silhouette): `p(x, z, hill)`
+   in course units, first three points `(0,0) (30,0) (60,0)` (the start straight), last
+   `(-30, 0)`, hills 0..12 blocks with the lowest 0 (`circuitsHaveCornersHillsAndWalkableSlopes`:
+   total rise 2-12, a real corner somewhere), start straight within 0.14 rad over 40 blocks, legs
+   far enough apart at your scale that detours never touch (`legsNeverRunIntoEachOther`: > 38
+   blocks with terrain, > 30 open road) — keep legs 22+ units apart and check.
+4. **Features**: C boosts only; B exactly one terrain feature (water or ridge; lava is A/S);
+   A two or more with a bog (`mud`); S three or more. Spans between 0.05 and 0.95, 0.02 apart,
+   terrain on level road (a span where the hill profile is flat), never in the opening stretch.
+   Each colour feature's `detourCost` must be 0.55-1.3x `detourTarget()` (2 % of a lap, 13-28)
+   and >= 12, the bog the cheapest thing to go round (aim ~45 % of target): slide spans along a
+   bend and measure with a scratch test printing `track.detourCost(f)`. Boosts: **five on a
+   sprint, three on a grand prix**, `boost(start)` on a corner exit (`turnAhead(start, 45) <
+   0.7`), clear of every terrain span by 0.012. `CourseBalanceTest`, `ShortcutMarkerTest`,
+   `DetourSteeringTest`, `RacerLineTest`, `CourseIslandTest`, `CourseLiquidTest` and
+   `CourseCrowdTest` cover it.
+5. **Theme**: at least one new course on your class's new theme (C FARMLAND, B SAVANNA, A
+   MUSHROOM, S DEEP_DARK; `twelveCoursesPerClass` wants four themes a class), the rest new shapes
+   on existing themes. Add a theme only if a course truly needs one (its region in `Theme`, plus
+   `raceLoopKey`, `decorate`, `verge`, `themeLandmark`, stand wood, lang).
+6. **Landmark**: in `RaceCourseLayout.landmarkX`, `case X_NAME -> onPlinth(t, surf, this::piece);`
+   between your markers, and the `piece(int x, int y, int z)` method in your class's set-piece
+   region (it stands on a 7x7 plinth ROAD_HALF + 6 outside the road at about t = 0.5; keep it
+   within ~7x7 and under ~16 tall; `archOver` / `halo` are the over-the-road options). The first
+   course on a new theme may use the theme's piece (`this::themeLandmark`); any other course
+   needs a piece of its own. Add its signature (blocks the piece lays, unique) to
+   `CourseIdentityTest.signatureOf` between your markers — the switch must cover every course.
+7. **Lang**: `"chocobosreborn.track.<id>": "Name"` between `_anchor.track.x.begin` and
+   `_anchor.track.x.end` in `en_us.json` (CRLF). A sprint's name must not say Grand Prix, nor a
+   grand prix's Sprint.
+8. **Island**: nothing to do; the index places it. Check the grid test.
+9. **Run**: `./gradlew test --tests "*Course*" --tests "*RaceTrackTest" --tests "*RaceSim*"
+   --tests "*RacerLine*" --tests "*Detour*" --tests "*Shortcut*"` (below-normal priority,
+   `--no-daemon -Dorg.gradle.workers.max=1`), then `test`; eyeball with the
+   `CourseMapDumpTest` + `python tools/track_sheet.py`. `RaceSimTest` averages every course of
+   the class, so new courses move the ladder: keep it green. After all four classes merge,
+   remove `@Disabled` from `RaceTrackTest.twelveCoursesPerClass`, bump `COURSE_VERSION` only if
+   an existing course changed, and update the README / store / SPEC count.
+
 ## Open
 
 1. In-game test pass: the new circuits (hills, kerbs, rails, detours, boost pads,
