@@ -153,8 +153,10 @@ Overworld (foot or saddle); owned awake birds within 16 blocks follow
 home (birds follow again).
 
 Courses (`RaceTrack`, `TrackSpline`): twelve per class, six sprints and six grands prix (every count derives from the table: `ofClass`, `sprintsOf`, `grandsPrixOf`).
-Sprint or grand prix is the lap count alone (`isSprint` = 1 lap: 1 point and the base purse;
-`isGrandPrix` = 3-5 laps: 3 points, three times the purse). Sprints are one long lap
+Sprint or grand prix is the lap count alone (`isSprint` = 1 lap, `isGrandPrix` = 3-5 laps).
+Points by distance (`RaceScoring.winPoints`, `RaceTrack.winPoints`): a ranked win is worth
+round(4 x heat length / the class's shortest sprint), so every sprint is 4 and a grand prix
+scores by its heat; the first-place purse is the class base (6 / 12 / 24 / 48) x points / 4. Sprints are one long lap
 (1150-1620 blocks, >= 120 s at 9 b/s, longer up the classes); grands prix are 3, 4 or 5
 laps of a shorter circuit (600-1000 blocks, the most laps on the shortest lap, never under
 600). Since the swap, courses 0-2 of each class are grands prix (5 / 4 / 3 laps) and 3-5
@@ -219,7 +221,7 @@ are dropped. The field is filled with AI (`RacerProfile` by class, driven by
 Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own bird, land
 speed included, by `RaceScoring.rivalPaceAbs`; field birds run their class's land speed and
 keep a quarter of their colour's edge, `RaceScoring.fieldLandSpeed`; the ladder is simulated
-in `RaceSimTest`); nine points promote (sprint win 1, grand prix 3), never demote; prizes GP + greens / nuts for a finished
+in `RaceSimTest`); 36 points promote (nine sprint wins; a grand prix by its length), never demote; prizes GP + greens / nuts for a finished
 course. Bets at Rook before the heat (pending in player data) or during the hold. No
 racing in armour.
 

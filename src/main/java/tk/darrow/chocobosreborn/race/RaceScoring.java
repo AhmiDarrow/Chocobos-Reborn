@@ -17,34 +17,108 @@ public final class RaceScoring {
 	}
 
 	/**
-	 * A sprint win is one point. A grand prix win is three. Nine points promote.
-	 * Nine sprint wins, or three grand prix wins, or a mix that adds to nine.
+	 * A win on a heat as long as the class's shortest sprint is worth this many points;
+	 * every other heat scales from it by length ({@link #winPoints}).
 	 */
-	public static Promotion afterFirstPlace(RaceClass current, int classWins, boolean grandPrix) {
-		if (current == RaceClass.S) {
-			return new Promotion(RaceClass.S, RaceClass.POINTS_TO_PROMOTE, false);
+	static final int REFERENCE_POINTS = 4;
+
+	/** Promotion on the nine-point ladder (save formats 1 and 2); an older first-place mark was 3 of its points. */
+	static final int OLD_PROMOTE = 9;
+	private static final int OLD_MARK_POINTS = 3;
+
+	private static final java.util.Map<RaceClass, Double> REFERENCE = new java.util.EnumMap<>(RaceClass.class);
+
+	/**
+	 * Points for a ranked first place on {@code track}: 4 x heat length / the class's
+	 * shortest sprint, rounded. Every sprint is 4 (a class's sprints are within 12.5 % of
+	 * each other, so pinning them is only a guard); a grand prix scores by its heat, e.g.
+	 * a heat 2.5 times the shortest sprint is 10. {@link RaceClass#POINTS_TO_PROMOTE} (36)
+	 * is nine sprint wins. HANDOFF.md "Points by distance" has the table.
+	 */
+	public static int winPoints(RaceTrack track) {
+		if (track.isSprint()) {
+			return REFERENCE_POINTS;
 		}
-		int wins = classWins + (grandPrix ? RaceClass.GRAND_PRIX_POINTS : RaceClass.SPRINT_POINTS);
-		if (wins >= RaceClass.POINTS_TO_PROMOTE) {
-			return new Promotion(current.next(), 0, true);
-		}
-		return new Promotion(current, wins, false);
+		return winPoints(track.raceLength(), referenceLength(track.getRaceClass()));
+	}
+
+	/** {@link #winPoints(RaceTrack)} for a heat of {@code heatLength} against a class reference. */
+	static int winPoints(double heatLength, double reference) {
+		return Math.max(REFERENCE_POINTS, (int) Math.round(REFERENCE_POINTS * heatLength / reference));
+	}
+
+	/** The class's yardstick: its shortest sprint (one lap), from the course table. */
+	public static synchronized double referenceLength(RaceClass raceClass) {
+		return REFERENCE.computeIfAbsent(raceClass, rc -> {
+			double min = Double.MAX_VALUE;
+			for (RaceTrack t : RaceTrack.sprintsOf(rc)) {
+				min = Math.min(min, t.raceLength());
+			}
+			if (min == Double.MAX_VALUE) {
+				// no sprint in the class: its longest lap stands in
+				min = 1.0D;
+				for (RaceTrack t : RaceTrack.ofClass(rc)) {
+					min = Math.max(min, t.lapLength());
+				}
+			}
+			return min;
+		});
 	}
 
 	/**
-	 * A bird saved before the points ladder carried first-place marks toward the old
-	 * three-win promotion. Convert them once, keeping the same share of the way up:
-	 * 1 or 2 marks become 3 or 6 points of 9, and a Class S bird shows the full 9.
+	 * A ranked first place worth {@code earned} points ({@link #winPoints}).
+	 * {@link RaceClass#POINTS_TO_PROMOTE} promote; spare points do not carry over.
+	 * Class S is the top: it shows the full ladder and earns nothing more.
+	 */
+	public static Promotion afterFirstPlace(RaceClass current, int classPoints, int earned) {
+		if (current == RaceClass.S) {
+			return new Promotion(RaceClass.S, RaceClass.POINTS_TO_PROMOTE, false);
+		}
+		int points = Math.max(0, classPoints) + Math.max(0, earned);
+		if (points >= RaceClass.POINTS_TO_PROMOTE) {
+			return new Promotion(current.next(), 0, true);
+		}
+		return new Promotion(current, points, false);
+	}
+
+	/**
+	 * Save format 1 -> 2. A bird saved before the points ladder carried first-place marks
+	 * toward the old three-win promotion. Convert them once, keeping the same share of the
+	 * way up: 1 or 2 marks become 3 or 6 points of 9, and a Class S bird shows the full 9.
 	 * Anything else is already points (a bird cannot hold 3 marks below S).
 	 */
 	public static int migratedClassPoints(int classId, int stored) {
 		if (classId >= RaceClass.S.getId()) {
-			return RaceClass.POINTS_TO_PROMOTE;
+			return OLD_PROMOTE;
 		}
 		if (stored >= 1 && stored <= 2) {
-			return stored * RaceClass.GRAND_PRIX_POINTS;
+			return stored * OLD_MARK_POINTS;
 		}
 		return Math.max(0, stored);
+	}
+
+	/**
+	 * Save format 2 -> 3. Points of 9 become points of 36 (x4, the same share of the way
+	 * up: a sprint was 1 of 9 and is 4 of 36). Class S shows the full 36.
+	 */
+	public static int rescaledClassPoints(int classId, int stored) {
+		if (classId >= RaceClass.S.getId()) {
+			return RaceClass.POINTS_TO_PROMOTE;
+		}
+		int scale = RaceClass.POINTS_TO_PROMOTE / OLD_PROMOTE;
+		return Math.min(RaceClass.POINTS_TO_PROMOTE - 1, Math.max(0, stored) * scale);
+	}
+
+	/** A bird's class points saved in {@code format}, brought up to the current ladder, one step at a time. */
+	public static int convertedClassPoints(int format, int classId, int stored) {
+		int points = stored;
+		if (format < 2) {
+			points = migratedClassPoints(classId, points);
+		}
+		if (format < 3) {
+			points = rescaledClassPoints(classId, points);
+		}
+		return points;
 	}
 
 	/** Points still needed in this class. Class S is the top of the ladder. */
@@ -55,15 +129,27 @@ public final class RaceScoring {
 		return Math.max(0, RaceClass.POINTS_TO_PROMOTE - classWins);
 	}
 
-	/** First-place GP. A sprint pays the base. A grand prix pays three times that. */
-	public static int purse(RaceClass raceClass, boolean grandPrix) {
-		int sprint = switch (raceClass) {
+	/** A sprint's first-place GP in the class. */
+	public static int basePurse(RaceClass raceClass) {
+		return switch (raceClass) {
 			case C -> 6;
 			case B -> 12;
 			case A -> 24;
 			case S -> 48;
 		};
-		return grandPrix ? sprint * RaceClass.GRAND_PRIX_POINTS : sprint;
+	}
+
+	/**
+	 * First-place GP on {@code track}: the class base scaled like the points
+	 * (base x winPoints / 4, rounded), so a sprint pays the base and a grand prix
+	 * pays by its length (10 points: 2.5 times the base).
+	 */
+	public static int purse(RaceTrack track) {
+		return purse(track.getRaceClass(), winPoints(track));
+	}
+
+	static int purse(RaceClass raceClass, int winPoints) {
+		return (int) Math.round(basePurse(raceClass) * winPoints / (double) REFERENCE_POINTS);
 	}
 
 	public static boolean wrappedPastStart(double lastProgress, double nowProgress) {

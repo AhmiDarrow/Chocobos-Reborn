@@ -4,7 +4,8 @@ import java.util.Locale;
 
 /**
  * Gold Saucer / Chocobo Square classes from Final Fantasy VII.
- * Three first-place finishes promote a bird; class never drops.
+ * Ranked wins earn points by the heat's length ({@link RaceScoring#winPoints});
+ * {@link #POINTS_TO_PROMOTE} of them promote a bird; class never drops.
  */
 public enum RaceClass {
 	C(0),
@@ -12,10 +13,11 @@ public enum RaceClass {
 	A(2),
 	S(3);
 
-	/** Points to leave a class. A sprint win is 1, a grand prix win is 3. */
-	public static final int POINTS_TO_PROMOTE = 9;
-	public static final int SPRINT_POINTS = 1;
-	public static final int GRAND_PRIX_POINTS = 3;
+	/**
+	 * Points to leave a class: nine sprint wins (4 each), or fewer grand prix wins (each
+	 * worth more, by the heat's length). See {@link RaceScoring#winPoints}.
+	 */
+	public static final int POINTS_TO_PROMOTE = 36;
 
 	private final int id;
 

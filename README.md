@@ -71,7 +71,7 @@ The town: a plaza round the arrival medallion, the chocobo fountain, awninged ma
 - **Pell the Broker** swaps birds between players or hands over a gift.
 - Stalls, all priced in **GP**: Sage Wynn (greens), Bilo the Nutkeeper (nuts), Tack (saddles, lures), the Fair (the Almanac, pocketwatches, fireworks, leads) and **Marl's GP Exchange**.
 
-Classes run C → B → A → S. Nine points promote: a sprint is 1, a grand prix is 3. A bird never drops a class.
+Classes run C → B → A → S. A ranked win scores by distance: a sprint is 4 points, a grand prix more the longer its heat, and the purse grows the same way. 36 points promote (nine sprint wins, or fewer grands prix). A bird never drops a class.
 
 ## Chocobo Farm
 

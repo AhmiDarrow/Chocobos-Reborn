@@ -10,13 +10,15 @@ import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 import tk.darrow.chocobosreborn.net.RacePayloads;
 import tk.darrow.chocobosreborn.race.RaceClass;
+import tk.darrow.chocobosreborn.race.RaceScoring;
 import tk.darrow.chocobosreborn.race.RaceTrack;
 
 /**
  * Pick a course: one class at a time (a tab per class, the bird's own and every class
  * below it), its sprints (one long lap) in the left column and its grands prix (three
  * to five laps of a shorter circuit) in the right, each labelled with its laps and
- * length. However many courses a class has ({@link RaceTrack#sprintsOf} /
+ * length and, where a ranked win would count toward promotion, its points
+ * ({@link RaceTrack#winPoints}); the tooltip adds the first-place purse. However many courses a class has ({@link RaceTrack#sprintsOf} /
  * {@link RaceTrack#grandsPrixOf}), a class fits in six rows, so the whole picker sits on
  * a 1080p screen at GUI scale 3 (640 x 360) or 4 (480 x 270); anything taller scrolls.
  * Ranked heats start at once; a duel challenge also picks a GP stake and then waits
@@ -98,21 +100,44 @@ public class CourseSelectScreen extends Screen {
 		maxScroll = Math.max(0, y + 26 - (height - 4));
 	}
 
-	/** One course button: name, laps and length; the tooltip has the theme, features and lap length. */
+	/**
+	 * One course button: name, laps and length, and the points a ranked win earns when it
+	 * would count (a heat, the bird's own class, below S); the tooltip has the theme,
+	 * features, lap length and the first-place purse.
+	 */
 	private void course(RaceTrack t, int bx, int by, boolean lower) {
-		Component label = Component.translatable("chocobosreborn.select.row",
-				Component.translatable("chocobosreborn.track." + t.id()), length(t));
+		Component name = Component.translatable("chocobosreborn.track." + t.id());
+		boolean counts = mode == 0 && !lower && shown != RaceClass.S;
+		Component label = counts
+				? Component.translatable("chocobosreborn.select.row_pts", name, length(t, false), t.winPoints())
+				: Component.translatable("chocobosreborn.select.row", name, length(t, false));
+		if (counts && font.width(label) > columnWidth - 8) {
+			// the longest names: "5×630 m" keeps the points on the button at 480 x 270
+			label = Component.translatable("chocobosreborn.select.row_pts", name, length(t, true), t.winPoints());
+		}
+		Component win = Component.empty();
+		if (mode == 0) {
+			int purse = RaceScoring.purse(t);
+			win = counts ? Component.translatable("chocobosreborn.select.win", t.winPoints(), RaceClass.POINTS_TO_PROMOTE, purse)
+					: Component.translatable("chocobosreborn.select.win_gp", lower ? purse / 2 : purse);
+		}
 		Component tip = Component.translatable("chocobosreborn.select.tip", Math.round(t.lapLength()), t.getLaps(), features(t),
-				lower ? Component.translatable("chocobosreborn.select.lower") : Component.empty());
+				win, lower ? Component.translatable("chocobosreborn.select.lower") : Component.empty());
 		track(addRenderableWidget(Button.builder(label, b -> choose(t)).bounds(bx, by, columnWidth, 18)
 				.tooltip(net.minecraft.client.gui.components.Tooltip.create(tip)).build()), by);
 	}
 
-	/** "1 lap · 1150 m" for a sprint, "5 laps × 600 m" for a grand prix (lap rounded to 10 blocks). */
-	static Component length(RaceTrack t) {
+	/**
+	 * "1 lap · 1150 m" for a sprint, "5 laps × 600 m" for a grand prix, or "5×600 m" when
+	 * {@code compact} (lap rounded to 10 blocks).
+	 */
+	static Component length(RaceTrack t, boolean compact) {
 		long lap = Math.round(t.lapLength() / 10.0D) * 10L;
-		return t.isSprint() ? Component.translatable("chocobosreborn.select.len.sprint", lap)
-				: Component.translatable("chocobosreborn.select.len.gp", t.getLaps(), lap);
+		if (t.isSprint()) {
+			return Component.translatable("chocobosreborn.select.len.sprint", lap);
+		}
+		return Component.translatable(compact ? "chocobosreborn.select.len.gp_short" : "chocobosreborn.select.len.gp",
+				t.getLaps(), lap);
 	}
 
 	private void track(Button button, int baseY) {

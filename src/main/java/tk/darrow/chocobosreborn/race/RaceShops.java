@@ -6,8 +6,8 @@ import java.util.List;
  * ChocobosReborn stall tables, priced in GP (Chocobo Square money). Greens and
  * nuts follow the FF7 ladder: Gysahl is pocket change, Sylkis and Zeio are
  * the prize of a long season. A sprint win pays 6 / 12 / 24 / 48 GP in
- * C / B / A / S. A grand prix pays three times that. 128 is the ceiling two
- * 64-stack cost slots can hold.
+ * C / B / A / S. A grand prix pays by its length, base x points / 4
+ * ({@link RaceScoring#purse}). 128 is the ceiling two 64-stack cost slots can hold.
  */
 public final class RaceShops {
 	public record Line(String role, int cost, String resultId, int resultCount) {

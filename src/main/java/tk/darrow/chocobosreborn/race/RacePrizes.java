@@ -15,8 +15,9 @@ public final class RacePrizes {
 	private RacePrizes() {
 	}
 
-	public static int gp(RaceClass rc, int place, boolean ranked, boolean grandPrix) {
-		int first = RaceScoring.purse(rc, grandPrix);
+	/** GP for {@code place} on {@code track}: the purse ({@link RaceScoring#purse}) to 1st, half to 2nd, a quarter to 3rd. */
+	public static int gp(RaceTrack track, int place, boolean ranked) {
+		int first = RaceScoring.purse(track);
 		if (!ranked) {
 			first /= 2;
 		}

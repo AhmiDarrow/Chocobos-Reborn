@@ -494,12 +494,12 @@ public enum RaceTrack {
 		return course;
 	}
 
-	/** One lap: a sprint (1 point, the base purse). Everything sprint-or-GP keys off the lap count. */
+	/** One lap: a sprint (4 points, the base purse). Everything sprint-or-GP keys off the lap count. */
 	public boolean isSprint() {
 		return laps <= 1;
 	}
 
-	/** Three to five laps: a grand prix (3 points, three times the purse). */
+	/** Three to five laps: a grand prix (points and purse by the heat's length, {@link #winPoints()}). */
 	public boolean isGrandPrix() {
 		return laps > 1;
 	}
@@ -511,6 +511,11 @@ public enum RaceTrack {
 	/** Blocks for the whole heat: lap length x laps. */
 	public double raceLength() {
 		return lapLength() * laps;
+	}
+
+	/** Points for a ranked win here ({@link RaceScoring#winPoints}): 4 a sprint, a grand prix by its length. */
+	public int winPoints() {
+		return RaceScoring.winPoints(this);
 	}
 
 	public Theme theme() {

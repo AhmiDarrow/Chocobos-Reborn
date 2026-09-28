@@ -782,7 +782,11 @@ public class ChocobosRebornGameTests {
 		}
 	}
 
-	/** A bird saved before the points ladder and bloodlines converts once on load, and only once. */
+	/**
+	 * A bird saved before the points ladder and bloodlines converts once on load, and only once
+	 * (format 1 -> 2 -> 3: two old marks are 6 of 9, then 24 of 36); a format-2 bird's points of
+	 * nine become points of 36 and its (blank) line is left alone.
+	 */
 	@GameTest(template = EMPTY, timeoutTicks = 40)
 	public static void oldSaveConvertsOnce(GameTestHelper helper) {
 		ServerLevel level = helper.getLevel();
@@ -796,7 +800,7 @@ public class ChocobosRebornGameTests {
 		tag.putInt("ClassWins", 2);    // two of the old three
 		ChocoboEntity old = ModEntities.CHOCOBO.get().create(level);
 		old.load(tag);
-		helper.assertTrue(old.classWins() == 6, "two old marks became six points: " + old.classWins());
+		helper.assertTrue(old.classWins() == 24, "two old marks became 24 points of 36: " + old.classWins());
 		int floor = tk.darrow.chocobosreborn.breed.BreedGenes.gradeFloor(3);
 		helper.assertTrue(old.geneSpeed() >= floor && old.geneStamina() >= floor && old.geneIntelligence() >= floor
 				&& old.geneCooperation() >= floor, "a blank line rolled wild blood from its grade");
@@ -804,9 +808,17 @@ public class ChocobosRebornGameTests {
 		old.saveWithoutId(again);
 		ChocoboEntity reloaded = ModEntities.CHOCOBO.get().create(level);
 		reloaded.load(again);
-		helper.assertTrue(reloaded.classWins() == 6, "converted once, not again: " + reloaded.classWins());
+		helper.assertTrue(reloaded.classWins() == 24, "converted once, not again: " + reloaded.classWins());
 		helper.assertTrue(reloaded.geneSpeed() == old.geneSpeed() && reloaded.geneCooperation() == old.geneCooperation(),
 				"blood kept on the next load");
+		net.minecraft.nbt.CompoundTag nine = new net.minecraft.nbt.CompoundTag();
+		bird.saveWithoutId(nine);
+		nine.putInt("SaveFormat", 2);   // the nine-point ladder
+		nine.putInt("ClassWins", 5);
+		ChocoboEntity two = ModEntities.CHOCOBO.get().create(level);
+		two.load(nine);
+		helper.assertTrue(two.classWins() == 20, "five of nine became 20 of 36: " + two.classWins());
+		helper.assertTrue(two.geneSpeed() == 0 && two.geneCooperation() == 0, "format 2 does not roll blood again");
 		helper.succeed();
 	}
 

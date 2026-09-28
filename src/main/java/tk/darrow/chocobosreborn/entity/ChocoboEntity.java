@@ -434,16 +434,19 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * Save format 2 (1.0.19). A bird saved by an older version is brought onto the
-	 * current rules once: its first-place marks toward the old three-win promotion
-	 * become points of nine, and a bird from before bloodlines rolls born stats from
-	 * its birth grade, as a wild bird does. Training, wins, colour and grade stay.
+	 * Save format 3 (points by distance). A bird saved by an older version is brought onto
+	 * the current rules once, step by step ({@link RaceScoring#convertedClassPoints}):
+	 * format 1 -> 2, its first-place marks toward the old three-win promotion become
+	 * points of nine, and a bird from before bloodlines rolls born stats from its birth
+	 * grade, as a wild bird does; format 2 -> 3, points of nine become points of 36 (x4).
+	 * Training, wins, colour and grade stay.
 	 */
-	static final int SAVE_FORMAT = 2;
+	static final int SAVE_FORMAT = 3;
 
-	private void convertOldSave() {
-		this.entityData.set(DATA_CLASS_WINS, RaceScoring.migratedClassPoints(raceClass().getId(), classWins()));
-		if (!raceNpc() && !townBird() && BreedGenes.blankLine(geneSpeed(), geneStamina(), geneIntelligence(), geneCooperation())) {
+	private void convertOldSave(int format) {
+		this.entityData.set(DATA_CLASS_WINS, RaceScoring.convertedClassPoints(format, raceClass().getId(), classWins()));
+		if (format < 2 && !raceNpc() && !townBird()
+				&& BreedGenes.blankLine(geneSpeed(), geneStamina(), geneIntelligence(), geneCooperation())) {
 			rollWildBlood();
 		}
 	}
@@ -942,18 +945,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * First-place finish at Chocobo Square. Ranked wins count for the farm line.
-	 * A sprint is one point and a grand prix is three. Nine points promote.
-	 * The class never drops.
+	 * First-place finish at Chocobo Square. Ranked wins count for the farm line and earn
+	 * {@code points} toward promotion ({@link RaceScoring#winPoints}: 4 a sprint, a grand
+	 * prix by its length; 36 promote). The class never drops. Returns the outcome, or
+	 * null for an unranked finish.
 	 */
-	public void recordFirstPlace(boolean ranked, boolean grandPrix) {
+	@org.jetbrains.annotations.Nullable
+	public RaceScoring.Promotion recordFirstPlace(boolean ranked, int points) {
 		if (!ranked) {
-			return;
+			return null;
 		}
 		this.entityData.set(DATA_WINS, raceWins() + 1);
-		RaceScoring.Promotion p = RaceScoring.afterFirstPlace(raceClass(), classWins(), grandPrix);
+		RaceScoring.Promotion p = RaceScoring.afterFirstPlace(raceClass(), classWins(), points);
 		this.entityData.set(DATA_CLASS, p.raceClass().getId());
 		this.entityData.set(DATA_CLASS_WINS, p.classWins());
+		return p;
 	}
 
 	/** Stamp training exactly. Feeding still goes through {@link #addTraining}. */
@@ -1228,8 +1234,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			lastGreensFeed = tag.getLong("LastGreensFeed");
 		}
 		featherTicks = tag.contains("FeatherTicks") ? tag.getInt("FeatherTicks") : -1;
-		if (tag.getInt("SaveFormat") < SAVE_FORMAT) {
-			convertOldSave();
+		int format = tag.getInt("SaveFormat");
+		if (format < SAVE_FORMAT) {
+			convertOldSave(format);
 		}
 		this.entityData.set(DATA_STAGE, computeStage());
 		// Attributes follow the plumage; health is whatever was saved.

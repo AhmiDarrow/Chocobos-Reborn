@@ -1755,3 +1755,141 @@ and both earn a full lap. Results: 244 unit tests (1 skipped, AtlasTint), all 29
 * AI: C birds bumping about one pass in three, S and the rivals clean, leaders covering the inside once
   without weaving, nobody stuck behind a slower bird for long.
 * Ghosts: a set-back bird dropped into traffic, finished AI parking, a finished rider coasting.
+
+## Points by distance (2026-09-28, unreleased, branch `points-balance`; Ahmi: "Now that we have swapped the sprints and grand prix, further balance the point system for ranks, since some grand prix are 3, 4, 5 laps etc. Assign the values based off maybe distance or something fair")
+
+### The rule (`RaceScoring.winPoints`, `RaceTrack.winPoints()`)
+
+* A ranked first place is worth **round(4 x heat length / the class's shortest sprint)** points.
+  Heat length is `raceLength()` (lap x laps); the reference is derived from the table
+  (`RaceScoring.referenceLength`: min `raceLength()` over `sprintsOf(rc)`, cached), never hard-coded.
+* Every sprint is **4** (pinned; a class's longest sprint is under 1.125x its shortest, so the pin
+  never changes a value today). A grand prix scores by its heat and never under 4.
+* **36 promote** (`RaceClass.POINTS_TO_PROMOTE`, the one constant; `SPRINT_POINTS` /
+  `GRAND_PRIX_POINTS` are gone): nine sprint wins, as before, or four or five grand prix wins today.
+  Spare points do not carry over. Class S is the top (shows 36, earns nothing more). Below-class
+  racing, duels and unranked heats still earn no points; `raceWins` (breeding) still counts every
+  ranked first place as 1.
+* **Purse by the same ratio** (`RaceScoring.purse(RaceTrack)` = `basePurse(rc)` x points / 4,
+  rounded; base C 6 / B 12 / A 24 / S 48): a sprint pays the base, a grand prix 1.75-2.8x it today.
+  `RacePrizes.gp(track, place, ranked)` still pays 1st / 2nd / 3rd full / half / quarter, unranked
+  half, below-class half again (`RaceSession`).
+
+### The table today (`WinPointsTest.writeTheTable`, `build/win_points.txt`)
+
+Generated from the current course table. **It changes when the short-GP rework lands** (grand prix
+laps cut to a share of the shortest sprint, heats ~1.15-1.6x a sprint): the rule stays, the grands
+prix then land at 5-6 points (6-8 wins to promote) and purses of 1.25-1.5x the base. x ref = heat /
+shortest sprint; wins = grand prix wins to promote from zero; purse = first place (old = 1 / 3x
+base); secs = the class favourite at its best form in `RaceSim` (the pace a winner beats); marks =
+five-minute heat marks the heat ties up (13 s hold + heat + ~30 s back to Esther + 10 s last call).
+
+| course | format | heat | x ref | pts | wins | purse | old | secs | marks |
+|---|---|---|---|---|---|---|---|---|---|
+| C_DOWNS | sprint | 1150 | 1.00 | 4 | 9 | 6 | 6 | 114 | 1 |
+| C_CIDER | sprint | 1170 | 1.02 | 4 | 9 | 6 | 6 | 117 | 1 |
+| C_LAGOON | sprint | 1190 | 1.03 | 4 | 9 | 6 | 6 | 117 | 1 |
+| C_HARVEST | sprint | 1200 | 1.04 | 4 | 9 | 6 | 6 | 119 | 1 |
+| C_HONEYCOMB | sprint | 1160 | 1.01 | 4 | 9 | 6 | 6 | 116 | 1 |
+| C_SCALLOP | sprint | 1240 | 1.08 | 4 | 9 | 6 | 6 | 125 | 1 |
+| C_SHORE | 3 x 760 | 2280 | 1.98 | 8 | 5 | 12 | 18 | 230 | 1 |
+| C_HORSESHOE | 3 x 800 | 2400 | 2.09 | 8 | 5 | 12 | 18 | 242 | 1 |
+| C_ORCHARD | 4 x 660 | 2640 | 2.30 | 9 | 4 | 14 | 18 | 268 | 2 |
+| C_KITE_HILL | 4 x 700 | 2800 | 2.43 | 10 | 4 | 15 | 18 | 283 | 2 |
+| C_MEADOW | 5 x 600 | 3000 | 2.61 | 10 | 4 | 15 | 18 | 299 | 2 |
+| C_HEARTFIELD | 5 x 630 | 3150 | 2.74 | 11 | 4 | 17 | 18 | 311 | 2 |
+| B_MESA | sprint | 1280 | 1.00 | 4 | 9 | 12 | 12 | 76 | 1 |
+| B_RAPIDS | sprint | 1300 | 1.02 | 4 | 9 | 12 | 12 | 78 | 1 |
+| B_GLACIER | sprint | 1320 | 1.03 | 4 | 9 | 12 | 12 | 80 | 1 |
+| B_ACACIA | sprint | 1340 | 1.05 | 4 | 9 | 12 | 12 | 81 | 1 |
+| B_GULCH | sprint | 1320 | 1.03 | 4 | 9 | 12 | 12 | 79 | 1 |
+| B_OXBOW | sprint | 1360 | 1.06 | 4 | 9 | 12 | 12 | 82 | 1 |
+| B_FROST | 3 x 825 | 2475 | 1.93 | 8 | 5 | 24 | 36 | 153 | 1 |
+| B_SNOWCAP | 3 x 860 | 2580 | 2.02 | 8 | 5 | 24 | 36 | 161 | 1 |
+| B_FORD | 4 x 715 | 2860 | 2.23 | 9 | 4 | 27 | 36 | 176 | 1 |
+| B_KOPJE | 4 x 760 | 3040 | 2.38 | 10 | 4 | 30 | 36 | 185 | 1 |
+| B_CANYON | 5 x 650 | 3250 | 2.54 | 10 | 4 | 30 | 36 | 195 | 1 |
+| B_BAOBAB | 5 x 680 | 3400 | 2.66 | 11 | 4 | 33 | 36 | 205 | 1 |
+| A_DEEPS | sprint | 1420 | 1.00 | 4 | 9 | 24 | 24 | 43 | 1 |
+| A_TEMPLE | sprint | 1440 | 1.01 | 4 | 9 | 24 | 24 | 44 | 1 |
+| A_INFERNO | sprint | 1460 | 1.03 | 4 | 9 | 24 | 24 | 44 | 1 |
+| A_TOADSTOOL | sprint | 1480 | 1.04 | 4 | 9 | 24 | 24 | 44 | 1 |
+| A_AMMONITE | sprint | 1440 | 1.01 | 4 | 9 | 24 | 24 | 45 | 1 |
+| A_FORGE | sprint | 1500 | 1.06 | 4 | 9 | 24 | 24 | 46 | 1 |
+| A_EMBER | 3 x 890 | 2670 | 1.88 | 8 | 5 | 48 | 72 | 84 | 1 |
+| A_MACHETE | 3 x 950 | 2850 | 2.01 | 8 | 5 | 48 | 72 | 88 | 1 |
+| A_CANOPY | 4 x 770 | 3080 | 2.17 | 9 | 4 | 54 | 72 | 92 | 1 |
+| A_MOONSHELF | 4 x 800 | 3200 | 2.25 | 9 | 4 | 54 | 72 | 100 | 1 |
+| A_CRYSTAL | 5 x 700 | 3500 | 2.46 | 10 | 4 | 60 | 72 | 100 | 1 |
+| A_GROTTO | 5 x 760 | 3800 | 2.68 | 11 | 4 | 66 | 72 | 111 | 1 |
+| S_STARFALL | sprint | 1560 | 1.00 | 4 | - | 48 | 48 | 32 | 1 |
+| S_CITADEL | sprint | 1580 | 1.01 | 4 | - | 48 | 48 | 33 | 1 |
+| S_MAELSTROM | sprint | 1600 | 1.03 | 4 | - | 48 | 48 | 33 | 1 |
+| S_ABYSS | sprint | 1620 | 1.04 | 4 | - | 48 | 48 | 32 | 1 |
+| S_ZENITH | sprint | 1600 | 1.03 | 4 | - | 48 | 48 | 34 | 1 |
+| S_BASTION | sprint | 1580 | 1.01 | 4 | - | 48 | 48 | 31 | 1 |
+| S_VOID | 3 x 950 | 2850 | 1.83 | 7 | - | 84 | 144 | 68 | 1 |
+| S_RIFT | 3 x 1000 | 3000 | 1.92 | 8 | - | 96 | 144 | 71 | 1 |
+| S_KEEP | 4 x 825 | 3300 | 2.12 | 8 | - | 96 | 144 | 76 | 1 |
+| S_ECLIPSE | 4 x 880 | 3520 | 2.26 | 9 | - | 108 | 144 | 80 | 1 |
+| S_SKYWAY | 5 x 750 | 3750 | 2.40 | 10 | - | 120 | 144 | 87 | 1 |
+| S_ORBIT | 5 x 790 | 3950 | 2.53 | 10 | - | 120 | 144 | 78 | 1 |
+
+Per class today: sprints 4 points everywhere; grands prix C 8-11, B 8-11, A 8-11, S 7-10 (S does
+not promote). Wins to promote by grand prix: 5 on the 3-lap courses, 4 on the 4- and 5-lap ones.
+
+### Economy check (numbers from the table)
+
+* **Per minute of racing, the formats now pay the same**: mean GP per racing minute, sprints vs
+  grands prix, C 3.1 / 3.1, B 9.1 / 9.4, A 32.5 / 34.4, S 89.1 / 81.2 (S grand prix laps carry
+  more features per block, so they run a little slower). The old flat 3x paid grands prix ~30 %
+  more per minute (C 4.0, B 12.2, A 45.5, S 113.5).
+* **Per hour on the five-minute timetable a grand prix still pays about twice a sprint**, because
+  every heat but the four longest C grands prix fits in one mark: C 72 vs 109 GP/hr (the 4- and
+  5-lap C grands prix run 268-311 s and take two marks), B 144 vs 336, A 288 vs 660, S 576 vs 1248.
+  The long grand prix is the better pay, as asked; it is just no longer 3x.
+* **At the short-GP rework (~1.3x a sprint, estimated at today's GP pace per block)**: 5 points,
+  8 wins, purse C 8 / B 15 / A 30 / S 60, one mark: GP per racing minute stays level with sprints
+  (C 3.2, B 8.8, A 32.3, S 78.2) and per hour a grand prix pays 1.25-1.33x a sprint (C 96, B 180, A 360,
+  S 720).
+* **Shop prices: no change.** A grand prix racer earns about a quarter less than under the flat 3x
+  (C 12-17 for 18, A 48-66 for 72, S 84-120 for 144), sprint racers are unchanged, and item prizes
+  are per win as before. Reagan 40 / Sylkis 80 / Carob 48 / Zeio 96 are still one or two A / S grand
+  prix wins, which is the "long season" the stall prices were set for. If the short-GP rework lands
+  and GP income feels thin, nudge the purse base, not the prices.
+
+### Old saves: `ChocoboEntity.SAVE_FORMAT` 3
+
+* `RaceScoring.convertedClassPoints(format, classId, stored)` runs the steps in order:
+  format < 2 -> `migratedClassPoints` (old marks: 1 -> 3, 2 -> 6 of 9; Class S -> 9), then
+  format < 3 -> `rescaledClassPoints` (x4 onto 36; Class S -> 36). So a format-2 bird with 5 of 9
+  has 20 of 36, and a format-1 bird with two marks has 24 of 36 (the same share of the way up
+  both times). Wild blood is still rolled only for format < 2 birds with a blank line.
+* The almanac ledger (`BirdRecord`) now saves `"Ladder": 36`; a record without it is rescaled on
+  load (`BirdRecord.ladderPoints`), so a bird in an unloaded chunk does not show 6 of 36.
+* `OldSaveConversionTest` covers both steps, the 2 -> 3 step alone, 1 -> 3 in order, Class S and
+  a current bird left alone. GameTest `oldSaveConvertsOnce` now expects 24 (was 6) and adds a
+  format-2 bird (5 -> 20, blood not re-rolled). **Not run here** (GameTests are Ahmi's).
+
+### Shown to the player
+
+* **Course picker** (`CourseSelectScreen`, ranked tab of the bird's own class below S): "Name · 1 lap
+  · 1150 m · 4 pts" / "Name · 5 laps × 600 m · 10 pts"; a label too wide for its column (only
+  Heartfield Grand Prix at 480 x 270) falls back to "5×630 m". The tooltip adds "First place: 10
+  points (36 promote), 15 GP", or just the GP on a lower-class tab (half purse) or in Class S.
+  Duels show neither (no points, no purse).
+* **After a ranked win**: "+10 points (26 of 36) in Class C." (`race.class`), or "+10 points:
+  promoted to Class B!" (new `race.promoted`); a Class S win shows the top-of-ladder line with the
+  bird's real first-place count (it used to print class points there).
+* Text: almanac racing line and the Whiskerwind page, `gossip.7`, the Race Hall board signs
+  (board.5-7: "sprint wins 4," / "GPs by length," / "36 up, no drop"), README, store description
+  (+ html), SPEC, `docs/RELEASE_1.0.19.md` (new "Points by distance" block, old-bird numbers).
+
+### Tests
+
+New `WinPointsTest` (relative, so it survives the short-GP rework): the reference is the shortest
+sprint; every sprint 4 and sprints within 1.125x; every grand prix = round(4 x ratio) and more than
+a sprint; points never fall as the heat grows; the formula over ratios 1.15-3.4; nine sprint wins
+promote (eight do not); grand prix wins to promote = ceil(36 / points), fewer than nine; Class S
+stays; purse = base x points / 4 and places half / quarter; plus the table. `RaceScoringTest` and
+`OldSaveConversionTest` moved to the 36 ladder.

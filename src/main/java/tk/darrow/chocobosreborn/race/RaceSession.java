@@ -917,12 +917,14 @@ public class RaceSession {
 			ChocoboEntity mine = me.entity();
 			// racing below your class: half the purse and no credit toward promotion
 			boolean below = mine != null && mine.raceClass().getId() > track.getRaceClass().getId();
+			int earned = track.winPoints();
+			RaceScoring.Promotion won = null;
 			if (mine != null && !below && RaceScoring.awardsRankedWin(ranked, completed, place)) {
-				mine.recordFirstPlace(true, track.getLaps() > 1);
+				won = mine.recordFirstPlace(true, earned);
 			}
 			if (player == null) {
 				if (me.player != null) {
-					int gp = completed && !duel ? RacePrizes.gp(track.getRaceClass(), place, ranked, track.getLaps() > 1) : 0;
+					int gp = completed && !duel ? RacePrizes.gp(track, place, ranked) : 0;
 					if (below) {
 						gp /= 2;
 					}
@@ -934,7 +936,7 @@ public class RaceSession {
 				continue;
 			}
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.result", place, racers.size()), false);
-			int gp = completed && !duel ? RacePrizes.gp(track.getRaceClass(), place, ranked, track.getLaps() > 1) : 0;
+			int gp = completed && !duel ? RacePrizes.gp(track, place, ranked) : 0;
 			if (below) {
 				gp /= 2;
 				player.displayClientMessage(Component.translatable("chocobosreborn.race.below_class"), false);
@@ -963,13 +965,17 @@ public class RaceSession {
 				player.playNotifySound(ModSounds.RACE_VICTORY.get(), SoundSource.MUSIC, 1.0F, 1.0F);
 			}
 			if (mine != null && ranked && completed && place == 1 && !below) {
-				if (RaceScoring.winsUntilPromote(mine.raceClass(), mine.classWins()) == 0) {
+				Component cls = Component.translatable("chocobosreborn.class." + mine.raceClass().id());
+				if (won != null && won.promoted()) {
+					// "+10 points: promoted to Class B!"
+					player.displayClientMessage(Component.translatable("chocobosreborn.race.promoted", earned, cls), false);
+				} else if (RaceScoring.winsUntilPromote(mine.raceClass(), mine.classWins()) == 0) {
 					player.displayClientMessage(Component.translatable("chocobosreborn.almanac.d.racing_top",
-							Component.translatable("chocobosreborn.class." + mine.raceClass().id()), mine.classWins()), false);
+							cls, mine.raceWins()), false);
 				} else {
+					// "+10 points (26 of 36), Class C"
 					player.displayClientMessage(Component.translatable("chocobosreborn.race.class",
-							Component.translatable("chocobosreborn.class." + mine.raceClass().id()), mine.classWins(),
-							RaceClass.POINTS_TO_PROMOTE), false);
+							earned, mine.classWins(), RaceClass.POINTS_TO_PROMOTE, cls), false);
 				}
 				SquareAdvancements.award(player, SquareAdvancements.FIRST_PLACE);
 				if (mine.raceClass() == RaceClass.S) {

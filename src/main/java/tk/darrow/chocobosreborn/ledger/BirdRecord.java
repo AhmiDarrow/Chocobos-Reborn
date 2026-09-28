@@ -64,6 +64,7 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		t.putInt("Class", raceClass);
 		t.putInt("Wins", wins);
 		t.putInt("ClassWins", classWins);
+		t.putInt("Ladder", tk.darrow.chocobosreborn.race.RaceClass.POINTS_TO_PROMOTE);
 		t.putInt("TrSpeed", trSpeed);
 		t.putInt("TrStamina", trStamina);
 		t.putInt("TrIntel", trIntel);
@@ -88,10 +89,23 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		return t;
 	}
 
+	/**
+	 * Class points as the almanac shows them. A record written on the nine-point ladder
+	 * (no "Ladder") is rescaled to 36 like the bird itself (save format 3), so a bird in an
+	 * unloaded chunk does not show 6 of 36 until it next loads.
+	 */
+	static int ladderPoints(CompoundTag t) {
+		int stored = t.getInt("ClassWins");
+		if (t.getInt("Ladder") == tk.darrow.chocobosreborn.race.RaceClass.POINTS_TO_PROMOTE) {
+			return stored;
+		}
+		return tk.darrow.chocobosreborn.race.RaceScoring.rescaledClassPoints(t.getInt("Class"), stored);
+	}
+
 	public static BirdRecord load(CompoundTag t) {
 		return new BirdRecord(t.getUUID("Id"), t.getUUID("Owner"), t.getString("Name"), t.getInt("Color"),
 				t.getInt("BornGrade"), t.getInt("Grade"), t.getBoolean("Male"), t.getInt("Class"), t.getInt("Wins"),
-				t.getInt("ClassWins"), t.getInt("TrSpeed"), t.getInt("TrStamina"), t.getInt("TrIntel"), t.getInt("TrCoop"),
+				ladderPoints(t), t.getInt("TrSpeed"), t.getInt("TrStamina"), t.getInt("TrIntel"), t.getInt("TrCoop"),
 				t.getInt("GeneSpeed"), t.getInt("GeneStamina"), t.getInt("GeneIntel"), t.getInt("GeneCoop"),
 				t.contains("Spark") ? t.getInt("Spark") : -1,
 				t.hasUUID("ParentA") ? t.getUUID("ParentA") : null, t.hasUUID("ParentB") ? t.getUUID("ParentB") : null,
