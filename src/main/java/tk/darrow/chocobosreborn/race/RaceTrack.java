@@ -85,6 +85,15 @@ public enum RaceTrack {
 	// ---- new C courses (phase 2) end ----
 
 	// ---- new B courses (phase 2) begin ----
+	// sprints: a watering hole at the tip of a savanna tusk, a ridge in the notch of a canyon
+	// arrowhead, a ford across a river's oxbow; grands prix: a savanna lozenge with a waterhole,
+	// a kopje ridge on a savanna shield, a snow ridge across a mitten's thumb
+	B_ACACIA(RaceClass.B, 6, Theme.SAVANNA, Shape.TUSK, 1340, 1, water(0.51, 0.54), boost(0.14), boost(0.36), boost(0.58), boost(0.69), boost(0.80)),
+	B_GULCH(RaceClass.B, 7, Theme.CANYON, Shape.ARROWHEAD, 1320, 1, ridge(0.66, 0.70), boost(0.14), boost(0.33), boost(0.50), boost(0.73), boost(0.82)),
+	B_OXBOW(RaceClass.B, 8, Theme.RIVER, Shape.OXBOW, 1360, 1, water(0.20, 0.25), boost(0.36), boost(0.52), boost(0.65), boost(0.79), boost(0.87)),
+	B_BAOBAB(RaceClass.B, 9, Theme.SAVANNA, Shape.LOZENGE, 680, 5, water(0.78, 0.825), boost(0.21), boost(0.44), boost(0.69)),
+	B_KOPJE(RaceClass.B, 10, Theme.SAVANNA, Shape.HEATER, 760, 4, ridge(0.70, 0.745), boost(0.25), boost(0.59), boost(0.93)),
+	B_SNOWCAP(RaceClass.B, 11, Theme.SNOW, Shape.MITTEN, 860, 3, ridge(0.40, 0.435), boost(0.21), boost(0.65), boost(0.93)),
 	// ---- new B courses (phase 2) end ----
 
 	// ---- new A courses (phase 2) begin ----
@@ -252,6 +261,18 @@ public enum RaceTrack {
 		// ---- new C shapes (phase 2) end ----
 
 		// ---- new B shapes (phase 2) begin ----
+		/** A crescent tusk: a long climbing outer sweep, a hairpin at the tip, a concave run home. */
+		TUSK(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 1), p(150, 10, 2), p(200, 40, 3), p(236, 90, 3), p(250, 150, 3), p(236, 210, 3), p(200, 254, 2), p(160, 272, 1), p(126, 266, 0), p(120, 240, 0), p(160, 216, 0), p(186, 180, 1), p(192, 140, 2), p(180, 104, 3), p(150, 76, 3), p(110, 58, 2), p(60, 54, 1), p(16, 56, 0), p(-16, 44, 0), p(-30, 20, 0), p(-30, 0, 0)),
+		/** An arrowhead: two long flanks out to a sharp point, and a notched tail back by the line. */
+		ARROWHEAD(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(150, 0, 1), p(200, 14, 2), p(250, 44, 3), p(296, 82, 4), p(310, 104, 5), p(296, 126, 5), p(250, 164, 4), p(200, 194, 3), p(150, 208, 2), p(100, 212, 1), p(60, 212, 0), p(20, 210, 0), p(-20, 204, 0), p(-40, 186, 0), p(-30, 160, 0), p(10, 124, 0), p(26, 106, 0), p(10, 86, 0), p(-30, 50, 0), p(-44, 22, 0), p(-30, 0, 0)),
+		/** A meandering river: a pinched oxbow loop out, a long falling diagonal home. */
+		OXBOW(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(174, 14, 0), p(190, 44, 0), p(180, 76, 0), p(150, 90, 0), p(130, 110, 0), p(136, 140, 0), p(166, 150, 0), p(200, 160, 1), p(214, 196, 2), p(196, 230, 3), p(156, 242, 4), p(110, 236, 5), p(80, 212, 5), p(70, 180, 4), p(60, 150, 3), p(40, 120, 2), p(20, 100, 1), p(-10, 90, 0), p(-36, 70, 0), p(-40, 34, 0), p(-30, 0, 0)),
+		/** A lozenge: four straights leaning one way, two sharp corners and two open ones. */
+		LOZENGE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(130, 4, 1), p(150, 22, 2), p(170, 60, 3), p(186, 96, 3), p(176, 116, 2), p(146, 124, 1), p(100, 124, 0), p(60, 124, 0), p(30, 118, 0), p(10, 96, 0), p(-10, 60, 0), p(-30, 24, 0), p(-30, 0, 0)),
+		/** A heater shield: a flat top, and two long curving flanks down to a rounded point. */
+		HEATER(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(170, 10, 1), p(180, 40, 2), p(176, 80, 3), p(160, 120, 3), p(130, 156, 2), p(96, 180, 1), p(70, 186, 0), p(44, 176, 0), p(10, 148, 0), p(-16, 110, 0), p(-30, 70, 0), p(-34, 30, 0), p(-30, 0, 0)),
+		/** A mitten: a round hand and a thumb poking out the side. */
+		MITTEN(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(130, 6, 1), p(146, 30, 2), p(146, 70, 3), p(140, 110, 4), p(120, 150, 4), p(84, 170, 3), p(48, 166, 2), p(24, 144, 1), p(20, 116, 1), p(-6, 104, 0), p(-40, 110, 0), p(-62, 96, 0), p(-58, 70, 0), p(-34, 54, 0), p(-24, 30, 0), p(-30, 0, 0)),
 		// ---- new B shapes (phase 2) end ----
 
 		// ---- new A shapes (phase 2) begin ----

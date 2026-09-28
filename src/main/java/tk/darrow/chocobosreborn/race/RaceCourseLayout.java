@@ -1382,6 +1382,12 @@ public final class RaceCourseLayout {
 			case B_RAPIDS -> onPlinth(t, surf, this::millWheel);
 			case B_GLACIER -> onPlinth(t, surf, this::frozenFall);
 			// ---- new B landmarks (phase 2) begin ----
+			case B_ACACIA -> onPlinth(t, surf, this::themeLandmark);   // the first SAVANNA course: the great acacia
+			case B_GULCH -> onPlinth(t, surf, this::balancedRock);
+			case B_OXBOW -> onPlinth(t, surf, this::stiltHut);
+			case B_BAOBAB -> onPlinth(t, surf, this::baobab);
+			case B_KOPJE -> onPlinth(t, surf, this::kopje);
+			case B_SNOWCAP -> onPlinth(t, surf, this::snowman);
 			// ---- new B landmarks (phase 2) end ----
 			default -> onPlinth(t, surf, this::themeLandmark);
 		}
@@ -1502,6 +1508,144 @@ public final class RaceCourseLayout {
 	}
 
 	// ---- new B set pieces (phase 2): private methods, begin ----
+	/** B_GULCH: a red boulder balanced on a wind-cut neck of sandstone. */
+	private void balancedRock(int x, int y, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y, z + dz, "red_sandstone");
+			}
+		}
+		put(x, y + 1, z, "red_sandstone");
+		put(x + 1, y + 1, z, "cut_red_sandstone");
+		for (int h = 2; h <= 5; h++) {
+			put(x, y + h, z, h == 4 ? "chiseled_red_sandstone" : "cut_red_sandstone");
+		}
+		// the boulder: a squat ellipsoid, wider than its neck, leaning a block off centre
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				for (int dy = -2; dy <= 2; dy++) {
+					double ex = (dx - 0.5D) / 3.2D, ez = dz / 2.8D, ey = dy / 2.2D;
+					if (ex * ex + ez * ez + ey * ey <= 1.0D) {
+						put(x + dx, y + 8 + dy, z + dz, dy == 0 ? "orange_terracotta" : "red_sandstone");
+					}
+				}
+			}
+		}
+		put(x - 2, y, z + 2, "dead_bush");
+	}
+
+	/** B_OXBOW: a fisher's hut on stilts, a lantern at the door and a barrel of the catch. */
+	private void stiltHut(int x, int y, int z) {
+		for (int dx = -2; dx <= 2; dx += 4) {
+			for (int dz = -2; dz <= 2; dz += 4) {
+				for (int h = 0; h < 4; h++) {
+					put(x + dx, y + h, z + dz, "stripped_oak_log[axis=y]");
+				}
+			}
+		}
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				put(x + dx, y + 4, z + dz, "oak_planks");
+			}
+		}
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				boolean wall = Math.abs(dx) == 1 || Math.abs(dz) == 1;
+				for (int h = 5; h <= 6 && wall; h++) {
+					if (!(dx == 0 && dz == -1)) {   // the door
+						put(x + dx, y + h, z + dz, "spruce_planks");
+					}
+				}
+			}
+		}
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				int lift = 2 - Math.max(Math.abs(dx), Math.abs(dz));
+				put(x + dx, y + 6 + lift, z + dz, "dark_oak_slab[type=bottom]");
+			}
+		}
+		put(x - 1, y + 5, z - 2, "lantern[hanging=true]");   // under the eave
+		put(x + 1, y + 5, z - 2, "barrel[facing=east]");
+	}
+
+	/** B_BAOBAB: a baobab, a bottle trunk with a crown of stubby branches. */
+	private void baobab(int x, int y, int z) {
+		for (int h = 0; h < 8; h++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					boolean corner = Math.abs(dx) == 1 && Math.abs(dz) == 1;
+					if (!corner || (h > 0 && h < 5)) {
+						put(x + dx, y + h, z + dz, "stripped_jungle_wood");
+					}
+				}
+			}
+		}
+		int[][] arms = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		for (int[] a : arms) {
+			for (int k = 2; k <= 3; k++) {
+				put(x + a[0] * k, y + 7 + k - 2, z + a[1] * k, "jungle_wood");
+			}
+			int ex = x + a[0] * 3, ez = z + a[1] * 3;
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					put(ex + dx, y + 9, ez + dz, "jungle_leaves[persistent=true]");
+				}
+			}
+			put(ex, y + 10, ez, "jungle_leaves[persistent=true]");
+		}
+		put(x, y + 8, z, "jungle_wood");
+	}
+
+	/** B_KOPJE: a kopje, granite boulders piled into a lookout. */
+	private void kopje(int x, int y, int z) {
+		boulder(x - 1, y + 1, z, 2.6D, 1.8D, "granite");
+		boulder(x + 2, y + 1, z + 1, 1.7D, 1.4D, "granite");
+		boulder(x, y + 3, z - 1, 1.6D, 1.3D, "polished_granite");
+		boulder(x + 1, y + 5, z, 1.1D, 1.0D, "granite");
+		put(x + 1, y + 6, z, "polished_granite");
+		put(x + 1, y + 7, z, "dead_bush");
+	}
+
+	/** A squashed ball of {@code block} about (x, y, z), {@code r} across and {@code h} up. */
+	private void boulder(int x, int y, int z, double r, double h, String block) {
+		int ri = (int) Math.ceil(r), hi = (int) Math.ceil(h);
+		for (int dx = -ri; dx <= ri; dx++) {
+			for (int dz = -ri; dz <= ri; dz++) {
+				for (int dy = -hi; dy <= hi; dy++) {
+					double ex = dx / r, ez = dz / r, ey = dy / h;
+					if (ex * ex + ez * ez + ey * ey <= 1.0D) {
+						put(x + dx, y + dy, z + dz, block);
+					}
+				}
+			}
+		}
+	}
+
+	/** B_SNOWCAP: a snowman in a top hat, coal buttons, a carrot nose and stick arms. */
+	private void snowman(int x, int y, int z) {
+		boulder(x, y + 2, z, 2.6D, 2.4D, "snow_block");
+		boulder(x, y + 5, z, 1.9D, 1.6D, "snow_block");
+		boulder(x, y + 8, z, 1.6D, 1.3D, "snow_block");
+		// a face both ways along z (either may be the side the riders see), arms along x
+		for (int side = -1; side <= 1; side += 2) {
+			put(x, y + 5, z + side * 2, "coal_block");
+			put(x, y + 3, z + side * 3, "coal_block");
+			put(x, y + 8, z + side * 2, "orange_terracotta");
+			put(x - 1, y + 9, z + side, "coal_block");
+			put(x + 1, y + 9, z + side, "coal_block");
+		}
+		for (int k = 2; k <= 3; k++) {
+			put(x + k, y + 5 + (k - 2), z, "spruce_fence");
+			put(x - k, y + 5 + (k - 2), z, "spruce_fence");
+		}
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y + 10, z + dz, "black_wool");
+			}
+		}
+		put(x, y + 11, z, "black_wool");
+		put(x, y + 12, z, "black_wool");
+	}
 	// ---- new B set pieces (phase 2) end ----
 
 	// ================================================================ A landmarks
