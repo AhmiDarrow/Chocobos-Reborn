@@ -52,9 +52,9 @@ public enum RaceTrack {
 	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 1, boost(0.42), boost(0.59), boost(0.70), boost(0.85), boost(0.93)),
 	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 1, boost(0.10), boost(0.22), boost(0.46), boost(0.81), boost(0.92)),
 	// ---- B: canyon, river, snow
-	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 650, 5, ridge(0.50, 0.54), boost(0.31), boost(0.71), boost(0.93)),
-	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.LOLLIPOP, 715, 4, water(0.59, 0.64), boost(0.14), boost(0.68), boost(0.93)),
-	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.KIDNEY, 825, 3, ridge(0.55, 0.59), boost(0.41), boost(0.77), boost(0.92)),
+	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 340, 5, ridge(0.53, 0.66), boost(0.22), boost(0.485), boost(0.84)),
+	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.KIDNEY, 395, 4, water(0.40, 0.52), boost(0.33), boost(0.82), boost(0.93)),
+	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.LOLLIPOP, 500, 3, ridge(0.58, 0.62), boost(0.44), boost(0.65), boost(0.87)),
 	B_MESA(RaceClass.B, 3, Theme.CANYON, Shape.SERPENT, 1280, 1, ridge(0.44, 0.48), boost(0.20), boost(0.35), boost(0.53), boost(0.83), boost(0.91)),
 	B_RAPIDS(RaceClass.B, 4, Theme.RIVER, Shape.HAIRPIN, 1300, 1, water(0.51, 0.56), boost(0.22), boost(0.39), boost(0.60), boost(0.75), boost(0.92)),
 	B_GLACIER(RaceClass.B, 5, Theme.SNOW, Shape.STAIRS, 1320, 1, water(0.33, 0.38), boost(0.45), boost(0.58), boost(0.66), boost(0.78), boost(0.87)),
@@ -91,9 +91,9 @@ public enum RaceTrack {
 	B_ACACIA(RaceClass.B, 6, Theme.SAVANNA, Shape.TUSK, 1340, 1, water(0.51, 0.54), boost(0.14), boost(0.36), boost(0.58), boost(0.69), boost(0.80)),
 	B_GULCH(RaceClass.B, 7, Theme.CANYON, Shape.ARROWHEAD, 1320, 1, ridge(0.66, 0.70), boost(0.14), boost(0.33), boost(0.50), boost(0.73), boost(0.82)),
 	B_OXBOW(RaceClass.B, 8, Theme.RIVER, Shape.OXBOW, 1360, 1, water(0.20, 0.25), boost(0.36), boost(0.52), boost(0.65), boost(0.79), boost(0.87)),
-	B_BAOBAB(RaceClass.B, 9, Theme.SAVANNA, Shape.LOZENGE, 680, 5, water(0.78, 0.825), boost(0.21), boost(0.44), boost(0.69)),
-	B_KOPJE(RaceClass.B, 10, Theme.SAVANNA, Shape.HEATER, 760, 4, ridge(0.70, 0.745), boost(0.25), boost(0.59), boost(0.93)),
-	B_SNOWCAP(RaceClass.B, 11, Theme.SNOW, Shape.MITTEN, 860, 3, ridge(0.40, 0.435), boost(0.21), boost(0.65), boost(0.93)),
+	B_BAOBAB(RaceClass.B, 9, Theme.SAVANNA, Shape.LOZENGE, 345, 5, water(0.41, 0.53), boost(0.155), boost(0.655), boost(0.84)),
+	B_KOPJE(RaceClass.B, 10, Theme.SAVANNA, Shape.HEATER, 405, 4, ridge(0.53, 0.65), boost(0.30), boost(0.48), boost(0.82)),
+	B_SNOWCAP(RaceClass.B, 11, Theme.SNOW, Shape.MITTEN, 515, 3, ridge(0.56, 0.60), boost(0.44), boost(0.74), boost(0.89)),
 	// ---- new B courses (phase 2) end ----
 
 	// ---- new A courses (phase 2) begin ----
@@ -211,12 +211,12 @@ public enum RaceTrack {
 		ZIGZAG(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(112, 12, 1), p(104, 40, 2), p(64, 52, 3), p(30, 62, 4), p(20, 86, 5), p(40, 106, 5), p(80, 112, 4), p(112, 122, 3), p(118, 148, 2), p(92, 166, 1), p(50, 168, 0), p(14, 162, 0), p(-10, 140, 0), p(-20, 108, 0), p(-24, 70, 0), p(-28, 36, 0), p(-30, 0, 0)),
 		/** Two round lobes joined through a narrow waist. */
 		PEANUT(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(112, 14, 1), p(118, 44, 2), p(104, 70, 2), p(80, 86, 1), p(68, 110, 1), p(78, 134, 2), p(102, 152, 3), p(108, 180, 3), p(88, 206, 2), p(50, 214, 1), p(14, 202, 0), p(-6, 174, 0), p(0, 146, 0), p(20, 128, 0), p(26, 104, 0), p(10, 84, 0), p(-6, 58, 0), p(-10, 30, 0), p(-30, 0, 0)),
-		/** Three long straights and three tight corners: a triangle. */
-		DELTA(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(180, 0, 0), p(212, 6, 1), p(220, 28, 2), p(200, 54, 3), p(160, 90, 4), p(120, 126, 4), p(80, 160, 3), p(46, 180, 2), p(16, 176, 1), p(0, 156, 0), p(-4, 120, 0), p(-8, 80, 0), p(-14, 40, 0), p(-30, 0, 0)),
-		/** A drag strip out to a round loop and the same strip back. */
-		LOLLIPOP(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(180, 0, 0), p(214, 10, 1), p(236, 40, 2), p(236, 80, 3), p(214, 110, 3), p(180, 120, 2), p(146, 110, 1), p(126, 80, 1), p(110, 50, 1), p(80, 46, 1), p(40, 46, 1), p(0, 46, 0), p(-24, 38, 0), p(-30, 16, 0), p(-30, 0, 0)),
-		/** A bean: one long sweeper and a concave inner bend. */
-		KIDNEY(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 4, 1), p(176, 20, 2), p(196, 52, 3), p(184, 84, 3), p(150, 96, 2), p(110, 90, 2), p(80, 100, 2), p(60, 124, 1), p(30, 140, 1), p(0, 132, 0), p(-20, 104, 0), p(-26, 70, 0), p(-30, 30, 0), p(-30, 0, 0)),
+		/** A canyon triangle: a hairpin off the line, a long climb to a crest hairpin, a pass bowing in down the far side, a hairpin home. */
+		DELTA(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(70, 0, 0), p(80, 0, 0), p(90.1, 3.1, 0), p(96.9, 11.3, 0), p(97.9, 21.8, 0), p(92.9, 31.2, 0), p(84.2, 39.9, 0.7), p(75.4, 48.7, 1.4), p(66.7, 57.4, 2.1), p(57.9, 66.2, 2.9), p(49.1, 74.9, 3.6), p(40.4, 83.7, 4.3), p(31.6, 92.5, 5), p(17.8, 97.2, 5.5), p(5.6, 89, 6), p(1.6, 82.1, 4), p(-6.2, 70.5, 4), p(-15.6, 60.1, 4), p(-26.3, 51.2, 4), p(-36.1, 44, 3.3), p(-45.9, 36.9, 2.7), p(-55.7, 29.8, 2), p(-62.4, 18.2, 1.3), p(-58.2, 5.5, 0.7), p(-46, 0, 0), p(-30, 0, 0)),
+		/** An ice lolly: the stick (out along the line, back on the other side, a hairpin at its end) and a round loop swelling off it. */
+		LOLLIPOP(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(69, 0, 0), p(80.7, -2.1, 0.5), p(91, -8, 1), p(101.3, -14.4, 1.2), p(113.1, -17.7, 1.5), p(125.3, -17.6, 1.8), p(136.9, -14, 2), p(147.1, -7.4, 2.2), p(155.1, 1.9, 2.5), p(160.1, 13, 2.8), p(161.8, 25.1, 3), p(160.1, 37.1, 3.2), p(155.1, 48.2, 3.5), p(147.1, 57.5, 3.8), p(136.9, 64.2, 4), p(125.3, 67.7, 4.2), p(113.1, 67.8, 4.5), p(101.3, 64.5, 4.8), p(91, 58.1, 5), p(80.7, 52.2, 4.5), p(69, 50.1, 4), p(57.3, 50.1, 3.8), p(45.7, 50.1, 3.6), p(34, 50.1, 3.3), p(22.3, 50.1, 3.1), p(10.7, 50.1, 2.9), p(-1, 50.1, 2.7), p(-12.7, 50.1, 2.4), p(-24.3, 50.1, 2.2), p(-36, 50.1, 2), p(-48.1, 46.9, 1.7), p(-57, 38, 1.3), p(-60.3, 25.8, 1), p(-60.3, 24.3, 1), p(-57, 12.1, 0.7), p(-48.1, 3.3, 0.3), p(-36, 0, 0), p(-30, 0, 0)),
+		/** A kidney bean: two round lobes and a river bend bowing deep in between them along the back. */
+		KIDNEY(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(73.6, 0, 0), p(85.9, 2.5, 0.2), p(96.3, 9.4, 0.5), p(103.3, 19.9, 0.8), p(105.8, 32.2, 1), p(103.8, 43.2, 2.2), p(98.2, 52.9, 2.3), p(89.7, 60, 2.5), p(79.2, 63.9, 2.7), p(68, 63.9, 2.8), p(57.5, 60, 3), p(48.9, 55, 4), p(37.4, 49.9, 4), p(25.1, 47.3, 4), p(12.5, 47.3, 4), p(0.2, 49.9, 4), p(-11.2, 55, 4), p(-19.9, 60, 3), p(-31, 64, 2.8), p(-42.7, 63.7, 2.6), p(-53.5, 59.2, 2.4), p(-62, 51.1, 2.2), p(-67.1, 40.5, 2), p(-68, 28.8, 1.8), p(-64.7, 17.6, 1.6), p(-57.5, 8.3, 1.4), p(-47.5, 2.1, 1.2), p(-36, 0, 1), p(-30, 0, 0)),
 		/** A D: one long straight and one enormous arc. */
 		DEE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(176, 10, 1), p(200, 40, 2), p(206, 80, 3), p(196, 120, 4), p(170, 150, 4), p(130, 164, 3), p(90, 166, 2), p(50, 166, 1), p(10, 166, 0), p(-16, 150, 0), p(-24, 110, 0), p(-26, 70, 0), p(-30, 30, 0), p(-30, 0, 0)),
 		/** A long L: two straights joined by a fast corner, a hairpin at each end. */
@@ -279,12 +279,12 @@ public enum RaceTrack {
 		ARROWHEAD(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(150, 0, 1), p(200, 14, 2), p(250, 44, 3), p(296, 82, 4), p(310, 104, 5), p(296, 126, 5), p(250, 164, 4), p(200, 194, 3), p(150, 208, 2), p(100, 212, 1), p(60, 212, 0), p(20, 210, 0), p(-20, 204, 0), p(-40, 186, 0), p(-30, 160, 0), p(10, 124, 0), p(26, 106, 0), p(10, 86, 0), p(-30, 50, 0), p(-44, 22, 0), p(-30, 0, 0)),
 		/** A meandering river: a pinched oxbow loop out, a long falling diagonal home. */
 		OXBOW(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(174, 14, 0), p(190, 44, 0), p(180, 76, 0), p(150, 90, 0), p(130, 110, 0), p(136, 140, 0), p(166, 150, 0), p(200, 160, 1), p(214, 196, 2), p(196, 230, 3), p(156, 242, 4), p(110, 236, 5), p(80, 212, 5), p(70, 180, 4), p(60, 150, 3), p(40, 120, 2), p(20, 100, 1), p(-10, 90, 0), p(-36, 70, 0), p(-40, 34, 0), p(-30, 0, 0)),
-		/** A lozenge: four straights leaning one way, two sharp corners and two open ones. */
-		LOZENGE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(130, 4, 1), p(150, 22, 2), p(170, 60, 3), p(186, 96, 3), p(176, 116, 2), p(146, 124, 1), p(100, 124, 0), p(60, 124, 0), p(30, 118, 0), p(10, 96, 0), p(-10, 60, 0), p(-30, 24, 0), p(-30, 0, 0)),
-		/** A heater shield: a flat top, and two long curving flanks down to a rounded point. */
-		HEATER(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(170, 10, 1), p(180, 40, 2), p(176, 80, 3), p(160, 120, 3), p(130, 156, 2), p(96, 180, 1), p(70, 186, 0), p(44, 176, 0), p(10, 148, 0), p(-16, 110, 0), p(-30, 70, 0), p(-34, 30, 0), p(-30, 0, 0)),
-		/** A mitten: a round hand and a thumb poking out the side. */
-		MITTEN(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(130, 6, 1), p(146, 30, 2), p(146, 70, 3), p(140, 110, 4), p(120, 150, 4), p(84, 170, 3), p(48, 166, 2), p(24, 144, 1), p(20, 116, 1), p(-6, 104, 0), p(-40, 110, 0), p(-62, 96, 0), p(-58, 70, 0), p(-34, 54, 0), p(-24, 30, 0), p(-30, 0, 0)),
+		/** A lozenge: a long leaning parallelogram, two open corners and two sharp ones, the back straight sagging round a waterhole. */
+		LOZENGE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(72.6, 0, 0), p(85.3, 0, 0), p(96.3, 2.6, 0.5), p(104.9, 10, 1), p(111.7, 19.3, 1.5), p(118.4, 28.7, 2), p(125.2, 38, 2.5), p(132, 47.3, 3), p(135.5, 57.6, 3.2), p(132.5, 68, 3.5), p(124.2, 75, 3.8), p(113.4, 75.9, 4), p(103, 73.7, 4), p(92.5, 71.5, 4), p(82.1, 69.3, 4), p(69.7, 67.3, 4), p(57.2, 66.7, 4), p(44.6, 67.3, 4), p(32.2, 69.3, 4), p(21.8, 71.5, 4), p(11.3, 73.7, 4), p(0.9, 75.9, 4), p(-12.9, 74.9, 3.5), p(-23.9, 66.4, 3), p(-30.6, 57.1, 2.5), p(-37.4, 47.8, 2), p(-44.1, 38.5, 1.5), p(-50.9, 29.2, 1), p(-54.3, 16.5, 0.7), p(-48.3, 4.7, 0.3), p(-36, 0, 0), p(-30, 0, 0)),
+		/** A heater shield, one flank battered in: flat top, a long domed flank to the point, a hollow flank back to a sharp corner. */
+		HEATER(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(106, 8, 0), p(114, 26, 1), p(116, 50, 2), p(110, 76, 3), p(96, 98, 4), p(76, 114, 4), p(54, 124, 3), p(34, 126, 3), p(22, 114, 2), p(14, 96, 2), p(4, 78, 1), p(-10, 62, 1), p(-26, 54, 1), p(-44, 46, 0), p(-62, 34, 0), p(-72, 16, 0), p(-60, 2, 0), p(-30, 0, 0)),
+		/** A mitten: a round hand, a thumb poking out the side, down the cuff to the line. */
+		MITTEN(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(95, 0, 0), p(116, 10, 1), p(126, 32, 2), p(128, 60, 3), p(120, 88, 4), p(102, 110, 5), p(76, 124, 5), p(46, 126, 4), p(22, 116, 3), p(8, 98, 2), p(-8, 86, 2), p(-28, 84, 2), p(-52, 86, 2), p(-76, 86, 2), p(-96, 78, 2), p(-102, 60, 1), p(-92, 44, 1), p(-74, 38, 1), p(-58, 32, 1), p(-52, 18, 0), p(-46, 4, 0), p(-30, 0, 0)),
 		// ---- new B shapes (phase 2) end ----
 
 		// ---- new A shapes (phase 2) begin ----

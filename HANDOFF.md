@@ -1755,3 +1755,49 @@ and both earn a full lap. Results: 244 unit tests (1 skipped, AtlasTint), all 29
 * AI: C birds bumping about one pass in three, S and the rivals clean, leaders covering the inside once
   without weaving, nobody stuck behind a slower bird for long.
 * Ghosts: a set-back bird dropped into traffic, finished AI parking, a finished rider coasting.
+
+### Short grands prix: class B
+
+Six class B grands prix rebuilt as short technical circuits (Ahmi: "grand prix are supposed to be short
+courses, multiple laps; sprints long one-lap tracks"; "Mario Kart meets F1"). Sprints (3-8) untouched;
+the class's shortest sprint is still B_MESA at 1280. Each course keeps its one terrain feature type (water or
+ridge: the class stays six water / six ridge), its theme, laps, landmark and name. Every shortcut is the lap's
+risk/reward moment: the Blue or Green bird takes the direct line straight through, everyone else swings round.
+
+| id | name | laps x lap | heat (blocks, x sprint) | shape | features (detour / target) | landmark | borrowed from |
+|---|---|---|---|---|---|---|---|
+| b_canyon | Canyon Pass | 5 x 340 | 1700, 1.33x | DELTA: triangle; hairpin off the line, climb to a crest hairpin, the pass bowing in down the far side, hairpin home | ridge 0.53-0.66 down the pass (15.4 / 13); boosts 0.22 0.485 0.84 | hoodoo (t 0.50, crest exit) | La Source hairpin off the grid, an Eau Rouge / Raidillon climb to a blind crest, Baby Park's five-lap loop |
+| b_ford | Fern Ford | 4 x 395 | 1580, 1.23x | KIDNEY (was LOLLIPOP): two round lobes, the river bend bowing deep between them | water 0.40-0.52 across the bend (14.3 / 13); boosts 0.33 0.82 0.93 | cairn (t 0.56) | Monza-style long round ends (Parabolica), a Yoshi Circuit / Luigi Circuit water line across the inside of the bend, boost into the ford |
+| b_frost | Frost Hollow | 3 x 500 | 1500, 1.17x | LOLLIPOP (was KIDNEY): an ice lolly; the stick out and back, a 260-degree loop at its end | ridge 0.58-0.62 on the return stick (15.7 / 13); boosts 0.44 0.65 0.87 | ice spire (t 0.50) | S-bend necks (Suzuka esses) into a constant-radius carousel, a Monaco hairpin at the stick's end |
+| b_baobab | Baobab Loop | 5 x 345 | 1725, 1.35x | LOZENGE: leaning parallelogram, two sharp and two open corners, back straight sagging round a waterhole | water 0.41-0.53 on the sag (14.8 / 13); boosts 0.155 0.655 0.84 | baobab (t 0.56) | Baby Park's tiny many-lap loop, Monaco's harbour line: the waterhole sits where the back straight bends away |
+| b_kopje | Kopje Circuit | 4 x 405 | 1620, 1.27x | HEATER: shield with one flank battered in; flat top, long domed flank to the point, hollow flank to a sharp corner | ridge 0.53-0.65 down the hollow flank (15.6 / 13); boosts 0.30 0.48 0.82 | kopje (t 0.50) | COTA's long climbing turn to the top, the point and the hollow flank as a left-right (Senna S), boost on the point exit into the fork |
+| b_snowcap | Snowcap Ring | 3 x 515 | 1545, 1.21x | MITTEN: round hand, thumb out the side, down the cuff | ridge 0.56-0.60 along the thumb (15.9 / 13); boosts 0.44 0.74 0.89 | snowman (t 0.50) | a big round sweeper (Interlagos' Curva do Sol), a narrow finger with a hairpin tip (Baku castle / Monaco Loews), the wrist S back onto the line |
+
+Laps 5 x 340-345 (0.27x the shortest sprint), 4 x 395-405 (0.31x), 3 x 500-515 (0.39-0.40x); heats
+1.17-1.35x the sprint. 3 x 490 would be a 1.148x heat, under the 1.15 floor, so the 3-lap laps are 500 and 515.
+Legs 39.5-47 blocks apart (need > 38), islands at most 125 x 75 half extent, 5 stands and 72-88 fans each.
+
+**Shape swap**: B_FORD now races `Shape.KIDNEY` and B_FROST `Shape.LOLLIPOP` (no enum renamed). A lollipop cannot
+fit a 395 lap (the start straight alone is a quarter of it, leaving no room for a round loop 38+ blocks from the
+stick); it fits Frost Hollow's 500 (an ice lolly), and the bean with the river bend is Fern Ford's. HEATER keeps its
+name; one flank is now hollow.
+
+**Why every short lap has a concave bend** (engine fact, no shared code changed): at these lap lengths the detour
+connectors (`DETOUR_CONNECT` 0.012 of a lap, 4-5 blocks) swing 12.5 blocks out, so a detour on a straight costs
+2 x (hypot(c, 12.5) - c): 18.1 blocks at 340, 17.2 at 395, above the 1.3 x 13 = 16.9 ceiling of
+`CourseBalanceTest` (a straight only works from about a 418 lap). `detourCost` samples tangents per block, so a
+tight reverse bend adds length rather than saving it; only a long gentle reverse bend (radius ~60-120, 25-60
+degrees) under a long feature (0.10-0.13 of the lap, 35-50 blocks) brings the cost into the window. So the four
+5- and 4-lap courses carry their water or ridge on a long bend that bows in toward the infield (the pass, the river
+bend, the sag, the hollow flank). The 3-lap courses sit on straights (15.7 / 15.9). Python port of `TrackSpline` +
+`detourCost` (matches Java to 0.1 block) was the design tool; scratch, not committed.
+
+**RaceSim** (B, mean heat seconds over all twelve B courses, before -> after): field best 129.3 -> 86.9, fresh Green
+driven well 143.0 -> 95.7 (still loses, +10.1 % vs +10.6 %), 25-trained 125.0 -> 82.3 (still wins the field, by
+5.3 % vs 3.3 %), 50-trained vs Teiyo 96.2 / 101 -> 61.8 / 64 (still wins). Every ladder line holds; no expectation moved.
+
+**Merge notes**: the six islands shrank a lot (B_FROST's old 825 lap to 500) and `clearChunks` clears only the new
+island's box plus one chunk, so old road would be left hanging round the new, smaller islands: when the four classes
+land, `COURSE_VERSION` needs a bump and the relay needs to clear the old footprint (for instance the whole slot out to
+`MAX_ISLAND_RADIUS`). Not changed here (shared code). In-game look wanted: the 12.5-block detour connectors over 4
+blocks on the 340 laps (steep swing out), and five birds with collision on 340-block laps.
