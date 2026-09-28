@@ -24,9 +24,25 @@ class RaceClimbTest {
 
 	@Test
 	void noBirdStepsOntoTheRailInARace() {
-		assertTrue(RaceScoring.stepHeight(true, 2.0F) <= 1.0F, "a climbing colour steps two blocks, a rail stands 1.5");
+		assertTrue(RaceScoring.stepHeight(true, 2.0F) < 1.5F, "a climbing colour steps two blocks, a rail stands 1.5");
 		assertTrue(RaceScoring.stepHeight(true, 1.0F) >= 1.0F, "the road's hill steps are one block");
+		assertTrue(RaceScoring.stepHeight(true, 1.0F) >= 1.0F + 1.0F / 16.0F, "from a dirt-path road up onto a concrete kerb or paint a block higher");
+		assertTrue(RaceScoring.stepHeight(true, 1.0F) < 1.5F, "never onto the rail");
 		assertTrue(RaceScoring.stepHeight(false, 2.0F) == 2.0F, "off the course the colour keeps its step");
+	}
+
+	@Test
+	void aRidersBirdStepsFromItsFootingNotALeftOverFlag() {
+		assertFalse(RaceScoring.riderStepGround(true, true, false),
+				"left 'on ground' by a step that ended over the bog: no zero-height slide the server cannot replay");
+		assertTrue(RaceScoring.riderStepGround(true, false, true),
+				"the server's replay climbed onto the top: standing on it, it steps like the client");
+		assertTrue(RaceScoring.riderStepGround(true, true, true));
+		assertFalse(RaceScoring.riderStepGround(true, false, false));
+		assertTrue(RaceScoring.riderStepGround(false, true, false), "an AI bird keeps vanilla's flag");
+		assertFalse(RaceScoring.riderStepGround(false, false, true), "an AI bird keeps vanilla's flag");
+		assertTrue(RaceScoring.FOOTING_PROBE > 0.0D && RaceScoring.FOOTING_PROBE < 1.0D / 16.0D,
+				"a hair under the feet, never the depth of a carpet or a snow layer");
 	}
 
 	@Test

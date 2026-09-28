@@ -6,6 +6,9 @@
   "mixins": [
     "ChocoboVehicleMoveMixin"
   ],
+  "client": [
+    "ChocoboVehicleCorrectionMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

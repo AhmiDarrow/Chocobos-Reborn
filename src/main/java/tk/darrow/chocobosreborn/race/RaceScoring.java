@@ -784,14 +784,42 @@ public final class RaceScoring {
 	}
 
 	/** Highest step in a race: the road's hill steps are one block; a rail stands 1.5, a pool wall one above the road. */
-	public static final float RACE_STEP = 1.0F;
+	public static final float RACE_STEP = 1.1F;
 
 	/**
-	 * Step height a bird has: its colour's (2 for the climbing colours), capped at
-	 * {@link #RACE_STEP} in a race so no bird walks up onto the rail and off the course.
+	 * Step height a bird has: its colour's (2 for the climbing colours) off the course, and
+	 * exactly {@link #RACE_STEP} for every bird in a race. Under the 1.5 of the rail, so no bird
+	 * walks up onto it and off the course; over the 1.0625 from a dirt-path road (15/16 high) up
+	 * onto a full block, so a road that climbs a block where kerb or paint is concrete never walls
+	 * off a lane (the hub harness wedged a Yellow on C_HEARTFIELD's dip, lane -3.5, at a 1.0 step).
 	 */
 	public static float stepHeight(boolean racing, float colourStep) {
-		return racing ? Math.min(colourStep, RACE_STEP) : colourStep;
+		return racing ? RACE_STEP : colourStep;
+	}
+
+	/**
+	 * How far below a bird's feet {@link #riderStepGround} looks for footing. A hair: the
+	 * rider's client and the server's replay stand the bird at exactly the same coordinates
+	 * (the server copies the packet), so only float noise from a step has to fit in it.
+	 */
+	public static final double FOOTING_PROBE = 1.0E-3D;
+
+	/**
+	 * The on-ground flag a bird moves with. Minecraft steps a moving box up when its fall
+	 * was stopped this move, or when its on-ground flag is set; that flag is left over from
+	 * the side's own last move. A rider's bird is moved twice with different histories:
+	 * the client moves it with gravity (a step up lands it: on ground), then the server
+	 * replays the net move from the packet (a step up is a climb: not on ground). After a
+	 * fast step the box can end wholly over the lower side, level with the top it stepped
+	 * onto (the end of a bog, the top of a pool wall): the client, still "on ground", then
+	 * slides along that top at a zero-height step while the server, not on ground, is
+	 * stopped by the block's side one micro-epsilon above its feet ("moved wrongly!"), every
+	 * tick (S_ORBIT, S_RIFT hub harness). So a rider's bird goes by its footing right now,
+	 * which both sides read from the same box in the same world; everything else (AI
+	 * birds, the server simulating them) keeps vanilla's flag.
+	 */
+	public static boolean riderStepGround(boolean riderDriven, boolean onGround, boolean footing) {
+		return riderDriven ? footing : onGround;
 	}
 
 	public static boolean stallFitsTrack(double offset, double halfWidth) {

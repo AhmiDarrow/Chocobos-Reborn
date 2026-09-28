@@ -2097,6 +2097,44 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return RaceScoring.stepHeight(racing(), super.maxUpStep());
 	}
 
+	/**
+	 * A rider's bird moves (its client's travel, the server's replay of the rider's packet)
+	 * with the on-ground flag its footing gives, not the one its side's last move left: see
+	 * {@link RaceScoring#riderStepGround}. The move itself sets the flag again as usual.
+	 */
+	@Override
+	public void move(net.minecraft.world.entity.MoverType type, Vec3 movement) {
+		if ((type == net.minecraft.world.entity.MoverType.SELF || type == net.minecraft.world.entity.MoverType.PLAYER)
+				&& !noPhysics && getControllingPassenger() instanceof Player) {
+			boolean ground = RaceScoring.riderStepGround(true, onGround(), hasFooting());
+			if (ground != onGround()) {
+				setOnGround(ground);
+			}
+		}
+		super.move(type, movement);
+	}
+
+	/** Something solid (or water a water bird stands on) within {@link RaceScoring#FOOTING_PROBE} under the feet. */
+	public boolean hasFooting() {
+		net.minecraft.world.phys.AABB box = getBoundingBox();
+		return !level().noCollision(this, new net.minecraft.world.phys.AABB(box.minX, box.minY - RaceScoring.FOOTING_PROBE,
+				box.minZ, box.maxX, box.minY, box.maxZ));
+	}
+
+	/**
+	 * The server rejected the rider's last move and sent the bird back
+	 * ({@code ClientboundMoveVehiclePacket}; vanilla only sets the position). Take the rest
+	 * of the server's state too: it holds a rider's bird still (no velocity) and has no
+	 * leftover on-ground flag. Keeping this side's momentum and flag replayed the same
+	 * rejected move from the same spot every tick, and the rider froze there.
+	 */
+	public void adoptVehicleCorrection() {
+		setDeltaMovement(Vec3.ZERO);
+		setOnGround(hasFooting());
+		resetFallDistance();
+		localX = Double.NaN;   // the snap back is not a ride across a boost pad
+	}
+
 	@Override
 	public boolean onClimbable() {
 		boolean climbs = color().climb(), racing = racing();
