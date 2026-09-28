@@ -378,6 +378,8 @@ public enum RaceTrack {
 	 * spaced for: two neighbours of this size still keep 40 blocks of void between them
 	 * (column step 820, row step 900). {@code RaceTrackTest} holds every course to it.
 	 */
+	/** Blocks before a ridge's start (and past its end) a climber may already climb, measured on the centre line. */
+	public static final double RIDGE_BAND_PAD = 4.0D;
 	public static final double MAX_ISLAND_RADIUS = 385.0D;
 	/** The most courses a class can hold on its row today (six sprints and six grands prix). */
 	public static final int MAX_COURSES_PER_CLASS = 12;
@@ -708,16 +710,17 @@ public enum RaceTrack {
 	}
 
 	/**
-	 * On a ridge feature's band: within the road half-width of the line, from a couple of
-	 * blocks before the ridge face to a couple past its far end (a climber meets the face
-	 * with its body, not its centre). The only place a climber climbs during a race
-	 * ({@link RaceScoring#mayClimb}).
+	 * On a ridge feature's band: within the road half-width of the line, from a few blocks
+	 * before the ridge face to a few past its far end. A climber meets the face with its nose,
+	 * not its centre, and on a diagonal leg the face reaches the outer lanes before the centre
+	 * line's start (B_CANYON lane -4: 2.3 blocks; {@code RaceClimbTest.everyRidgeFaceIsClimbableFromEveryLane}).
+	 * The only place a climber climbs during a race ({@link RaceScoring#mayClimb}).
 	 */
 	public boolean ridgeBandAt(double t, double lane) {
 		if (Math.abs(lane) > ROAD_HALF) {
 			return false;
 		}
-		double w = t - Math.floor(t), pad = 2.0D / lapLength();
+		double w = t - Math.floor(t), pad = RIDGE_BAND_PAD / lapLength();
 		for (Feature f : features) {
 			if (f.type() == Feature.Type.RIDGE && w >= f.start() - pad && w <= f.end() + pad) {
 				return true;

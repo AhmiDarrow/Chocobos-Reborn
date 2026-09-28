@@ -50,6 +50,38 @@ class RaceClimbTest {
 		}
 	}
 
+	/**
+	 * Walk a bird up to every ridge in every racing lane: where its nose first meets a block of
+	 * the ridge, it must already be allowed to climb. On a diagonal leg the face reaches the outer
+	 * lanes before the centre line's start (B_CANYON, lane -4.1: 2.2 blocks early), which a
+	 * 2-block pad missed and pinned a Green bird on the face every lap.
+	 */
+	@Test
+	void everyRidgeFaceIsClimbableFromEveryLane() {
+		for (RaceTrack track : RaceTrack.values()) {
+			RaceCourseLayout layout = RaceCourseLayout.of(track);
+			double lap = track.lapLength();
+			for (RaceTrack.Feature ridge : track.terrainFeatures()) {
+				if (ridge.type() != RaceTrack.Feature.Type.RIDGE) continue;
+				for (double lane = -RacerLine.LANE_LIMIT; lane <= RacerLine.LANE_LIMIT + 1.0E-9D; lane += 0.5D) {
+					for (double t = ridge.start() - 12.0D / lap; t < ridge.start() + 4.0D / lap; t += 0.25D / lap) {
+						RacePoint at = track.pointAtLane(t, lane);
+						double[] tg = track.tangent(t);
+						// the nose: a bird is about 2 blocks long, the box half-width 0.875
+						double nx = at.x() + tg[0] * 1.0D, nz = at.z() + tg[1] * 1.0D;
+						int bx = (int) Math.floor(nx), bz = (int) Math.floor(nz), by = (int) Math.floor(at.y()) + 1;
+						String block = layout.blocks().get(new RaceCourseLayout.Cell(bx, by, bz));
+						if (block == null || block.contains("water") || block.contains("carpet") || block.contains("boost")) continue;
+						assertTrue(track.ridgeBandAt(t, lane), track + " lane " + lane + ": nose meets " + block + " at "
+								+ String.format(java.util.Locale.ROOT, "%.4f", t) + " (" + Math.round((ridge.start() - t) * lap * 10) / 10.0D
+								+ " blocks before the ridge) outside the climb band");
+						break;
+					}
+				}
+			}
+		}
+	}
+
 	@Test
 	void laneAtReadsBackPointAtLane() {
 		for (RaceTrack track : new RaceTrack[]{RaceTrack.A_CRYSTAL, RaceTrack.B_FORD, RaceTrack.S_MAELSTROM}) {
