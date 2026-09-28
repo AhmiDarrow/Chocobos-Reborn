@@ -41,6 +41,12 @@ class CourseIdentityTest {
 			case B_RAPIDS -> List.of("stripped_spruce_log[axis=x]");          // mill wheel
 			case B_GLACIER -> List.of("blue_ice", "snow[layers=4]");          // frozen fall
 			// ---- new B signatures (phase 2) begin ----
+			case B_ACACIA -> List.of("acacia_wood", "packed_mud");                       // great acacia (the SAVANNA piece)
+			case B_GULCH -> List.of("cut_red_sandstone", "chiseled_red_sandstone");      // balanced rock
+			case B_OXBOW -> List.of("stripped_oak_log[axis=y]", "lantern[hanging=true]"); // stilt hut
+			case B_BAOBAB -> List.of("stripped_jungle_wood", "jungle_leaves[persistent=true]");
+			case B_KOPJE -> List.of("granite", "polished_granite");
+			case B_SNOWCAP -> List.of("coal_block", "black_wool");                       // snowman
 			// ---- new B signatures (phase 2) end ----
 			// ---- A
 			case A_CRYSTAL -> List.of("amethyst_block");

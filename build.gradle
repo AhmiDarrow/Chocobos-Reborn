@@ -94,6 +94,8 @@ dependencies {
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    // every course's layout is cached (RaceCourseLayout.CACHE): the 48-course table outgrows the 512m default
+    maxHeapSize = '2g'
     testLogging {
         events 'passed', 'skipped', 'failed'
     }

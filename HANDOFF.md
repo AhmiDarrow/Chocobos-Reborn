@@ -1487,3 +1487,34 @@ use; nothing existing changes).
   `custom_chocobo_kweh*`) stay deleted.
 * Beak orange, plumage tint only via `isPlumage`; white vcol × atlas, no double tint.
 * Do not remesh / re-bake / repaint the Meshy bird; do not touch the eyes unasked.
+
+### Phase 2: class B courses
+
+Six new class B courses (indices 6-11), one terrain feature each, three water and three ridge, so
+a Blue and a Green rider each get three that suit them (the class as a whole: six water, six ridge).
+SAVANNA gets three courses, CANYON, RIVER and SNOW one more each (three a theme).
+
+| id | name | theme | shape | lap x laps | features | landmark |
+|---|---|---|---|---|---|---|
+| B_ACACIA | Acacia Run | SAVANNA | TUSK (crescent: climbing outer sweep, hairpin tip, concave run home) | 1340 x 1 | water 0.51-0.54 on the tip hairpin (25.5 / 26.8, 0.95x); boosts 0.14 0.36 0.58 0.69 0.80 | great acacia (the theme piece) |
+| B_GULCH | Arrowhead Gulch | CANYON | ARROWHEAD (two flanks to a point, notched tail) | 1320 x 1 | ridge 0.66-0.70 round the lower barb (28.1 / 26.4, 1.06x); boosts 0.14 0.33 0.50 0.73 0.82 | balanced rock (boulder on a sandstone neck) |
+| B_OXBOW | Oxbow Bend | RIVER | OXBOW (pinched meander loop, falling diagonal home) | 1360 x 1 | water 0.20-0.25 on the first bend (26.6 / 27.2, 0.98x); boosts 0.36 0.52 0.65 0.79 0.87 | fisher's stilt hut |
+| B_BAOBAB | Baobab Loop | SAVANNA | LOZENGE (rhombus) | 680 x 5 | water 0.78-0.825 (13.3 / 13.6, 0.98x); boosts 0.21 0.44 0.69 | baobab |
+| B_KOPJE | Kopje Circuit | SAVANNA | HEATER (heater shield) | 760 x 4 | ridge 0.70-0.745 on the flank (15.2 / 15.2, 1.00x); boosts 0.25 0.59 0.93 | kopje (granite boulder pile) |
+| B_SNOWCAP | Snowcap Ring | SNOW | MITTEN (round hand, thumb out the side) | 860 x 3 | ridge 0.40-0.435 (16.7 / 17.2, 0.97x); boosts 0.21 0.65 0.93 | snowman in a top hat |
+
+Detour costs are `detourCost / detourTarget`. Sprints stay above B_MESA (1280), so the
+class's shortest sprint and every existing length rule are unchanged; grand prix laps
+5-lap 680 <= 4-lap 760 <= 3-lap 860. Legs 49-64 blocks apart, islands at most 249 x 199.
+
+**Outside the markers** (both small, both needed by any class that lands alone):
+* `build.gradle`: test `maxHeapSize = '2g'`. `RaceCourseLayout.CACHE` keeps every layout, and
+  30 courses already ran the 512m default test JVM out of heap (OOM in `CourseCrowdTest`).
+* `RaceTrackTest.everyClassHasAsManySprintsAsGrandsPrix`: the count is checked per class
+  (6 or 12 each) instead of "every class as many as C", which cannot hold while the classes
+  merge one at a time; `twelveCoursesPerClass` still pins 12 each once it is enabled.
+
+**RaceSim** (B, mean heat s, phase 1 -> with these six): field best 126.5 -> 129.3, fresh
+Green driven well 139.8 -> 143.0 (still loses), 25-trained 122.1 -> 125.0 (still wins the
+field), 50-trained vs Teiyo 94.0 / 99 -> 96.2 / 101 (still wins). Every ratio moves under
+0.3 %; no expectation changed.
