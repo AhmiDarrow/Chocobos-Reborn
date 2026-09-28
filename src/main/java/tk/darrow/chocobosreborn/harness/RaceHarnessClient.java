@@ -153,16 +153,33 @@ public final class RaceHarnessClient {
             recoverTicks--;
             aim = 0.0D;
         }
-        RacePoint target = track.pointAtLane(progress + Math.max(5.0D, bird.getDeltaMovement().horizontalDistance() * 6.0D) / track.lapLength(), aim);
+        // the same line the AI drives for this colour (RaceTrack#steerLaneAt): round every feature
+        // it cannot cross (a Black round lava, a Green round water), out to the band's outside lane
+        // before the opening and back after it, never through the rail either side
+        double lap = track.lapLength();
+        var colour = bird.color();
+        double speed = bird.getDeltaMovement().horizontalDistance();
+        double ahead = Math.max(5.0D, speed * 6.0D);
+        if (Math.abs(track.steerLaneAt(progress, aim, colour, true) - aim) > 1e-6
+                || Math.abs(track.steerLaneAt(progress + ahead / lap, aim, colour, true) - aim) > 1e-6) {
+            ahead = 4.0D;   // a connector's own tangent, not a chord through its corner
+        }
+        double aimT = progress + ahead / lap;
+        double lane = track.steerLaneAt(aimT, aim, colour, true);
+        RacePoint target = track.pointAtLane(aimT, lane);
         event.getEntity().setYRot((float) Math.toDegrees(Math.atan2(-(target.x() - bird.getX()), target.z() - bird.getZ())));
         event.getEntity().setXRot(0);
+        // brake for a detour connector as the AI does (RacerLine#connectorPace): off the throttle
+        // while faster than it can be crossed in RacerLine.CONNECTOR_TICKS
+        double connector = track.connectorAhead(progress, colour, true, RacerLine.CONNECTOR_BRAKE_LEAD);
+        boolean braking = !Double.isNaN(connector) && speed > connector / RacerLine.CONNECTOR_TICKS;
         var input = event.getInput();
-        input.forwardImpulse = 1;
+        input.forwardImpulse = braking ? 0 : 1;
         input.leftImpulse = 0;
-        input.up = true;
+        input.up = !braking;
         input.down = input.left = input.right = input.jumping = input.shiftKeyDown = false;
         input.jumping = jump;
-        mc.options.keySprint.setDown(ticks % 400 < 240);
+        mc.options.keySprint.setDown(!braking && ticks % 400 < 240);
         if (ticks > 0 && track.name().equals(System.getProperty("chocobosreborn.harness.traceTrack", ""))) {
             try {
                 var pads = new java.util.ArrayList<String>();

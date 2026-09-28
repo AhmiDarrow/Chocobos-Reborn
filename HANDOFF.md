@@ -2183,3 +2183,111 @@ was not run. **Needs an in-game look:** the pool rims on the ford/lava courses (
 cell by cell, so it is a little more ragged on diagonals). Rails that stepped out a column on diagonal legs
 (a kerb block under each). Climbers on A_CRYSTAL's ridge still climbing it and nothing else. A Black bird no
 longer mounting rails in a race. The AI back-off at a ridge face on a short lap.
+
+## AI stalls at detour exits (2026-09-28, unreleased, branch `ridge-band`; from the 3-client hub harness)
+
+**The report.** On A_CRYSTAL (5 x 372: bog 0.34-0.44, pool 0.4675-0.5375, ridge 0.6875-0.7375) two of three
+AI field birds froze for the whole race: "Vincent" (Blue) at lap 0 + 0.75, just past the ridge's rejoin, and
+"Cait" (Yellow) at 0 + 0.55, just past the pool's. The run before, "Vivi" (Blue) stood at the ridge face (0.69).
+The 3-block wall back-off from "Rail clearance" did not help.
+
+**The sweep** (`gametest/AiLapSweepGameTests`, one GameTest per course, batches `ai_sweep_<class>_<gp|sprint>`,
+the class's six courses side by side). Every one of the 36 courses with a terrain feature (all B, A and S;
+class C is open road) races every colour its field can bring (B Yellow/Green/Blue; A Yellow/Green/Blue/Black/
+White, the Yellow and Blue being B guests like Cait and Vincent; S the same plus Jolo's Gold) from two start
+lanes (the outside and inside grid stalls, -4.5 and +4.5): 336 birds. They are set up as `RaceSession` sets up
+a field bird (grade, class training, `fieldLandSpeed` pace), start spread round the lap and are solid, so they
+meet and bump; off the road they are set back as the session does. Each must be credited a lap by
+`RaceLapProgress` (from a start mid-lap that is 1 to 1.9 laps) within 2.5 x the class field's clean lap + 300
+ticks, and must never go 100 ticks without 3 blocks of new ground. Every stall is logged as `AI-SWEEP STALL`
+with course, colour, start lane, progress, lane, position, the blocks round it, the nearest feature ("RIDGE end
++5.6b") and the last 30 samples; `AI-SWEEP DONE` lists every bird's lap ticks. Birds are only put down once
+every chunk of the island ticks entities (`islandTicking`; the test server ticks as fast as it can, so a wait
+counted in ticks ran out while the previous batch's 2000 chunks were still saving, and a bird that drives into a
+chunk that does not tick freezes there; `aiUsesDetourOpening` now waits the same way). The sweep adds about
+100 s to `runVerification` (whole run about 160 s).
+
+**Before the fix** (the old code, this sweep): 10 birds on 6 courses.
+- A_CRYSTAL: Blue from lane +4.5 pinned on the ridge face (0.6855, 0.8 blocks short, lane -0.85), never lapped
+  ("Vivi"); Yellow from +4.5 the same, 216 ticks; Blue from -4.5 outside the band's rail 5.6 blocks past the
+  ridge rejoin (0.7527, lane -7.25), never lapped ("Vincent").
+- A_MOONSHELF: Yellow from -4.5 outside the rail 5.8 blocks past the ridge rejoin (0.5077, lane -7.16), never lapped.
+- A_CANOPY: Green from -4.5, 103 ticks past the pool (end + 6.1 blocks) after being set back.
+- S_ECLIPSE: Blue from +4.5 pinned on the second ridge's face (0.8887), never lapped; Blue from -4.5, 103 ticks.
+- S_CITADEL: both Gold birds hopping in place in the first lava pool (0.2595, 0.2652), never lapped.
+- S_KEEP: Gold from +4.5 hopping against the first pool's rim (0.4722), never lapped.
+Cait's exact spot did not come up, but it is the same thing as Vincent's on the pool's rejoin.
+
+**Causes.**
+1. *The connector is too short to steer at race pace.* `DETOUR_CONNECT` is 0.012 of a lap: 4.1-7.3 blocks on the
+   grands prix (14-19 on the sprints), and the AI's line blended from its racing line (about +1) to the detour's
+   middle (-12.5) across it: a 13.5-block swing in 4.5 blocks at A pace (1.4 blocks a tick, three ticks across).
+   On the way in a non-climber met the ridge face (four or five blocks, not jumpable); on the way out it was
+   carried wide past the end of the opening and came to rest outside the band's rail, aiming at the racing line
+   through the first rail post. Every sprint stall-free in the sweep, every stall on a short lap, fits.
+2. *The old back-off went nowhere.* It fired only when pressed on a wall on the ground, and aimed 3 blocks back on
+   the connector's lane: from outside the rail that is back into the same post, and from the face back into the
+   same diagonal. Nothing ever gave up, so a bird rocked there all race.
+3. *Rail stubs between openings* (found once 1 was fixed). Where two features are a few blocks apart the band's
+   outside rail stood for 0.5-7.4 blocks between two connectors (A_CRYSTAL bog to pool 1.2, S_ECLIPSE bog to ridge
+   0.5, A_MACHETE pool to bog 2.1, S_SKYWAY 2.6 and 4.9, A_MOONSHELF 3.8, S_KEEP 5.4, S_VOID 6.6, A_GROTTO 7.4):
+   a bird going round both had to dart back to the band and out again, and hit it (A_CRYSTAL Yellow never lapped,
+   Green twice held; A_MACHETE Yellow and Green).
+4. *Lava walkers hopped in lava.* Vanilla `FloatGoal` jumps a mob out of lava at the first touch (water only past
+   the jump threshold). A Gold standing on a lava pool dips its feet in the surface, so the AI bird jumped every
+   landing, spent its time in the air at air speed and made no ground. Riders are not affected (goals do not run
+   for a rider's bird).
+The contact guard (no sideways shove off the band) and a non-walker refused a pool showed up in none of the sweep's stalls.
+
+**The fix.**
+- `RaceTrack.steerLaneAt` is the AI's line round every detour its colour takes: it eases to the band's outside lane
+  (`DETOUR_WAIT` -4.5, clear of the rail) over the 14 blocks before the opening (`DETOUR_PREP`), crosses the
+  connector to `DETOUR_HOLD` (-10.25, a body and a margin inside the detour road's inner edge, so the swing is
+  5.75 blocks, not 13.5), holds it past the feature, crosses back to the outside lane at the rejoin and only then
+  eases back to its line over 10 blocks (`DETOUR_SETTLE`). Detours it takes whose openings are merged are one span.
+  `detourLaneAt` (the built connector centre line) is unchanged; the set-back still uses it.
+- The AI brakes for a short connector like a hairpin: `RacerLine.connectorPace` caps its pace to cross in no fewer
+  than 5.5 ticks (`CONNECTOR_TICKS`), from 6 blocks before it (`RaceTrack.connectorAhead`). A sprint's connector
+  costs nothing; on A_CRYSTAL an A bird takes about 0.8 blocks a tick through it.
+- `RacerRecovery` (pure, `RacerRecoveryTest`) replaces the wall back-off. It counts new ground along the lap, not
+  motion: 40 ticks without 1.5 blocks and it re-aims a block and a half ahead on the lane it should be on (the
+  detour lane or the road: a slide along the face, jumping if pressed), then backs off 6 blocks to the lane it
+  wants there, then races again; after two such cycles with no ground (about 9 s) `RacerGoal.takeSetBack` asks
+  `RaceSession` to set it back on the road like an off-road bird. Rocking back and forth is no ground; going up a
+  ridge face is (an S ridge is 40-odd ticks of climbing, and re-aiming near the top dropped the climber back down
+  the face; the sweep caught that). A bird found outside the band's rail just past an opening
+  (`RaceTrack.openingBehind`) steers back into the opening it came out of instead of at the rail post ahead.
+- Openings under `RaceTrack.DETOUR_MERGE` (10) blocks apart are laid as one (`RaceTrack.inOpening`, used by
+  `RaceCourseLayout`): the detour road runs on through the gap and no rail stub is left. Block geometry changed,
+  so `COURSE_VERSION` 13 -> 14 (`RaceTrackTest` pins it). The detour cost model (`detourCost`) and every feature
+  span are untouched, so `CourseBalanceTest` is unchanged and green.
+- `ChocoboEntity.ChocoFloatGoal`: a lava walker in lava floats only when it is actually under, as in water.
+
+Why not longer connectors: a connector as a length in blocks (`max(0.012, 16 / lap)`) was the note left open in
+"Rail clearance". On a straight a detour costs about 2 x (hypot(L, 12.5) - L): 17.6 blocks at 4.5, 9.5 at 14, under
+`CourseBalanceTest`'s 12-block floor, so every short course's features would need re-solving (and the stands,
+which keep 12 blocks off a connector). The steering and braking make the 4-7-block connectors raceable instead.
+
+**After** (same sweep): 336 birds on 36 courses, every one lapped, no stall, no set-back, no off-road rescue.
+Lap times moved little; the two Gold birds on S_CITADEL now lap in 676 and 744 ticks (limit 2400).
+
+**Tests.** `DetourSteeringTest`: the AI's line round every detour, for every racing colour, bog sense and three
+approach lanes, is road all the way and clear across the bird's whole body (`theDetourLineIsRoadAndClearForEveryColour`);
+openings a few blocks apart are laid as one; a bird pinned on any ridge face re-aims and backs off onto clear road;
+one outside the rail past any rejoin steers back into the opening; short connectors are braked, long ones not.
+`RacerRecoveryTest` (six cases). GameTests `aiPinnedOnARidgeFaceGetsRound` (Vivi's spot) and
+`aiOutsideTheRailPastARejoinGetsBack` (Vincent's) must get on without a set-back, in their own batches (they share
+A_CRYSTAL's island). Full `test` 279, 0 failures, 1 skipped; `runVerification` 67 of 67; `build` passes.
+
+**Harness** (dev only, not in the jar). `RaceHarnessBirds.colorFor` gives only colours that may race
+(`RaceScoring.mayRace`): C Yellow, B Blue on a water-only course else Green, A Black (it was Flame on a lava
+course: barred from racing and no climber, all three riders stood at A_EMBER's ridge face at 0 + 0.8627), S Gold.
+`RaceHarnessClient.input` drives the AI's line for its bird's colour (`steerLaneAt`, bog-savvy), with the 4-block
+lookahead near a detour, and comes off the throttle and the dash while faster than `connectorPace` allows. The
+wall recovery aims at the steered lane rather than lane 0. Output files are unchanged.
+
+**Needs an in-game look.** The merged openings (A_CRYSTAL bog to pool, S_ECLIPSE bog to ridge, the others listed
+above): a wider apron with no rail between two detours. AI birds easing to the outside lane 14 blocks before a
+fork and braking into short connectors (a field now visibly lifts there; it should read as a hairpin, not a stall).
+A Gold AI walking the lava pools without hopping. A human on a short connector at A/S pace still has to brake
+for it; the harness bot now does.

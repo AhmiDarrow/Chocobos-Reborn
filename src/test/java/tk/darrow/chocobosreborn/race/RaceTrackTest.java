@@ -529,9 +529,10 @@ class RaceTrackTest {
 		// markers; 11: the 48-course swap (grand prix laps lengthened on six courses, boost
 		// strips and set pieces follow the new format); 12: an island an older plan laid is swept over its
 		// whole slot; 13: rails, pool rims and scenery kept out of the racing lanes
-		// (CourseClearanceTest).
+		// (CourseClearanceTest); 14: two detour openings under RaceTrack.DETOUR_MERGE blocks
+		// apart are laid as one, no rail stub between them.
 		// Older islands have to be re-laid either way.
-		assertEquals(13, SquareBuilder.COURSE_VERSION);
+		assertEquals(14, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

@@ -11,14 +11,17 @@ public final class RaceHarnessBirds {
 	private RaceHarnessBirds() {
 	}
 
-	/** C is a normal yellow. B climbs or fords. A is a black, or a flame where the course is lava. S is a gold. */
+	/**
+	 * Only colours that may race ({@link RaceScoring#mayRace}): C a yellow; B a blue on a
+	 * water-only course, else a green; A a black (it goes round lava like everything but Gold);
+	 * S a gold. A Flame bird on A_EMBER's lava is barred from racing and cannot climb: all three
+	 * harness riders stood at its ridge face (0 + 0.8627) the whole heat.
+	 */
 	public static ChocoboColor colorFor(RaceTrack track) {
-		boolean lava = false;
 		boolean water = false;
 		boolean ridge = false;
 		for (RaceTrack.Feature feature : track.features()) {
 			switch (feature.type()) {
-				case LAVA -> lava = true;
 				case WATER -> water = true;
 				case RIDGE -> ridge = true;
 				default -> {
@@ -28,7 +31,7 @@ public final class RaceHarnessBirds {
 		return switch (track.getRaceClass()) {
 			case C -> ChocoboColor.YELLOW;
 			case B -> water && !ridge ? ChocoboColor.BLUE : ChocoboColor.GREEN;
-			case A -> lava ? ChocoboColor.FLAME : ChocoboColor.BLACK;
+			case A -> ChocoboColor.BLACK;
 			case S -> ChocoboColor.GOLD;
 		};
 	}

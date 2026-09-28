@@ -134,6 +134,32 @@ public final class RacerLine {
 		}
 		return clampLane(lane + Math.min(DEFEND_MAX * skill, d));
 	}
+	// ------------------------------------------------------------ detour connectors
+
+	/**
+	 * Fewest ticks a racer spends crossing a detour connector. A connector is a share of the
+	 * lap ({@link RaceTrack#DETOUR_CONNECT}): 4-7 blocks on a grand prix's short lap, 14-19 on a
+	 * sprint's, and at A / S pace (1.4 / 2.2 blocks a tick) a short one went by in two or three
+	 * ticks, far too quick to swing out to the detour. Slowed to this, the swing is made.
+	 */
+	public static final double CONNECTOR_TICKS = 5.5D;
+	/** Blocks before a connector a racer starts braking for it (ground friction sheds half the speed a tick). */
+	public static final double CONNECTOR_BRAKE_LEAD = 6.0D;
+	/** Terminal ground speed, blocks a tick, per unit of movement speed x pace (vanilla ground friction). */
+	public static final double GROUND_BLOCKS_PER_SPEED = 2.9D;
+
+	/**
+	 * Pace scale for a connector of {@code connectorBlocks} for a racer that would cruise at
+	 * {@code cruiseBlocksPerTick}: at most the speed that takes {@link #CONNECTOR_TICKS} to cross
+	 * it, never faster than its own pace. A sprint's long connector costs nothing.
+	 */
+	public static double connectorPace(double connectorBlocks, double cruiseBlocksPerTick) {
+		if (!(connectorBlocks > 0.0D) || cruiseBlocksPerTick <= 1.0E-6D) {
+			return 1.0D;
+		}
+		return Math.min(1.0D, connectorBlocks / CONNECTOR_TICKS / cruiseBlocksPerTick);
+	}
+
 	// ------------------------------------------------------------ walls
 
 	/** Ticks pressed on a wall without getting anywhere before a racer recovers, and how long it recovers. */

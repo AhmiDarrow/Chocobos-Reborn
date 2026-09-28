@@ -390,6 +390,11 @@ public enum RaceTrack {
 	private final Shape shape;
 	private final int laps;
 	private final List<Feature> features;
+	/** Terrain features only, in table order. */
+	private final List<Feature> terrain;
+	/** {@link #detourSpans} per colour and bog sense, worked out on first use (the spans never change). */
+	@SuppressWarnings("unchecked")
+	private final List<double[]>[] spanCache = new List[ChocoboColor.values().length * 2];
 	private final TrackSpline spline;
 	private final double offsetX, offsetZ;
 
@@ -400,6 +405,13 @@ public enum RaceTrack {
 		this.shape = shape;
 		this.laps = laps;
 		this.features = List.of(features);
+		List<Feature> terrainOnly = new ArrayList<>();
+		for (Feature f : features) {
+			if (f.terrain()) {
+				terrainOnly.add(f);
+			}
+		}
+		this.terrain = List.copyOf(terrainOnly);
 		List<double[]> flat = new ArrayList<>();
 		for (Feature f : features) {
 			if (f.terrain()) {
@@ -543,13 +555,7 @@ public enum RaceTrack {
 
 	/** Terrain features only (the ones with a detour). */
 	public List<Feature> terrainFeatures() {
-		List<Feature> out = new ArrayList<>();
-		for (Feature f : features) {
-			if (f.terrain()) {
-				out.add(f);
-			}
-		}
-		return out;
+		return terrain;
 	}
 
 	public double centerX() {
@@ -693,6 +699,11 @@ public enum RaceTrack {
 		return f != null && f.terrain() ? f : null;
 	}
 
+	/** A detour connector's length along the lap, as a share of the lap. */
+	public double detourConnect() {
+		return DETOUR_CONNECT;
+	}
+
 	/** Lane at a steering target: enter and leave only through the actual detour connectors. */
 	public double detourLaneAt(double t, double directLane, ChocoboColor color, boolean knowsBog) {
 		double progress = t - Math.floor(t);
@@ -707,6 +718,180 @@ public enum RaceTrack {
 			return directLane + (-(DETOUR_INNER + DETOUR_OUTER) / 2.0D - directLane) * blend;
 		}
 		return directLane;
+	}
+
+	/** Blocks before a detour's connector a bird that goes round starts easing out to the band's outside lane. */
+	public static final double DETOUR_PREP = 14.0D;
+	/** Blocks after the rejoin a bird holds the outside lane and eases back to its line. */
+	public static final double DETOUR_SETTLE = 10.0D;
+	/**
+	 * Lane a racer holds on a detour road: a body and a margin in from its inner edge. The
+	 * detour's middle (-12.5) asked for a 13.5-block swing through a connector 4-7 blocks long
+	 * on a short lap; from the band's outside lane this is a 5.75-block one.
+	 */
+	public static final double DETOUR_HOLD = -(DETOUR_INNER + 1.25D);
+	/** The band's outside lane, where a bird waits for a detour's opening: clear of the outside rail. */
+	public static final double DETOUR_WAIT = -(ROAD_HALF - 1.0D);
+
+	/**
+	 * Lane a racer steers for at {@code t} ({@code directLane} when no detour is near): the
+	 * racing line of the detours this colour takes. On the band before the opening it eases to
+	 * the outside lane ({@link #DETOUR_WAIT}, the rail is still up), crosses the connector to
+	 * {@link #DETOUR_HOLD}, holds it past the feature, crosses back to the outside lane at the
+	 * rejoin and only then eases back to its line: it never aims through the rail that stands
+	 * either side of the opening. Two detours close together keep it outside between them.
+	 * The connectors and the road are the built ones ({@link #detourLaneAt} is their centre line).
+	 */
+	public double steerLaneAt(double t, double directLane, ChocoboColor color, boolean knowsBog) {
+		double lap = lapLength(), c = DETOUR_CONNECT * lap;
+		double out = directLane;
+		for (double[] span : detourSpans(color, knowsBog)) {
+			double len = (span[1] - span[0]) * lap;
+			double x = wrapHalf(t - span[0]) * lap;   // blocks past the detour's start
+			double lane;
+			if (x < -(c + DETOUR_PREP) || x > len + c + DETOUR_SETTLE) {
+				continue;
+			} else if (x < -c) {
+				lane = directLane + (DETOUR_WAIT - directLane) * smooth((x + c + DETOUR_PREP) / DETOUR_PREP);
+			} else if (x < 0.0D) {
+				lane = DETOUR_WAIT + (DETOUR_HOLD - DETOUR_WAIT) * ((x + c) / c);
+			} else if (x <= len) {
+				lane = DETOUR_HOLD;
+			} else if (x <= len + c) {
+				lane = DETOUR_HOLD + (DETOUR_WAIT - DETOUR_HOLD) * ((x - len) / c);
+			} else {
+				lane = DETOUR_WAIT + (directLane - DETOUR_WAIT) * smooth((x - len - c) / DETOUR_SETTLE);
+			}
+			out = Math.min(out, lane);
+		}
+		return out;
+	}
+
+	/**
+	 * The detours a bird of this colour takes, as {start, end} lap spans in lap order. Two whose
+	 * openings are laid as one ({@link #DETOUR_MERGE}) are one span: the bird stays out on the
+	 * detour road between them instead of weaving back to the band.
+	 */
+	private List<double[]> detourSpans(ChocoboColor color, boolean knowsBog) {
+		int key = color.ordinal() * 2 + (knowsBog ? 1 : 0);
+		List<double[]> cached = spanCache[key];
+		if (cached != null) {
+			return cached;
+		}
+		List<Feature> taken = new ArrayList<>();
+		for (Feature f : terrain) {
+			if (takesDetour(f, color, knowsBog)) {
+				taken.add(f);
+			}
+		}
+		taken.sort(java.util.Comparator.comparingDouble(Feature::start));
+		List<double[]> spans = new ArrayList<>();
+		double lap = lapLength();
+		for (Feature f : taken) {
+			double[] last = spans.isEmpty() ? null : spans.get(spans.size() - 1);
+			if (last != null && (f.start() - last[1] - 2.0D * DETOUR_CONNECT) * lap < DETOUR_MERGE) {
+				last[1] = Math.max(last[1], f.end());
+			} else {
+				spans.add(new double[]{f.start(), f.end()});
+			}
+		}
+		List<double[]> frozen = List.copyOf(spans);
+		spanCache[key] = frozen;
+		return frozen;
+	}
+
+	/** Whether a bird of this colour goes round {@code f} (a bog only if it knows one when it sees it). */
+	public static boolean takesDetour(Feature f, ChocoboColor color, boolean knowsBog) {
+		return f.terrain() && !f.suits(color) && (f.type() != Feature.Type.MUD || knowsBog);
+	}
+
+	/**
+	 * Blocks of a detour connector this colour is on or about to cross at {@code t}: the
+	 * connector's length if {@code t} is within {@code lead} blocks before it or on it (either
+	 * end of a detour it takes), else NaN. {@link RacerLine#connectorPace} slows for it.
+	 */
+	public double connectorAhead(double t, ChocoboColor color, boolean knowsBog, double lead) {
+		double lap = lapLength(), c = DETOUR_CONNECT * lap;
+		for (double[] span : detourSpans(color, knowsBog)) {
+			double len = (span[1] - span[0]) * lap;
+			double x = wrapHalf(t - span[0]) * lap;
+			if ((x >= -(c + lead) && x <= 0.5D) || (x >= len - lead && x <= len + c)) {
+				return c;
+			}
+		}
+		return Double.NaN;
+	}
+
+	/**
+	 * Whether lane {@code lane} at {@code t} is open road on a detour or its connectors: inside a
+	 * feature's opening (connector to connector), from the band's outside kerb out to the detour's
+	 * outer edge. Outside the opening the band's rail stands at the kerb.
+	 */
+	public boolean inDetourOpening(double t, double lane) {
+		return inOpening(t) && lane <= -ROAD_HALF && lane >= -DETOUR_OUTER;
+	}
+
+	/**
+	 * Blocks of band between two detour openings below which the two are laid as one: the
+	 * detour road runs on through the gap and the band's outside rail stays down. A rail
+	 * stub a block or two long between two connectors (A_CRYSTAL's bog and pool, 1.2 blocks;
+	 * S_ECLIPSE's bog and ridge, 0.5) stood square in the line of a bird crossing from one
+	 * detour to the next.
+	 */
+	public static final double DETOUR_MERGE = 10.0D;
+
+	/**
+	 * Whether {@code t} is in a detour opening: a terrain feature with its connectors
+	 * ({@link #DETOUR_CONNECT} either side), or a gap of under {@link #DETOUR_MERGE} blocks
+	 * between two of them. There the detour road is laid and the band's outside rail is not.
+	 */
+	public boolean inOpening(double t) {
+		double w = t - Math.floor(t), lap = lapLength();
+		List<Feature> terrain = terrainFeatures();
+		for (Feature f : terrain) {
+			double from = f.start() - DETOUR_CONNECT, to = f.end() + DETOUR_CONNECT;
+			if (w >= from && w <= to) {
+				return true;
+			}
+			if (w > to) {
+				for (Feature g : terrain) {
+					double next = g.start() - DETOUR_CONNECT;
+					if (g != f && next >= to && w <= next && (next - to) * lap < DETOUR_MERGE) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * A bird at {@code lane} outside the band's outside rail at {@code t}, just past a detour's
+	 * rejoin (carried wide out of the connector): the progress to steer back to, a block and a
+	 * half inside the opening it came out of, within {@code maxBack} blocks. NaN when it is on
+	 * the band, in an opening, or nowhere near one.
+	 */
+	public double openingBehind(double t, double lane, double maxBack) {
+		if (lane > -(ROAD_HALF + 0.75D) || lane < -DETOUR_OUTER - 1.0D || inDetourOpening(t, lane)) {
+			return Double.NaN;
+		}
+		double lap = lapLength();
+		for (double b = 0.5D; b <= maxBack; b += 0.5D) {
+			double tb = t - b / lap;
+			if (inDetourOpening(tb, -(ROAD_HALF + 1.0D))) {
+				return tb - 1.5D / lap;
+			}
+		}
+		return Double.NaN;
+	}
+
+	private static double wrapHalf(double d) {
+		return d - Math.floor(d + 0.5D);
+	}
+
+	private static double smooth(double u) {
+		u = Math.max(0.0D, Math.min(1.0D, u));
+		return u * u * (3.0D - 2.0D * u);
 	}
 
 	/**

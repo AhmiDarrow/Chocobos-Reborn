@@ -3,7 +3,9 @@ package tk.darrow.chocobosreborn.race;
 import java.util.EnumSet;
 import java.util.List;
 
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
+import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 
 /**
@@ -69,10 +71,12 @@ public class RacerGoal extends Goal {
 	/** Last progress on this lap, so the next tick searches that section. */
 	private double along = -1.0D;
 	private double lastX = Double.NaN, lastZ;
-	/** Ticks pressed on a wall without moving ({@link RacerLine#stuckStep}), and ticks left of backing off it. */
-	private int stuckTicks, backOff;
-	/** A stuck bird aims this far back along the lap, on the lane it wants there. */
-	private static final double BACK_OFF_BLOCKS = 3.0D;
+	/** Lap progress last tick, for the recovery's forward count. */
+	private double lastT = Double.NaN;
+	/** Getting out of a stall on its own, then asking to be set back ({@link RacerRecovery}). */
+	private final RacerRecovery recovery = new RacerRecovery();
+	/** Pace while re-aiming or backing off a wall. */
+	private static final double RECOVER_PACE = 0.5D;
 	private List<ChocoboEntity> nearby = List.of();
 
 	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane, RacerProfile profile) {
@@ -115,6 +119,20 @@ public class RacerGoal extends Goal {
 
 	public double energy() {
 		return energy;
+	}
+
+	/**
+	 * True once when this bird has made no ground through a whole recovery twice over
+	 * ({@link RacerRecovery#takeSetBack}): the session puts it back on the road, as it does an
+	 * off-road bird.
+	 */
+	public boolean takeSetBack() {
+		return recovery.takeSetBack();
+	}
+
+	/** Recovery state, for tests and the sweep's log. */
+	public RacerRecovery.Mode recoveryMode() {
+		return recovery.mode();
 	}
 
 	@Override
@@ -203,29 +221,44 @@ public class RacerGoal extends Goal {
 
 		// A fraction of a long lap can span an entire bend, cutting its inside
 		// rail and invalidating the lap even when the bird never stops moving.
-		double ahead = Math.min(0.012D + 0.006D * Math.max(0.0D, speed - 1.0D), 8.0D / track.lapLength());
+		double lap = track.lapLength();
+		ChocoboColor color = bird.color();
+		double ahead = Math.min(0.012D + 0.006D * Math.max(0.0D, speed - 1.0D), 8.0D / lap);
 		double directLane = lane;
-		if (Math.abs(track.detourLaneAt(t, lane, bird.color(), bogSavvy) - lane) > 1e-6
-				|| Math.abs(track.detourLaneAt(t + ahead, lane, bird.color(), bogSavvy) - lane) > 1e-6) {
+		if (Math.abs(track.steerLaneAt(t, lane, color, bogSavvy) - lane) > 1e-6
+				|| Math.abs(track.steerLaneAt(t + ahead, lane, color, bogSavvy) - lane) > 1e-6) {
 			// A whole connector of lookahead cuts the diagonal's corner into the
 			// rail/ridge, especially at S-class pace. Follow its local tangent.
-			ahead = Math.min(ahead, 4.0D / track.lapLength());
+			ahead = Math.min(ahead, 4.0D / lap);
 		}
-		// The old fixed early swerve aimed through the rail before the detour
-		// entrance existed. Follow the same connector ramp the builder lays down.
+		// Out to the band's outside lane before the opening, across the connector to the
+		// detour, and back the same way (RaceTrack#steerLaneAt): never through the rail.
 		double aimT = t + ahead;
-		lane = track.detourLaneAt(aimT, lane, bird.color(), bogSavvy);
-		// pinned on a wall (a ridge face a non-climber cannot jump, a rail it was bumped
-		// into): back off along the lane it wants for a second instead of pressing on
-		stuckTicks = RacerLine.stuckStep(stuckTicks, bird.horizontalCollision, bird.onGround(), moved);
-		if (stuckTicks >= RacerLine.STUCK_TICKS && backOff == 0) {
-			backOff = RacerLine.RECOVER_TICKS;
-			stuckTicks = 0;
+		lane = track.steerLaneAt(aimT, lane, color, bogSavvy);
+		// no new ground for two seconds (a ridge face a non-climber cannot jump, the rail past
+		// a rejoin, a bump into a wall): slide along it, then back off, then ask to be set back
+		double forward = Double.isNaN(lastT) ? 0.0D : RacerLine.blocksAhead(lastT, t, lap);
+		lastT = t;
+		RacerRecovery.Mode mode;
+		if (bird.raceHeld() || finished) {
+			recovery.reset();
+			mode = RacerRecovery.Mode.RACE;
+		} else {
+			mode = recovery.step(forward, bird.onClimbable() && bird.horizontalCollision && bird.getDeltaMovement().y > 0.0D);
 		}
-		if (backOff > 0) {
-			backOff--;
-			aimT = t - BACK_OFF_BLOCKS / track.lapLength();
-			lane = track.detourLaneAt(aimT, directLane, bird.color(), bogSavvy);
+		double myLane = track.laneAt(t, bird.getX(), bird.getZ());
+		double behind = track.openingBehind(t, myLane, RacerRecovery.BACK_BLOCKS);
+		if (!Double.isNaN(behind) && mode != RacerRecovery.Mode.BACK_OFF) {
+			// outside the band's rail past a rejoin (carried wide out of the connector): the only
+			// way back is the opening behind, not through the rail post ahead
+			aimT = behind;
+			lane = RaceTrack.DETOUR_WAIT;
+		} else if (mode == RacerRecovery.Mode.REAIM) {
+			aimT = t + RacerRecovery.REAIM_BLOCKS / lap;
+			lane = track.steerLaneAt(t + 4.0D / lap, 0.0D, color, bogSavvy);
+		} else if (mode == RacerRecovery.Mode.BACK_OFF) {
+			aimT = t - RacerRecovery.BACK_BLOCKS / lap;
+			lane = track.steerLaneAt(aimT, RacerLine.clampLane(directLane), color, bogSavvy);
 		}
 		RacePoint target = track.pointAtLane(aimT - Math.floor(aimT), lane);
 		// terrain is physical (water slows swimmers, ridges block non-climbers); no attribute fudge.
@@ -248,6 +281,15 @@ public class RacerGoal extends Goal {
 		if (finished) {
 			mul *= 0.6D;   // finished: coast
 		}
+		// a detour connector on a short lap is a hairpin: brake for it like one
+		double connector = track.connectorAhead(t, color, bogSavvy, RacerLine.CONNECTOR_BRAKE_LEAD);
+		if (!Double.isNaN(connector)) {
+			mul *= RacerLine.connectorPace(connector,
+					RacerLine.GROUND_BLOCKS_PER_SPEED * bird.getAttributeValue(Attributes.MOVEMENT_SPEED) * mul);
+		}
+		if (mode != RacerRecovery.Mode.RACE || !Double.isNaN(behind)) {
+			mul *= RECOVER_PACE;   // manoeuvring off a wall, not racing
+		}
 		bird.getMoveControl().setWantedPosition(target.x(), target.y(), target.z(), mul);
 		bird.getLookControl().setLookAt(target.x(), target.y() + 1.0D, target.z());
 		for (net.minecraft.world.entity.Entity p : bird.getPassengers()) {
@@ -262,7 +304,7 @@ public class RacerGoal extends Goal {
 		}
 		if (!layout.onCourse(bird.getX(), bird.getZ()) && bird.tickCount % 10 == 0) {
 			// Drifted off the road: nudge back onto the line (or the detour).
-			RacePoint back = track.pointAtLane(t, track.detourLaneAt(t, directLane, bird.color(), bogSavvy));
+			RacePoint back = track.pointAtLane(t, track.steerLaneAt(t, directLane, color, bogSavvy));
 			bird.getMoveControl().setWantedPosition(back.x(), back.y(), back.z(), mul);
 		}
 	}

@@ -537,6 +537,10 @@ public class ChocobosRebornGameTests {
 		if (fullLap) helper.onEachTick(() -> helper.assertTrue(RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()),
 				"AI leaves the legal course at " + track.progressAt(bird.getX(), bird.getZ()) + " position=" + bird.position()));
 		helper.startSequence().thenWaitUntil(() -> {
+			// after a batch that let go of thousands of chunks the island can take a while to tick
+			// entities again; a bird in a chunk that does not tick yet only stands there
+			AiLapSweepGameTests.islandTicking(helper, level, track);
+		}).thenWaitUntil(() -> {
 			double progress = track.progressAt(bird.getX(), bird.getZ(), lap.lastProgress());
 			boolean credited = lap.update(progress, RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()));
 			if (progress > feature.start() + .01 && progress < feature.end() - .01) {

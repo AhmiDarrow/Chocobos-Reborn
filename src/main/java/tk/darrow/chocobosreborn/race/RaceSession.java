@@ -748,6 +748,11 @@ public class RaceSession {
 					&& RaceScoring.strayedTooFar(e.getX() - r.roadX, e.getZ() - r.roadZ)) {
 				step = RaceLapProgress.Step.RESCUE;
 			}
+			if (step == RaceLapProgress.Step.NONE && !r.human() && r.goal != null && r.goal.takeSetBack()) {
+				// an AI bird that got nowhere through its own recovery, twice (RacerRecovery): set it
+				// back on the road like an off-road bird rather than let it rock on a wall all race
+				step = RaceLapProgress.Step.RESCUE;
+			}
 			if (step == RaceLapProgress.Step.RESCUE) {
 				rescue(r, e);
 				continue;

@@ -1888,6 +1888,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (getControllingPassenger() instanceof Player p && (descending || p.isShiftKeyDown())) {
 				return false;
 			}
+			// Vanilla floats a mob up out of lava at the first touch (water only past the jump
+			// threshold). A lava walker stands on the pool (canStandOnFluid) and dips its feet
+			// into the surface: hopping there, it spent every tick in the air and crawled at air
+			// speed. An AI Gold stood hopping in S_CITADEL's and S_KEEP's lava all race. It
+			// floats like it does in water: only when it is actually under.
+			if (color().lavaWalk() && isInLava() && getFluidHeight(FluidTags.LAVA) <= getFluidJumpThreshold()) {
+				return isInWater() && getFluidHeight(FluidTags.WATER) > getFluidJumpThreshold();
+			}
 			return super.canUse();
 		}
 	}
