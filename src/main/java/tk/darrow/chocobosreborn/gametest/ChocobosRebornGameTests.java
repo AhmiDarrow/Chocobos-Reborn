@@ -990,10 +990,12 @@ public class ChocobosRebornGameTests {
 			helper.assertTrue(moved > 25.0D, "AI racers move, max d2=" + moved);
 		});
 		helper.runAtTickTime(2100, () -> {
-			// course 0 is a five-lap grand prix of 600-block laps since the 48-course swap:
-			// after ~90 s most of the field has a lap done (the stalled human keeps the heat
-			// open), which proves the AI gets round the kerbs, rails, boosts and corners of a
-			// real circuit at pace
+			// course 0 is a five-lap grand prix of 305-block laps (short grands prix): after
+			// ~92 s of racing (GO at ~265) three of the field have two laps done, 610 blocks,
+			// the distance the old single 600-block lap asked for in the same time (about 70 %
+			// of the C field's ~9.7 blocks a second). The stalled human keeps the heat open, and
+			// it proves the AI gets round the chicane, kerbs, rails, boosts and corners of a
+			// real circuit at pace, lap after lap
 			RaceSession s = RaceManager.sessionOf(sp.getUUID());
 			helper.assertTrue(s != null && s.running(), "heat still running with the human stalled");
 			StringBuilder where = new StringBuilder();
@@ -1004,7 +1006,7 @@ public class ChocobosRebornGameTests {
 						square.getBlockState(bp.below()).getBlock().getDescriptionId(),
 						RaceCourseLayout.of(RaceTrack.C_MEADOW).onCourse(e.getX(), e.getZ())));
 			}
-			helper.assertTrue(s.lapsDone(1) >= 3, "AI racers finish the first lap: " + s.progressReport() + " " + where);
+			helper.assertTrue(s.lapsDone(2) >= 3, "AI racers finish two laps: " + s.progressReport() + " " + where);
 			s.abort();
 			helper.assertTrue(RaceManager.sessionOf(sp.getUUID()) == null, "heat settled after abort");
 			long npcs = square.getEntities(ModEntities.CHOCOBO.get(), e -> e.raceNpc()).size();
