@@ -1659,6 +1659,12 @@ public final class RaceCourseLayout {
 			case A_TEMPLE -> onPlinth(t, surf, this::idol);
 			case A_INFERNO -> onPlinth(t, surf, this::boneArch);
 			// ---- new A landmarks (phase 2) begin ----
+			case A_TOADSTOOL -> onPlinth(t, surf, this::giantMushroom);
+			case A_AMMONITE -> onPlinth(t, surf, this::ammoniteFossil);
+			case A_FORGE -> onPlinth(t, surf, this::forgeAnvil);
+			case A_GROTTO -> onPlinth(t, surf, this::blindfishStatue);
+			case A_MOONSHELF -> onPlinth(t, surf, this::shelfFungus);
+			case A_MACHETE -> onPlinth(t, surf, this::machetePlanted);
 			// ---- new A landmarks (phase 2) end ----
 			default -> onPlinth(t, surf, this::themeLandmark);
 		}
@@ -1795,6 +1801,129 @@ public final class RaceCourseLayout {
 	}
 
 	// ---- new A set pieces (phase 2): private methods, begin ----
+	// (A_TOADSTOOL, the first course on MUSHROOM, stands by the theme's own giant mushroom)
+
+	/** A_AMMONITE: a fossil ammonite, a bone coil set in an upright slab of calcite with a tuff back. */
+	private void ammoniteFossil(int x, int y, int z) {
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dy = 0; dy <= 6; dy++) {
+				if (dx * dx + (dy - 3) * (dy - 3) <= 12) {
+					put(x + dx, y + dy, z, "calcite");
+					put(x + dx, y + dy, z + 1, "tuff");
+				}
+			}
+		}
+		// two and a quarter turns of the coil, widening from the heart outward
+		for (double a = 0.0D; a < Math.PI * 4.5D; a += 0.15D) {
+			double r = 0.4D + a / (Math.PI * 2.0D) * 1.25D;
+			int dx = (int) Math.round(r * Math.cos(a)), dy = 3 + (int) Math.round(r * Math.sin(a));
+			if (Math.abs(dx) <= 3 && dy >= 0 && dy <= 6) {
+				put(x + dx, y + dy, z, "bone_block[axis=z]");
+			}
+		}
+		put(x - 2, y, z - 1, "tuff");
+		put(x + 2, y, z - 1, "tuff");
+	}
+
+	/** A_FORGE: an iron anvil, horn and heel, over a hearth of glowing magma. */
+	private void forgeAnvil(int x, int y, int z) {
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				boolean rim = Math.abs(dx) == 3 || Math.abs(dz) == 2;
+				put(x + dx, y, z + dz, rim ? "polished_blackstone_bricks" : "magma_block");
+			}
+		}
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y + 1, z + dz, "iron_block");   // foot
+				put(x + dx, y + 4, z + dz, "iron_block");   // face
+			}
+		}
+		for (int dx = -1; dx <= 1; dx++) {
+			put(x + dx, y + 2, z, "iron_block");             // waist
+			put(x + dx, y + 3, z, "iron_block");
+		}
+		put(x + 3, y + 4, z, "iron_block");                 // horn
+		put(x + 3, y + 5, z, "iron_block");
+		put(x - 3, y + 4, z, "iron_block");                 // heel
+		put(x, y + 5, z, "anvil[facing=east]");
+		put(x - 3, y + 1, z - 2, "polished_blackstone_wall");
+		put(x - 3, y + 2, z - 2, "lantern[hanging=false]");
+	}
+
+	/** A_GROTTO: a pale blind cave fish leaping off a basalt stalk, no eyes, pink gills. */
+	private void blindfishStatue(int x, int y, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y, z + dz, "smooth_basalt");
+			}
+		}
+		put(x, y + 1, z, "smooth_basalt");
+		put(x, y + 2, z, "smooth_basalt");
+		put(x + 1, y + 1, z + 1, "glow_lichen[down=true]");
+		put(x - 1, y + 1, z - 1, "glow_lichen[down=true]");
+		// side on, tail to the west: rows from the top (dy 7) down to the lower tail fin (dy 2)
+		String[] rows = {"#......", "##.###.", ".######", ".######", "##.###.", "#......"};
+		for (int r = 0; r < rows.length; r++) {
+			for (int c = 0; c < 7; c++) {
+				if (rows[r].charAt(c) == '#') {
+					put(x + c - 3, y + 7 - r, z, "white_terracotta");
+				}
+			}
+		}
+		put(x + 1, y + 5, z, "pink_terracotta");            // gills
+		put(x + 1, y + 4, z, "pink_terracotta");
+	}
+
+	/** A_MOONSHELF: a dead trunk ringed with glowing shelf fungi. */
+	private void shelfFungus(int x, int y, int z) {
+		for (int h = 0; h < 12; h++) {
+			put(x, y + h, z, "dark_oak_log[axis=y]");
+		}
+		put(x, y + 12, z, "dark_oak_wood");
+		put(x + 1, y + 11, z, "dark_oak_wood");
+		// {height, direction x, direction z, radius}: a half-disc shelf sticking out of the trunk
+		int[][] shelves = {{3, 1, 0, 3}, {6, 0, -1, 3}, {8, -1, 0, 2}, {10, 0, 1, 2}};
+		for (int[] s : shelves) {
+			int h = s[0], ox = s[1], oz = s[2], rad = s[3];
+			for (int a = 1; a <= rad; a++) {
+				for (int b = -rad; b <= rad; b++) {
+					if (a * a + b * b <= rad * rad + 1) {
+						put(x + ox * a + oz * b, y + h, z + oz * a + ox * b, "brown_mushroom_block");
+					}
+				}
+			}
+			put(x + ox, y + h - 1, z + oz, "verdant_froglight");
+		}
+	}
+
+	/** A_MACHETE: a great machete driven point first into a jungle stump. */
+	private void machetePlanted(int x, int y, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y, z + dz, "jungle_wood");
+				if (dx == 0 || dz == 0) {
+					put(x + dx, y + 1, z + dz, "jungle_wood");
+				}
+			}
+		}
+		// the blade: spine on the west, edge on the east, widest just above the stump
+		for (int h = 1; h <= 8; h++) {
+			put(x - 1, y + h, z, "smooth_stone");
+			put(x, y + h, z, "polished_diorite");
+			if (h >= 2 && h <= 5) {
+				put(x + 1, y + h, z, "polished_diorite");
+			}
+		}
+		for (int dx = -2; dx <= 1; dx++) {
+			put(x + dx, y + 9, z, "polished_blackstone");    // guard
+		}
+		for (int h = 10; h <= 12; h++) {
+			put(x - 1, y + h, z, "stripped_mangrove_log[axis=y]");
+		}
+		put(x - 1, y + 13, z, "mangrove_wood");                // pommel
+		put(x + 1, y + 1, z + 1, "vine[north=true]");
+	}
 	// ---- new A set pieces (phase 2) end ----
 
 	// ================================================================ S landmarks
