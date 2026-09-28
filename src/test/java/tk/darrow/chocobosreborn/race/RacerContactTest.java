@@ -61,7 +61,8 @@ class RacerContactTest {
 		RacerContact.Push f = hit(front, rear);
 		assertEquals(RacerContact.Kind.FRONT, f.kind());
 		assertEquals(0.0D, f.loss(), 1e-12, "the front bird loses no pace");
-		assertTrue(f.dvz() > 0.0D && f.dvz() <= RacerContact.FRONT_NUDGE_MAX + 1e-12, "only a small nudge on: " + f);
+		// the nudge plus its share of the overlap push-out, both along its line
+		assertTrue(f.dvz() > 0.0D && f.dvz() <= RacerContact.FRONT_NUDGE_MAX + RacerContact.SEPARATION_MAX + 1e-12, "only a small nudge on: " + f);
 		assertEquals(0.0D, f.dvx(), 1e-12, "along its own line, not off it");
 	}
 

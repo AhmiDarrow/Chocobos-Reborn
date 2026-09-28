@@ -185,6 +185,11 @@ public final class RacerContact {
 				double j = Math.min(FRONT_NUDGE_MAX, FRONT_SHARE * (1.0D + RESTITUTION) * hit * share);
 				dvx += hx * j;
 				dvz += hz * j;
+				// and its share of the push-out, still along its own line: through a chicane the two
+				// headings part and the rear bird's push alone left them overlapping for several ticks
+				double out = sep * Math.max(0.0D, nx * hx + nz * hz);
+				dvx += hx * out;
+				dvz += hz * out;
 				if (kind == Kind.NONE) {
 					kind = Kind.FRONT;
 				}
