@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.0 - Full Grid
+Uploaded 2026-09-28: `chocobosreborn-1.1.0.jar` as file **8999472** ("Chocobos Reborn 1.1.0 - Full Grid",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.0.md`) via
+`tools/upload_curseforge.py`. Forty-eight courses (long one-lap sprints, short 3-5 lap grands prix), racers bump, points and purses by distance, rebuilt AI, cleaner courses, Flame and Purple do not race. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.0
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/8999472
+SHA-256: `def13932ebb9b678c6c90d61a431f95a26099f28f6585ade77a8e484c6c947a2`.
+
 ## 1.0.19 - Back on track
 Uploaded 2026-09-27: `chocobosreborn-1.0.19.jar` as file **8996621** ("Chocobos Reborn 1.0.19 - Back on track",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.19.md`) via
