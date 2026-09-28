@@ -152,18 +152,17 @@ Overworld (foot or saddle); owned awake birds within 16 blocks follow
 (`RaceManager.bringBirds`). Return gate, Esther on foot, or the pocketwatch send you
 home (birds follow again).
 
-Courses (`RaceTrack`, `TrackSpline`): six per class today (twelve once the 48-course plan's
-phase 2 lands; every count derives from the table: `ofClass`, `sprintsOf`, `grandsPrixOf`).
+Courses (`RaceTrack`, `TrackSpline`): twelve per class, six sprints and six grands prix (every count derives from the table: `ofClass`, `sprintsOf`, `grandsPrixOf`).
 Sprint or grand prix is the lap count alone (`isSprint` = 1 lap: 1 point and the base purse;
 `isGrandPrix` = 3-5 laps: 3 points, three times the purse). Sprints are one long lap
-(1150-1600 blocks, >= 120 s at 9 b/s, longer up the classes); grands prix are 3, 4 or 5
-laps of a shorter circuit (600-950 blocks, the most laps on the shortest lap, never under
+(1150-1620 blocks, >= 120 s at 9 b/s, longer up the classes); grands prix are 3, 4 or 5
+laps of a shorter circuit (600-1000 blocks, the most laps on the shortest lap, never under
 600). Since the swap, courses 0-2 of each class are grands prix (5 / 4 / 3 laps) and 3-5
-sprints. Kart style: a `Shape` template (straights, sweepers, hairpins, chicanes, hills) as a closed
+sprints; courses 6-8 are the new sprints and 9-11 the new grands prix (5 / 4 / 3). Kart style: a `Shape` template (straights, sweepers, hairpins, chicanes, hills) as a closed
 spline scaled to the lap length, dressed in a `Theme` (four per class: meadow /
 orchard / shore / farmland, canyon / river / snow / savanna, cavern / jungle / nether /
 mushroom, skyway / keep / end / deep dark; the fourth of each arrived with the 48-course
-plan and is raced from phase 2)
+plan)
 with striped corner kerbs, rails, a chequered start line and painted grid under the
 gantry, a yellow arrow just past it, warning posts before terrain, margins of themed
 decoration and an infield grandstand on the start straight where the crowd

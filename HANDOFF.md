@@ -1612,3 +1612,19 @@ solver output (a scratch designer that measures `detourCost` on the spline), not
 * Needs an in-game look: the spiral's descent into the heart (8 blocks over ~700 blocks of road, the
   features sit on short level terraces), the star fort's bastion-tip features (hairpin corners with a
   pool or ridge on the point), and the comet's floating head.
+
+### Phase 2 merged (2026-09-28)
+
+All four class branches merged into main (C, B, A, S); 48 courses, twelve a class (6 sprints,
+6 grands prix), every class on four themes. `twelveCoursesPerClass` is enabled and
+`everyClassHasAsManySprintsAsGrandsPrix` now demands 12 a class. README / store (html
+re-rendered) / SPEC say forty-eight; sprint laps 1150-1620, grand-prix laps 600-1000.
+`COURSE_VERSION` stays 11 (no existing course changed in phase 2; new islands build on first
+use). Gates: 224 unit tests (1 skipped, AtlasTint), all 28 GameTests, build green. Unreleased;
+it ships with the AI pass and the Flame/Purple racing ban as the next version.
+
+Open before release: an in-game look at the tight corners the class agents flagged (C Heart
+point and Horseshoe heels, A Ammonite inner coil and Grotto tail, S Abyssal Spiral terraces,
+Star Bastion tips, the floating comet head); S ladder: a maxed Gold driven well beats Teiyo by
+~8.4 % (test bound 9 %), 90-trained Black wins S; no new S course carries lava (only Gold would
+gain in S now that Flame does not race).

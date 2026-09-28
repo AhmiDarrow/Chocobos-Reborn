@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
@@ -134,14 +133,12 @@ class RaceTrackTest {
 	 */
 	@Test
 	void everyClassHasAsManySprintsAsGrandsPrix() {
-		// while the phase 2 class branches land one at a time a class has 6 or 12;
-		// twelveCoursesPerClass holds them all to 12 once every class is in
 		int total = 0;
 		for (RaceClass rc : RaceClass.values()) {
 			var tracks = RaceTrack.ofClass(rc);
 			int perClass = tracks.size();
 			total += perClass;
-			assertTrue(perClass == 6 || perClass == RaceTrack.MAX_COURSES_PER_CLASS, rc.name() + ": 6 (phase 1) or 12 (phase 2) courses: " + perClass);
+			assertEquals(RaceTrack.MAX_COURSES_PER_CLASS, perClass, rc.name() + " courses");
 			assertEquals(perClass / 2, RaceTrack.sprintsOf(rc).size(), rc.name() + " sprints");
 			assertEquals(perClass / 2, RaceTrack.grandsPrixOf(rc).size(), rc.name() + " grands prix");
 			for (int i = 0; i < tracks.size(); i++) {
@@ -178,7 +175,6 @@ class RaceTrackTest {
 	}
 
 	@Test
-	@Disabled("enable after phase 2: the 24 new courses (three sprints and three grands prix a class)")
 	void twelveCoursesPerClass() {
 		for (RaceClass rc : RaceClass.values()) {
 			assertEquals(12, RaceTrack.courseCount(rc), rc.name());
