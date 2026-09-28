@@ -106,6 +106,12 @@ public enum RaceTrack {
 	// ---- new A courses (phase 2) end ----
 
 	// ---- new S courses (phase 2) begin ----
+	S_ABYSS(RaceClass.S, 6, Theme.DEEP_DARK, Shape.NAUTILUS, 1620, 1, water(0.20, 0.27), ridge(0.34, 0.41), water(0.46, 0.51), mud(0.87, 0.92), boost(0.12), boost(0.30), boost(0.62), boost(0.71), boost(0.80)),
+	S_ZENITH(RaceClass.S, 7, Theme.END, Shape.COMET, 1600, 1, ridge(0.28, 0.35), water(0.40, 0.47), mud(0.56, 0.61), ridge(0.84, 0.90), boost(0.12), boost(0.20), boost(0.51), boost(0.66), boost(0.75)),
+	S_BASTION(RaceClass.S, 8, Theme.KEEP, Shape.STARFORT, 1580, 1, water(0.27, 0.30), ridge(0.47, 0.50), mud(0.57, 0.63), water(0.67, 0.70), boost(0.12), boost(0.33), boost(0.53), boost(0.73), boost(0.92)),
+	S_ORBIT(RaceClass.S, 9, Theme.SKYWAY, Shape.SATURN, 790, 5, water(0.10, 0.15), water(0.56, 0.61), mud(0.80, 0.83), boost(0.23), boost(0.47), boost(0.70)),
+	S_ECLIPSE(RaceClass.S, 10, Theme.SKYWAY, Shape.CRESCENT_MOON, 880, 4, ridge(0.13, 0.19), mud(0.45, 0.49), ridge(0.79, 0.85), boost(0.37), boost(0.56), boost(0.88)),
+	S_RIFT(RaceClass.S, 11, Theme.DEEP_DARK, Shape.FISSURE, 1000, 3, ridge(0.10, 0.16), water(0.49, 0.53), ridge(0.74, 0.78), mud(0.86, 0.90), boost(0.22), boost(0.37), boost(0.60)),
 	// ---- new S courses (phase 2) end ----
 	;
 
@@ -297,6 +303,18 @@ public enum RaceTrack {
 		// ---- new A shapes (phase 2) end ----
 
 		// ---- new S shapes (phase 2) begin ----
+		/** A nautilus shell: one coil spiralling down into a hairpin at the heart and back out between its own turns. */
+		NAUTILUS(p(0, 0, 8), p(30, 0, 8), p(60, 0, 8), p(90, 0, 8), p(120, 0, 8), p(211, 33, 8), p(270, 103, 7), p(285, 190, 6), p(256, 268, 5), p(194, 318, 4), p(120, 330, 3), p(54, 304, 2), p(13, 252, 1), p(5, 190, 0), p(28, 137, 0), p(61, 109, 0), p(106, 116, 0), p(91, 150, 0), p(67, 166, 0), p(54, 197, 1), p(59, 234, 2), p(86, 266, 3), p(130, 281, 4), p(179, 271, 5), p(219, 234, 6), p(236, 178, 7), p(221, 117, 8), p(174, 68, 8), p(120, 50, 8), p(40, 50, 8), p(0, 50, 8), p(-30, 50, 8), p(-55, 25, 8), p(-30, 0, 8)),
+		/** A comet: one huge round head and a long tail narrowing to a hairpin at its tip. */
+		COMET(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 0), p(170, 0, 1), p(230, 0, 2), p(300, 6, 4), p(355, 35, 6), p(392, 90, 8), p(390, 150, 9), p(355, 195, 9), p(300, 214, 8), p(240, 204, 7), p(170, 176, 5), p(100, 142, 3), p(30, 104, 1), p(-30, 70, 0), p(-70, 40, 0), p(-72, 12, 0), p(-30, 0, 0)),
+		/** A star fort: five arrowhead bastions jutting from straight curtain walls. */
+		STARFORT(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(107, 0, 0), p(142, -14, 1), p(177, -28, 2), p(175, 10, 2), p(172, 48, 2), p(184, 82, 3), p(195, 117, 3), p(206, 152, 4), p(218, 187, 4), p(242, 216, 5), p(266, 246, 5), p(230, 255, 5), p(193, 264, 5), p(163, 286, 5), p(133, 307, 6), p(104, 329, 6), p(74, 351, 6), p(54, 383, 7), p(33, 415, 7), p(13, 383, 7), p(-7, 351, 6), p(-37, 329, 6), p(-66, 307, 5), p(-96, 286, 5), p(-126, 264, 4), p(-163, 255, 4), p(-200, 246, 4), p(-175, 216, 3), p(-151, 187, 3), p(-139, 152, 2), p(-128, 117, 2), p(-117, 82, 1), p(-105, 48, 1), p(-108, 10, 1), p(-111, -28, 1), p(-75, -14, 0), p(-30, 0, 0)),
+		/** A ringed planet: a round body with its ring poking out either side as two long hairpin fingers. */
+		SATURN(p(0, 0, 2), p(30, 0, 2), p(60, 0, 2), p(100, 0, 2), p(140, 0, 2), p(175, -30, 1), p(204, -60, 0), p(250, -72, 0), p(296, -60, 0), p(325, -30, 1), p(360, 0, 2), p(400, 0, 2), p(440, 0, 2), p(480, 5, 2), p(505, 38, 2), p(480, 71, 2), p(440, 76, 2), p(400, 76, 2), p(360, 76, 2), p(330, 106, 3), p(300, 138, 5), p(250, 150, 6), p(200, 138, 5), p(170, 106, 3), p(140, 76, 2), p(100, 76, 2), p(60, 76, 2), p(20, 76, 2), p(-20, 71, 2), p(-45, 38, 2), p(-30, 0, 2)),
+		/** A crescent moon: a fat outer arc, a concave inner one and two blunt horns. */
+		CRESCENT_MOON(p(0, 0, 2), p(30, 0, 2), p(60, 0, 2), p(90, 0, 2), p(151, 18, 3), p(176, 34, 3), p(198, 54, 4), p(216, 77, 4), p(230, 103, 5), p(240, 132, 5), p(243, 149, 5), p(218, 178, 5), p(185, 144, 4), p(165, 123, 3), p(141, 107, 2), p(114, 95, 1), p(85, 90, 0), p(55, 91, 0), p(27, 98, 1), p(1, 110, 2), p(-23, 128, 3), p(-64, 180, 4), p(-95, 149, 4), p(-89, 120, 4), p(-78, 93, 3), p(-62, 67, 3), p(-45, 38, 2), p(-38, 14, 2), p(-30, 0, 2)),
+		/** A block of ground split by a jagged fissure that zigzags down into it and back out. */
+		FISSURE(p(0, 0, 8), p(30, 0, 8), p(60, 0, 8), p(100, 0, 8), p(140, 0, 8), p(185, 6, 8), p(222, 30, 8), p(242, 70, 8), p(246, 120, 8), p(238, 170, 8), p(212, 205, 8), p(180, 214, 8), p(170, 190, 7), p(188, 150, 5), p(156, 110, 3), p(172, 72, 1), p(138, 48, 0), p(104, 64, 1), p(106, 108, 3), p(88, 148, 5), p(100, 190, 7), p(84, 214, 8), p(50, 220, 8), p(15, 210, 8), p(-12, 185, 8), p(-24, 140, 8), p(-26, 90, 8), p(-30, 40, 8), p(-30, 0, 8)),
 		// ---- new S shapes (phase 2) end ----
 		;
 

@@ -1573,3 +1573,42 @@ Six new class A courses (indices 6-11), two on the new MUSHROOM theme. Every sil
 Colours: ridge-heavy (AMMONITE), lava-heavy (FORGE), water-heavy (GROTTO), mixed on the rest. Grand prix laps: 5 laps 760 <= 4 laps 800 <= 3 laps 950, all under the 1420 shortest sprint; heats 2.0-2.7x.
 
 Outside the markers: `build.gradle` test `maxHeapSize = '2g'` (the 30+ course tests ran out of the default heap; the same change as class B); `RaceTrackTest.everyClassHasAsManySprintsAsGrandsPrix` takes 6 or 12 courses per class while the classes merge one at a time. `RaceSimTest` untouched: the A ladder holds (field from 50 training, Teiyo from 75; A field best 67.7 -> 70.1 on the sim's scale).
+
+### Phase 2: class S courses
+
+Six new S courses (indices 6-11), built to the "How to add a course" recipe. Every one has four
+terrain features on a sprint or three on a grand prix, always with a bog. The detour costs are
+solver output (a scratch designer that measures `detourCost` on the spline), not guesses.
+
+| id | name | theme | shape | lap x laps | features (detour / target, blocks) | landmark |
+| --- | --- | --- | --- | --- | --- | --- |
+| S_ABYSS (6) | Abyssal Spiral | DEEP_DARK | NAUTILUS: one coil spiralling in and down 8 blocks to a hairpin at the heart, then back out between its own turns | 1620 x 1 | water 19, ridge 22, water 25 (the pool at the heart), bog 11 / 28; 5 boosts | warden frame (the DEEP_DARK theme piece; first course on the theme) |
+| S_ZENITH (7) | Zenith Comet | END | COMET: a long straight tail into a huge round head climbing 9 blocks, a hairpin at the tail tip | 1600 x 1 | ridge 17, water 19 (on the head), bog 9, ridge 28 (tail hairpin) / 28; 5 boosts | comet: a glowstone head floating 11 up, trailing a white and light-blue glass tail down to the plinth |
+| S_BASTION (8) | Star Bastion | KEEP | STARFORT: five arrowhead bastions on straight curtain walls, climbing to 7 at the top bastion | 1580 x 1 | water 28, ridge 28, bog 9 (on a curtain), water 28, all on bastion tips / 28; 5 boosts | belfry: a blackstone tower, a bell hung in its open top, a spire and a soul lantern |
+| S_ORBIT (9) | Ringed Orbit | SKYWAY | SATURN: a round planet with its ring poking out either side as two hairpin fingers | 790 x 5 | water 16, water 17 (on the planet's arcs), bog 12.5 (on a ring) / 16; 3 boosts | ringed planet: gold and orange bands on end rods, a tilted ring of light-grey glass |
+| S_ECLIPSE (10) | Eclipse Crescent | SKYWAY | CRESCENT_MOON: a fat outer arc, a concave inner one and two blunt horns | 880 x 4 | ridge 17.5, bog 8 (in the hollow of the moon), ridge 14 / 17.6; 3 boosts | eclipse: a black disc with an ochre-froglight corona on a quartz column |
+| S_RIFT (11) | Sculk Rift | DEEP_DARK | FISSURE: a block of ground split by a jagged crack that zigzags 8 blocks down and back out | 1000 x 3 | ridge 20, water 20 (flooded bottom of the crack), ridge 20, bog 10 / 20; 3 boosts | rift shards: two deepslate shards leaning apart over sculk, a shrieker (cannot summon) and candles between them |
+
+* **Which colours they favour**: ABYSS, BASTION and ORBIT lean Blue (two waters), ZENITH, ECLIPSE and
+  RIFT lean climbers (two ridges). **No lava on the new S courses**, on purpose: Flame does not race,
+  so in S a lava feature pays only Gold (and Gold Jolo). With lava on three of them (the first draft:
+  the comet head, a bastion tip, the bottom of the rift) the maxed-Gold-vs-Teiyo margin went to 8.7 %,
+  against the 9 % bound. The KEEP lava stays on S_KEEP / S_CITADEL.
+* **The S ladder** (`RaceSimTest`, mean heat over the class's courses; six courses before, twelve after):
+  field average 61.1 -> 61.2 s, field best (Black, +2.5 % form) 54.9 -> 54.5 s; half-trained Black
+  75.4 -> 75.6 s (still loses); 90-trained Black 51.6 -> 51.1 s (still wins the field, by 6.2 %, was 6.0 %);
+  maxed Black 48.6 -> 47.8 s and Teiyo against it 50.7 -> 50.2 s (the Black beats Teiyo by 4.8 %, was
+  4.3 %); maxed Black cruising 75.7 -> 75.3 s (still loses); Jolo 3.5 % -> 4.3 % behind Teiyo; maxed Gold
+  36.3 -> 35.7 s, Teiyo 8.2 % -> 8.4 % behind it (bound 9 %). Every ladder line holds; no expectation
+  moved, nothing in the AI retuned. Sprints are where a well-driven bird gains most on Teiyo (the Black
+  beats him by 7-12 % on the three new sprints, 3-4 % on the new grands prix).
+* The SKYWAY road is rainbow concrete in 4-block stripes counted from t = 0, and the start arrow is
+  yellow: on a SKYWAY sprint of 1500-1700 blocks the arrow always lands on or next to the yellow stripe
+  (S_STARFALL already does; `startArrowIsABlockArrowOnEveryCourse` caught the comet at 1600). So the
+  comet is an END course and the two SKYWAY courses are the short-lap grands prix.
+* Outside the class markers: `build.gradle` test task `maxHeapSize = '2g'` (48 courses of layouts
+  overflow the default heap) and `RaceTrackTest.everyClassHasAsManySprintsAsGrandsPrix` lets each class
+  have 6 or 12 courses while the classes merge one at a time (same change as the B and C agents).
+* Needs an in-game look: the spiral's descent into the heart (8 blocks over ~700 blocks of road, the
+  features sit on short level terraces), the star fort's bastion-tip features (hairpin corners with a
+  pool or ridge on the point), and the comet's floating head.

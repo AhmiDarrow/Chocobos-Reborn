@@ -77,6 +77,12 @@ class CourseIdentityTest {
 			case S_CITADEL -> List.of("red_wool", "chiseled_polished_blackstone");       // gatehouse
 			case S_MAELSTROM -> List.of("iron_bars", "magenta_stained_glass");           // caged crystal
 			// ---- new S signatures (phase 2) begin ----
+			case S_ABYSS -> List.of("reinforced_deepslate", "sculk_catalyst");          // warden frame (DEEP_DARK)
+			case S_ZENITH -> List.of("glowstone", "white_stained_glass");               // comet
+			case S_BASTION -> List.of("bell[attachment=ceiling]", "cracked_polished_blackstone_bricks");  // belfry
+			case S_ORBIT -> List.of("orange_concrete", "light_gray_stained_glass");     // ringed planet
+			case S_ECLIPSE -> List.of("black_concrete", "ochre_froglight");             // eclipse
+			case S_RIFT -> List.of("sculk_shrieker", "cracked_deepslate_bricks");       // rift shards
 			// ---- new S signatures (phase 2) end ----
 		};
 	}

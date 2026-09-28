@@ -1938,6 +1938,12 @@ public final class RaceCourseLayout {
 			case S_CITADEL -> onPlinth(t, surf, this::gatehouse);
 			case S_MAELSTROM -> onPlinth(t, surf, this::crystalCage);
 			// ---- new S landmarks (phase 2) begin ----
+			// S_ABYSS is the first course on DEEP_DARK: the theme's warden frame (default)
+			case S_ZENITH -> onPlinth(t, surf, this::comet);
+			case S_BASTION -> onPlinth(t, surf, this::belfry);
+			case S_ORBIT -> onPlinth(t, surf, this::ringedPlanet);
+			case S_ECLIPSE -> onPlinth(t, surf, this::eclipse);
+			case S_RIFT -> onPlinth(t, surf, this::riftShards);
 			// ---- new S landmarks (phase 2) end ----
 			default -> onPlinth(t, surf, this::themeLandmark);
 		}
@@ -2045,6 +2051,125 @@ public final class RaceCourseLayout {
 	}
 
 	// ---- new S set pieces (phase 2): private methods, begin ----
+	/** S_ZENITH: a comet standing on its tail, a glowstone head streaming glass back down to the plinth. */
+	private void comet(int x, int y, int z) {
+		int hx = x + 2, hy = y + 11, hz = z - 2;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (Math.abs(dx) + Math.abs(dy) + Math.abs(dz) < 3) {
+						put(hx + dx, hy + dy, hz + dz, "glowstone");
+					}
+				}
+			}
+		}
+		// the tail: white at its core, a blue fringe that thins out toward the plinth
+		for (int k = 1; k <= 10; k++) {
+			int tx = hx - k * 4 / 10, ty = hy - 1 - k, tz = hz + k * 4 / 10;
+			if (k < 8) {
+				put(tx - 1, ty + 1, tz, "light_blue_stained_glass");
+				put(tx, ty + 1, tz + 1, "light_blue_stained_glass");
+			}
+			put(tx, ty, tz, "white_stained_glass");
+		}
+		put(hx + 1, hy + 1, hz - 1, "end_rod");
+	}
+
+	/** S_BASTION: a belfry on the bastion, a bell hung in the open top under a spire. */
+	private void belfry(int x, int y, int z) {
+		for (int h = 0; h < 12; h++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					// a solid shaft, then four corner posts round the open belfry
+					if (h < 8 || (Math.abs(dx) == 1 && Math.abs(dz) == 1)) {
+						put(x + dx, y + h, z + dz, h % 4 == 3 ? "cracked_polished_blackstone_bricks" : "polished_blackstone_bricks");
+					}
+				}
+			}
+		}
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y + 12, z + dz, "polished_blackstone_bricks");
+			}
+		}
+		put(x, y + 11, z, "bell[attachment=ceiling]");
+		put(x, y + 13, z, "polished_blackstone_brick_wall");
+		put(x, y + 14, z, "polished_blackstone_brick_wall");
+		put(x, y + 15, z, "soul_lantern[hanging=false]");
+		// buttresses at the foot
+		for (int s = -2; s <= 2; s += 4) {
+			put(x + s, y, z, "chiseled_polished_blackstone");
+			put(x, y, z + s, "chiseled_polished_blackstone");
+		}
+	}
+
+	/** S_ORBIT: a ringed planet floating on end rods, banded gold and orange, its tilted ring of pale glass. */
+	private void ringedPlanet(int x, int y, int z) {
+		for (int h = 0; h < 6; h++) {
+			put(x, y + h, z, "end_rod");
+		}
+		int cy = y + 9;
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dy = -2; dy <= 2; dy++) {
+				for (int dz = -2; dz <= 2; dz++) {
+					if (dx * dx + dy * dy + dz * dz <= 5) {
+						put(x + dx, cy + dy, z + dz, dy == 0 ? "orange_concrete" : Math.abs(dy) == 1 ? "yellow_concrete" : "white_concrete");
+					}
+				}
+			}
+		}
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dz = -3; dz <= 3; dz++) {
+				double r = Math.hypot(dx, dz);
+				if (r > 2.5D && r <= 3.5D) {
+					put(x + dx, cy + (int) Math.round(dx * 0.35D), z + dz, "light_gray_stained_glass");
+				}
+			}
+		}
+	}
+
+	/** S_ECLIPSE: an eclipse on a quartz column, a black moon ringed by a burning corona. */
+	private void eclipse(int x, int y, int z) {
+		for (int h = 0; h < 5; h++) {
+			put(x, y + h, z, "quartz_pillar");
+		}
+		int cy = y + 8;
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dy = -3; dy <= 3; dy++) {
+				double d = Math.hypot(dx, dy);
+				if (d <= 2.3D) {
+					put(x + dx, cy + dy, z, "black_concrete");
+				} else if (d <= 3.4D) {
+					put(x + dx, cy + dy, z, "ochre_froglight");
+				}
+			}
+		}
+		put(x, cy + 4, z, "end_rod");
+	}
+
+	/** S_RIFT: two deepslate shards leaning apart over a crack of sculk, a shrieker in the gap. */
+	private void riftShards(int x, int y, int z) {
+		for (int h = 0; h < 12; h++) {
+			int lean = h / 4;
+			String b = h % 3 == 2 ? "cracked_deepslate_bricks" : "deepslate_bricks";
+			put(x - 1 - lean, y + h, z, b);
+			if (h < 8) {
+				put(x - 1 - lean, y + h, z + 1, b);
+			}
+			if (h < 9) {
+				put(x + 1 + lean, y + h, z - 1, b);
+				if (h < 5) {
+					put(x + 1 + lean, y + h, z, b);
+				}
+			}
+		}
+		put(x, y - 1, z, "sculk");
+		put(x, y - 1, z + 1, "sculk");
+		put(x, y - 1, z - 1, "sculk");
+		put(x, y, z, "sculk_shrieker");
+		put(x, y, z + 2, "black_candle[candles=3,lit=true]");
+		put(x, y, z - 2, "black_candle[candles=2,lit=true]");
+	}
 	// ---- new S set pieces (phase 2) end ----
 
 	/** S_STARFALL: a ring hung over the road where the skyway sprint has its arch. */
