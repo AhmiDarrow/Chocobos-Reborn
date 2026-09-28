@@ -50,6 +50,12 @@ class CourseIdentityTest {
 			case A_TEMPLE -> List.of("chiseled_stone_bricks", "moss_block");  // idol
 			case A_INFERNO -> List.of("bone_block[axis=y]", "soul_fire");     // bone arch
 			// ---- new A signatures (phase 2) begin ----
+			case A_TOADSTOOL -> List.of("red_mushroom_block", "ochre_froglight");               // giant mushroom
+			case A_AMMONITE -> List.of("calcite", "bone_block[axis=z]");                       // fossil coil
+			case A_FORGE -> List.of("iron_block", "magma_block");                             // anvil on a hearth
+			case A_GROTTO -> List.of("white_terracotta", "pink_terracotta");                  // blind cave fish
+			case A_MOONSHELF -> List.of("brown_mushroom_block", "verdant_froglight");         // shelf fungus
+			case A_MACHETE -> List.of("polished_diorite", "stripped_mangrove_log[axis=y]");   // planted machete
 			// ---- new A signatures (phase 2) end ----
 			// ---- S
 			case S_SKYWAY -> List.of("magenta_stained_glass");

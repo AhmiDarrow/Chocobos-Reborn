@@ -1487,3 +1487,20 @@ use; nothing existing changes).
   `custom_chocobo_kweh*`) stay deleted.
 * Beak orange, plumage tint only via `isPlumage`; white vcol × atlas, no double tint.
 * Do not remesh / re-bake / repaint the Meshy bird; do not touch the eyes unasked.
+
+### Phase 2: class A courses
+
+Six new class A courses (indices 6-11), two on the new MUSHROOM theme. Every silhouette is new, every set piece is new except A_TOADSTOOL's, and every colour detour sits inside 0.55-1.3x the course target with the bog the cheapest way round. Detour costs in blocks are given against each course's target.
+
+| id | name | theme | shape | lap x laps | features (detour cost / target) | landmark |
+| --- | --- | --- | --- | --- | --- | --- |
+| A_TOADSTOOL | Toadstool Rise | MUSHROOM | TOADSTOOL (bulb foot, stem climb, domed cap) | 1480 x 1 | ridge 0.29-0.33 (23/28), bog 0.47-0.51 (11), water 0.66-0.70 (26); 5 boosts | giant mushroom (the theme piece) |
+| A_AMMONITE | Ammonite Coil | CAVERN | AMMONITE (one coil into a hairpin at its heart and back out) | 1440 x 1 | ridge 0.36-0.41 (19/28), ridge 0.49-0.52 (26), bog 0.83-0.86 (7); 5 boosts | fossil coil: bone in an upright calcite slab |
+| A_FORGE | Anvil Forge | NETHER | ANVILHORN (foot, waist, face, long horn) | 1500 x 1 | lava 0.30-0.33 (21/28), bog 0.46-0.49 (8), lava 0.64-0.67 (24); 5 boosts | iron anvil over a magma hearth |
+| A_GROTTO | Blindfish Grotto | CAVERN | BLINDFISH (head, tail stock, two tail lobes) | 760 x 5 | bog 0.15-0.18 (14/15), water 0.38-0.41 (17), water 0.66-0.69 (15); 3 boosts | eyeless cave fish on a basalt stalk |
+| A_MOONSHELF | Moonshelf Hollow | MUSHROOM | SHELFCAP (outer arc, deep concave inner arc, two horns) | 800 x 4 | ridge 0.18-0.22 (18/16), lava 0.34-0.38 (17), bog 0.58-0.63 (8); 3 boosts | dead trunk ringed with glowing shelf fungi |
+| A_MACHETE | Machete Cut | JUNGLE | MACHETE (edge, point, spine, handle, pommel) | 950 x 3 | ridge 0.19-0.22 (16/19), bog 0.44-0.47 (11), water 0.64-0.67 (19); 3 boosts | machete driven into a jungle stump |
+
+Colours: ridge-heavy (AMMONITE), lava-heavy (FORGE), water-heavy (GROTTO), mixed on the rest. Grand prix laps: 5 laps 760 <= 4 laps 800 <= 3 laps 950, all under the 1420 shortest sprint; heats 2.0-2.7x.
+
+Outside the markers: `build.gradle` test `maxHeapSize = '2g'` (the 30+ course tests ran out of the default heap; the same change as class B); `RaceTrackTest.everyClassHasAsManySprintsAsGrandsPrix` takes 6 or 12 courses per class while the classes merge one at a time. `RaceSimTest` untouched: the A ladder holds (field from 50 training, Teiyo from 75; A field best 67.7 -> 70.1 on the sim's scale).

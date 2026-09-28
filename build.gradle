@@ -94,6 +94,7 @@ dependencies {
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    maxHeapSize = '2g'
     testLogging {
         events 'passed', 'skipped', 'failed'
     }

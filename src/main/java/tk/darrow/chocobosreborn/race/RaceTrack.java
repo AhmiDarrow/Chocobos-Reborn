@@ -82,6 +82,12 @@ public enum RaceTrack {
 	// ---- new B courses (phase 2) end ----
 
 	// ---- new A courses (phase 2) begin ----
+	A_TOADSTOOL(RaceClass.A, 6, Theme.MUSHROOM, Shape.TOADSTOOL, 1480, 1, ridge(0.29, 0.33), mud(0.47, 0.51), water(0.66, 0.70), boost(0.11), boost(0.22), boost(0.36), boost(0.73), boost(0.86)),
+	A_AMMONITE(RaceClass.A, 7, Theme.CAVERN, Shape.AMMONITE, 1440, 1, ridge(0.36, 0.41), ridge(0.49, 0.52), mud(0.83, 0.86), boost(0.10), boost(0.22), boost(0.30), boost(0.55), boost(0.72)),
+	A_FORGE(RaceClass.A, 8, Theme.NETHER, Shape.ANVILHORN, 1500, 1, lava(0.30, 0.33), mud(0.46, 0.49), lava(0.64, 0.67), boost(0.14), boost(0.25), boost(0.37), boost(0.70), boost(0.86)),
+	A_GROTTO(RaceClass.A, 9, Theme.CAVERN, Shape.BLINDFISH, 760, 5, mud(0.15, 0.18), water(0.38, 0.41), water(0.66, 0.69), boost(0.30), boost(0.53), boost(0.93)),
+	A_MOONSHELF(RaceClass.A, 10, Theme.MUSHROOM, Shape.SHELFCAP, 800, 4, ridge(0.18, 0.22), lava(0.34, 0.38), mud(0.58, 0.63), boost(0.53), boost(0.77), boost(0.92)),
+	A_MACHETE(RaceClass.A, 11, Theme.JUNGLE, Shape.MACHETE, 950, 3, ridge(0.19, 0.22), mud(0.44, 0.47), water(0.64, 0.67), boost(0.27), boost(0.53), boost(0.76)),
 	// ---- new A courses (phase 2) end ----
 
 	// ---- new S courses (phase 2) begin ----
@@ -237,6 +243,18 @@ public enum RaceTrack {
 		// ---- new B shapes (phase 2) end ----
 
 		// ---- new A shapes (phase 2) begin ----
+		/** A toadstool: a bulb foot, a narrow stem climbing to a great domed cap, and down the far rim. */
+		TOADSTOOL(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(96, 4, 0), p(118, 24, 1), p(112, 50, 2), p(90, 70, 3), p(84, 100, 4), p(92, 126, 5), p(130, 134, 6), p(176, 136, 6), p(210, 152, 6), p(218, 184, 5), p(196, 218, 4), p(150, 244, 3), p(90, 256, 2), p(30, 252, 1), p(-26, 232, 1), p(-70, 204, 0), p(-90, 172, 0), p(-78, 146, 0), p(-40, 136, 0), p(-4, 132, 0), p(12, 110, 0), p(10, 80, 0), p(-6, 56, 0), p(-34, 36, 0), p(-48, 14, 0), p(-30, 0, 0)),
+		/** An ammonite: one long coil winding into a hairpin at its heart and back out alongside itself. */
+		AMMONITE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(130, 0, 0), p(180, 12, 1), p(225, 35, 2), p(286, 110, 4), p(300, 200, 5), p(269, 280, 6), p(205, 330, 6), p(130, 340, 6), p(65, 313, 5), p(26, 260, 4), p(20, 200, 2), p(43, 150, 0), p(68, 126, 0), p(102, 140, 0), p(94, 176, 0), p(80, 204, 0), p(80, 232, 0), p(95, 261, 0), p(130, 280, 0), p(175, 278, 0), p(217, 250, 0), p(240, 200, 0), p(234, 140, 0), p(195, 87, 0), p(165, 70, 0), p(130, 60, 0), p(100, 60, 0), p(70, 60, 0), p(40, 60, 0), p(10, 60, 0), p(-20, 60, 0), p(-67, 30, 0), p(-30, 0, 0)),
+		/** An anvil: a broad foot, a pinched waist, a flat face and a long tapering horn. */
+		ANVILHORN(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 0), p(150, 0, 0), p(176, 8, 0), p(184, 30, 1), p(166, 46, 2), p(126, 52, 3), p(108, 70, 4), p(106, 100, 5), p(120, 122, 6), p(170, 128, 6), p(214, 134, 6), p(234, 156, 5), p(226, 182, 4), p(190, 194, 3), p(120, 196, 2), p(40, 196, 1), p(-30, 196, 0), p(-90, 190, 0), p(-150, 176, 0), p(-178, 160, 0), p(-160, 142, 0), p(-110, 132, 0), p(-50, 122, 0), p(-6, 110, 0), p(0, 80, 0), p(-10, 56, 0), p(-46, 48, 0), p(-66, 34, 0), p(-66, 12, 0), p(-50, 0, 0), p(-30, 0, 0)),
+		/** A cave fish: a round head and belly, a narrow tail stock and two fat tail lobes either side of a notch. */
+		BLINDFISH(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 6, 0), p(136, 30, 1), p(162, 10, 2), p(192, -16, 2), p(226, -14, 2), p(240, 14, 2), p(224, 40, 2), p(196, 62, 2), p(224, 86, 3), p(240, 114, 3), p(226, 142, 3), p(192, 144, 3), p(162, 118, 3), p(136, 94, 3), p(100, 112, 2), p(60, 120, 1), p(20, 118, 0), p(-20, 104, 0), p(-50, 78, 0), p(-58, 46, 0), p(-46, 16, 0), p(-30, 0, 0)),
+		/** A shelf fungus in profile: one great outer arc, a deep concave inner arc and a horn at each end. */
+		SHELFCAP(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 6, 1), p(136, 28, 2), p(160, 64, 3), p(168, 104, 3), p(156, 146, 2), p(124, 180, 1), p(80, 198, 0), p(36, 198, 0), p(2, 184, 0), p(-4, 160, 0), p(22, 148, 0), p(62, 140, 0), p(92, 118, 0), p(102, 92, 0), p(94, 66, 0), p(70, 50, 0), p(36, 48, 0), p(0, 50, 0), p(-34, 42, 0), p(-50, 20, 0), p(-30, 0, 0)),
+		/** A machete: a long straight edge sweeping up to the point, a flat spine and a narrow handle with a pommel. */
+		MACHETE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(120, 0, 0), p(170, 4, 1), p(214, 20, 2), p(244, 50, 3), p(258, 86, 3), p(240, 104, 3), p(200, 104, 3), p(140, 104, 2), p(80, 104, 2), p(20, 104, 1), p(-30, 106, 1), p(-60, 100, 0), p(-120, 100, 0), p(-170, 100, 0), p(-196, 112, 0), p(-216, 98, 0), p(-216, 58, 0), p(-196, 42, 0), p(-150, 46, 0), p(-100, 48, 0), p(-60, 48, 0), p(-40, 38, 0), p(-36, 18, 0), p(-30, 0, 0)),
 		// ---- new A shapes (phase 2) end ----
 
 		// ---- new S shapes (phase 2) begin ----
