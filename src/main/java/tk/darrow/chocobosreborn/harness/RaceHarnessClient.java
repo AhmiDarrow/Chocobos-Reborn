@@ -169,14 +169,16 @@ public final class RaceHarnessClient {
         RacePoint target = track.pointAtLane(aimT, lane);
         event.getEntity().setYRot((float) Math.toDegrees(Math.atan2(-(target.x() - bird.getX()), target.z() - bird.getZ())));
         event.getEntity().setXRot(0);
-        // brake for a detour connector as the AI does (RacerLine#connectorPace): off the throttle
-        // while faster than it can be crossed in RacerLine.CONNECTOR_TICKS
+        // brake for the swing into a detour as the AI does (RacerLine#connectorSpeed). Part
+        // throttle, not none: a bird off the throttle has no grip to turn with and ran straight
+        // on (A_MACHETE's bog rejoin, all three bots out past the rail).
         double connector = track.connectorAhead(progress, colour, true, RacerLine.CONNECTOR_BRAKE_LEAD);
-        boolean braking = !Double.isNaN(connector) && speed > connector / RacerLine.CONNECTOR_TICKS;
+        double cap = Double.isNaN(connector) ? Double.POSITIVE_INFINITY : RacerLine.connectorSpeed(connector);
+        boolean braking = speed > cap;
         var input = event.getInput();
-        input.forwardImpulse = braking ? 0 : 1;
+        input.forwardImpulse = braking ? (float) Math.max(0.3D, cap / speed) : 1;
         input.leftImpulse = 0;
-        input.up = !braking;
+        input.up = true;
         input.down = input.left = input.right = input.jumping = input.shiftKeyDown = false;
         input.jumping = jump;
         mc.options.keySprint.setDown(!braking && ticks % 400 < 240);

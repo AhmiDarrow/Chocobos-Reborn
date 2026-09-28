@@ -1,5 +1,6 @@
 package tk.darrow.chocobosreborn.race;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -166,6 +167,165 @@ class CourseClearanceTest {
 				for (int by = floor(y); by <= floor(y + ChocoboEntity.ADULT_H); by++) {
 					String block = layout.blocks().get(new RaceCourseLayout.Cell(bx, by, bz));
 					assertTrue(!solid(block), "B_FORD still has " + block + " at " + bx + " " + by + " " + bz);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Every solid cell in a detour's mouths, where a bird drifting wide goes: the whole apron of
+	 * an opening's connectors (from the band's kerb out to the detour's outer edge, fork and
+	 * rejoin alike), and the rejoin's flare ({@link RaceTrack#flareLane}) out to the road's edge
+	 * inside the flared rail. The feature's own blocks (the ridge, the pool's rim beside the
+	 * pool) are the feature, not an intrusion; anything else at body height is a wall a rider
+	 * drifting wide meets.
+	 */
+	static List<String> mouthIntrusions(RaceTrack track, RaceCourseLayout layout) {
+		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
+		Set<RaceCourseLayout.Cell> surface = layout.surfaceCells();
+		Map<RaceCourseLayout.Cell, String> hits = new LinkedHashMap<>();
+		double lap = track.lapLength();
+		int steps = (int) Math.ceil(lap * 2.0D);
+		for (int i = 0; i < steps; i++) {
+			double t = i / (double) steps;
+			double outer;
+			String where;
+			if (track.inOpening(t) && track.inOpening(t - 1.0D / lap) && track.terrainAt(t) == null) {
+				// from a block into the fork (the band's rail runs right up to it)
+				outer = -RaceTrack.DETOUR_OUTER + BODY;
+				where = "mouth";
+			} else if (!Double.isNaN(track.flareLane(t))) {
+				outer = track.flareLane(t) + 1.0D + BODY;
+				where = "flare";
+			} else {
+				continue;
+			}
+			int s = surf(track, t);
+			for (double o = -REACH; o >= outer - 1.0E-9D; o -= 0.125D) {
+				RacePoint q = track.pointAtLane(t, o);
+				int x = floor(q.x()), z = floor(q.z());
+				for (int y = s + 1; y < s + 1 + HEIGHT; y++) {
+					RaceCourseLayout.Cell c = new RaceCourseLayout.Cell(x, y, z);
+					String block = plan.get(c);
+					if (!solid(block) || surface.contains(c) || hits.containsKey(c) || ownFeature(track, layout, c)) {
+						continue;
+					}
+					hits.put(c, String.format("%s t=%.4f %s lane=%+.3f %d %d %d (surf %d) %s", track.name(), t, where, o, x, y, z, s, block));
+				}
+			}
+		}
+		return new ArrayList<>(hits.values());
+	}
+
+	/** A pool's rim: a wall block beside the pool's own water (the feature, not something in its mouth). */
+	private static boolean ownFeature(RaceTrack track, RaceCourseLayout layout, RaceCourseLayout.Cell c) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				for (int dy = -2; dy <= 0; dy++) {
+					if (liquid(layout.blocks().get(new RaceCourseLayout.Cell(c.x() + dx, c.y() + dy, c.z() + dz)))) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The harness bots on A_MACHETE (all three, four times each) came out of the bog's rejoin wide,
+	 * at lane -7.1, just as the band's rail started square at the kerb: they ran along its far side
+	 * into a flag post at 0.5544 and sat there. Past every rejoin the rail now flares back from the
+	 * detour's rail to the kerb over {@link RaceTrack#REJOIN_FLARE} blocks, with road inside it,
+	 * and no flag, lamp, post or set piece stands in a detour's mouths.
+	 */
+	@Test
+	void aDetoursMouthsAreOpenRoad() {
+		List<String> all = new ArrayList<>();
+		for (RaceTrack track : RaceTrack.values()) {
+			if (track.terrainFeatures().isEmpty()) {
+				continue;
+			}
+			List<String> hits = mouthIntrusions(track, RaceCourseLayout.of(track));
+			if (!hits.isEmpty()) {
+				System.out.println(track.name() + ": " + hits.size() + " solid cells in a detour's mouths");
+				hits.stream().limit(20).forEach(h -> System.out.println("  " + h));
+			}
+			all.addAll(hits);
+		}
+		System.out.println("MOUTH total intrusions: " + all.size());
+		assertTrue(all.isEmpty(), all.size() + " solid cells in a detour's mouths; first: " + (all.isEmpty() ? "" : all.get(0)));
+		// A_MACHETE: where the bots came out of the bog's connector (lane -7.1 at its end, and on
+		// for three blocks) is road inside the flare now, and the flag post they sat against is gone
+		RaceTrack machete = RaceTrack.A_MACHETE;
+		RaceCourseLayout layout = RaceCourseLayout.of(machete);
+		RaceTrack.Feature bog = machete.terrainFeatures().get(1);
+		double end = bog.end() + RaceTrack.DETOUR_CONNECT, lap = machete.lapLength();
+		for (double d = 0.25D; d <= 3.0D; d += 0.25D) {
+			double t = end + d / lap;
+			assertTrue(machete.inDetourOpening(t, -7.1D), "A_MACHETE lane -7.1 " + d + " blocks past the bog's rejoin is open road");
+			RacePoint p = machete.pointAtLane(t, -7.1D);
+			assertTrue(layout.onCourse(p.x(), p.z()), "and on the road " + d + " blocks past");
+		}
+		// the flag post (two logs and a banner) has given way to the end of the flare's rail
+		assertEquals(machete.theme().rail, layout.blocks().get(new RaceCourseLayout.Cell(4443, 68, 2541)));
+		assertTrue(!solid(layout.blocks().get(new RaceCourseLayout.Cell(4443, 69, 2541))), "the flag post at 4443 69 2541");
+	}
+
+	/** Past every rejoin the flare's rail stands, unbroken, from the detour's rail to the kerb. */
+	@Test
+	void everyRejoinFlaresItsRailBackToTheKerb() {
+		for (RaceTrack track : RaceTrack.values()) {
+			if (track.terrainFeatures().isEmpty() || track.theme().rail.equals("air")) {
+				continue;
+			}
+			RaceCourseLayout layout = RaceCourseLayout.of(track);
+			double lap = track.lapLength();
+			for (RaceTrack.Feature f : track.terrainFeatures()) {
+				double end = f.end() + RaceTrack.DETOUR_CONNECT;
+				if (track.inOpening(end + 0.25D / lap)) {
+					continue;   // laid as one with the next opening: its flare comes after that one
+				}
+				assertTrue(Double.isNaN(track.flareLane(end - 0.25D / lap)), track + ": no flare inside the opening");
+				assertEquals(-(RaceTrack.DETOUR_OUTER + 1.0D), track.flareLane(end + 1.0E-6D), 0.01D, track.name());
+				assertEquals(-(RaceTrack.ROAD_HALF + 1.0D), track.flareLane(end + (RaceTrack.REJOIN_FLARE - 0.01D) / lap), 0.03D, track.name());
+				assertTrue(Double.isNaN(track.flareLane(end + (RaceTrack.REJOIN_FLARE + 0.5D) / lap)), track.name());
+				// a bird on the flare's road meets a wall wherever it leaves the road (the rail, or a
+				// set piece standing against it): every column beside the flare's road is road or walled
+				for (double d = 0.25D; d <= RaceTrack.REJOIN_FLARE - 0.25D; d += 0.25D) {
+					double t = end + d / lap;
+					double flare = track.flareLane(t);
+					int s = surf(track, t);
+					for (double o = flare + 1.0D; o <= -(RaceTrack.ROAD_HALF + 0.5D); o += 0.25D) {
+						RacePoint q = track.pointAtLane(t, o);
+						int x0 = floor(q.x()), z0 = floor(q.z());
+						if (!layout.roadTile(x0, z0)) {
+							continue;
+						}
+						// the road's own level in this column (a hill step moves it off the line's)
+						int top = s;
+						for (int y = s + 2; y >= s - 2; y--) {
+							if (layout.surfaceCells().contains(new RaceCourseLayout.Cell(x0, y, z0))) {
+								top = y;
+								break;
+							}
+						}
+						for (int[] n : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+							int x = x0 + n[0], z = z0 + n[1];
+							if (layout.roadTile(x, z)) {
+								continue;
+							}
+							double tn = track.progressAt(x + 0.5D, z + 0.5D, t);
+							if (Math.abs(track.laneAt(tn, x + 0.5D, z + 0.5D)) <= RaceTrack.ROAD_HALF + 1.0D) {
+								continue;   // the band's own flush kerb, inside the band's rail
+							}
+							boolean wall = false;
+							for (int y = top + 1; y <= top + 2 && !wall; y++) {
+								RaceCourseLayout.Cell c = new RaceCourseLayout.Cell(x, y, z);
+								wall = solid(layout.blocks().get(c)) && !layout.surfaceCells().contains(c);
+							}
+							assertTrue(wall, track + " " + f.type() + ": a way out of the flare " + d + " blocks past the rejoin at " + x + " " + z);
+						}
+					}
 				}
 			}
 		}

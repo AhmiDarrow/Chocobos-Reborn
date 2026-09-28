@@ -380,6 +380,15 @@ public enum RaceTrack {
 	 */
 	/** Blocks before a ridge's start (and past its end) a climber may already climb, measured on the centre line. */
 	public static final double RIDGE_BAND_PAD = 4.0D;
+	/**
+	 * Half width of the climb band across a ridge ({@link #ridgeBandAt}): every lane in which a
+	 * bird's body can touch the ridge. The ridge is laid on the band's columns, and on a diagonal
+	 * leg a column's centre reaches 6.2 blocks out (the column's corner 6.9); a bird is 0.875 wide
+	 * either side of its centre. At ROAD_HALF (5.5) a climber pressed on the ridge's outer corner
+	 * or flank from 5.6 out could not climb it and sat wedged in a notch of the staircase ("Serah",
+	 * S_SKYWAY; the Green harness bot on B_KOPJE).
+	 */
+	public static final double RIDGE_BAND_HALF = ROAD_HALF + 2.25D;
 	public static final double MAX_ISLAND_RADIUS = 385.0D;
 	/** The most courses a class can hold on its row today (six sprints and six grands prix). */
 	public static final int MAX_COURSES_PER_CLASS = 12;
@@ -720,6 +729,22 @@ public enum RaceTrack {
 		return directLane;
 	}
 
+	/**
+	 * Where a set-back puts a bird of {@code color} down at {@code t}: its line there (the detour
+	 * round a feature it does not suit, else the middle of the road), standing on what the course
+	 * laid: on top of a ridge it climbs. {@code pointAtLane} is the road's own level, which on a
+	 * ridge is inside it.
+	 */
+	public RacePoint setBackPoint(double t, ChocoboColor color) {
+		double lane = detourLaneAt(t, 0.0D, color, true);
+		RacePoint at = pointAtLane(t, lane);
+		Feature ft = terrainAt(t);
+		if (ft != null && ft.type() == Feature.Type.RIDGE && Math.abs(lane) <= ROAD_HALF) {
+			return new RacePoint(at.x(), at.y() + ridgeHeight(), at.z());
+		}
+		return at;
+	}
+
 	/** Blocks before a detour's connector a bird that goes round starts easing out to the band's outside lane. */
 	public static final double DETOUR_PREP = 14.0D;
 	/** Blocks after the rejoin a bird holds the outside lane and eases back to its line. */
@@ -813,9 +838,10 @@ public enum RaceTrack {
 	public double connectorAhead(double t, ChocoboColor color, boolean knowsBog, double lead) {
 		double lap = lapLength(), c = DETOUR_CONNECT * lap;
 		for (double[] span : detourSpans(color, knowsBog)) {
-			double len = (span[1] - span[0]) * lap;
 			double x = wrapHalf(t - span[0]) * lap;
-			if ((x >= -(c + lead) && x <= 0.5D) || (x >= len - lead && x <= len + c)) {
+			// the way in only: the feature's face or rim stands at the end of that swing. The way
+			// out runs into the rejoin's flare (REJOIN_FLARE), open road, so it is taken at pace.
+			if (x >= -(c + lead) && x <= 0.5D) {
 				return c;
 			}
 		}
@@ -825,10 +851,74 @@ public enum RaceTrack {
 	/**
 	 * Whether lane {@code lane} at {@code t} is open road on a detour or its connectors: inside a
 	 * feature's opening (connector to connector), from the band's outside kerb out to the detour's
-	 * outer edge. Outside the opening the band's rail stands at the kerb.
+	 * outer edge, or inside a rejoin's flare ({@link #flareLane}). Elsewhere the band's rail stands
+	 * at the kerb.
 	 */
 	public boolean inDetourOpening(double t, double lane) {
-		return inOpening(t) && lane <= -ROAD_HALF && lane >= -DETOUR_OUTER;
+		if (lane > -ROAD_HALF) {
+			return false;
+		}
+		if (inOpening(t)) {
+			return lane >= -DETOUR_OUTER;
+		}
+		double flare = flareLane(t);
+		return !Double.isNaN(flare) && lane >= flare + 1.0D;
+	}
+
+	/**
+	 * Blocks past a detour opening's rejoin over which the band's outside rail comes back in: it
+	 * leaves the detour's outer rail at the end of the opening and meets the kerb this far on,
+	 * with road laid inside it. A bird carried wide out of a short connector (a harness bot at
+	 * A_MACHETE's bog rejoin, lane -7.1 at 30 degrees to the road; "Vincent" at A_CRYSTAL) used to
+	 * land outside a rail that started square at the kerb, and ran along its far side into a post.
+	 * Now the rail it meets is the flare, from inside, and it slides along it back onto the band.
+	 * Under {@link #DETOUR_MERGE}, so the flare always ends before the next opening.
+	 */
+	public static final double REJOIN_FLARE = 8.0D;
+
+	/**
+	 * The lane of the band's outside rail at {@code t} inside a rejoin's flare: from the detour's
+	 * outer rail ({@code -(DETOUR_OUTER + 1)}) at the end of the opening to the kerb
+	 * ({@code -(ROAD_HALF + 1)}) {@link #REJOIN_FLARE} blocks on. NaN outside every flare (and in
+	 * an opening).
+	 */
+	public double flareLane(double t) {
+		if (terrain.isEmpty() || inOpening(t)) {
+			return Double.NaN;
+		}
+		double lap = lapLength();
+		for (double end : openingEnds()) {
+			double d = wrapHalf(t - end) * lap;
+			if (d > 0.0D && d <= REJOIN_FLARE) {
+				double u = d / REJOIN_FLARE;
+				double far = DETOUR_OUTER + 1.0D, kerb = ROAD_HALF + 1.0D;
+				return -(far + (kerb - far) * u);
+			}
+		}
+		return Double.NaN;
+	}
+
+	/** Progress at which each detour opening ends (a group laid as one ends once), worked out on first use. */
+	private double[] openingEnds;
+
+	private double[] openingEnds() {
+		double[] ends = openingEnds;
+		if (ends == null) {
+			List<Double> out = new ArrayList<>();
+			double lap = lapLength();
+			for (Feature f : terrain) {
+				double to = f.end() + DETOUR_CONNECT;
+				if (!inOpening(to + 0.25D / lap)) {
+					out.add(to - Math.floor(to));
+				}
+			}
+			ends = new double[out.size()];
+			for (int i = 0; i < ends.length; i++) {
+				ends[i] = out.get(i);
+			}
+			openingEnds = ends;
+		}
+		return ends;
 	}
 
 	/**
@@ -899,10 +989,12 @@ public enum RaceTrack {
 	 * before the ridge face to a few past its far end. A climber meets the face with its nose,
 	 * not its centre, and on a diagonal leg the face reaches the outer lanes before the centre
 	 * line's start (B_CANYON lane -4: 2.3 blocks; {@code RaceClimbTest.everyRidgeFaceIsClimbableFromEveryLane}).
-	 * The only place a climber climbs during a race ({@link RaceScoring#mayClimb}).
+	 * The only place a climber climbs during a race ({@link RaceScoring#mayClimb}). Across the
+	 * road it reaches {@link #RIDGE_BAND_HALF}: a bird pressed on the ridge's corner or flank
+	 * climbs it wherever its body touches it.
 	 */
 	public boolean ridgeBandAt(double t, double lane) {
-		if (Math.abs(lane) > ROAD_HALF) {
+		if (Math.abs(lane) > RIDGE_BAND_HALF) {
 			return false;
 		}
 		double w = t - Math.floor(t), pad = RIDGE_BAND_PAD / lapLength();

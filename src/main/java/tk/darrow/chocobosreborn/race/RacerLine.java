@@ -136,28 +136,54 @@ public final class RacerLine {
 	}
 	// ------------------------------------------------------------ detour connectors
 
-	/**
-	 * Fewest ticks a racer spends crossing a detour connector. A connector is a share of the
-	 * lap ({@link RaceTrack#DETOUR_CONNECT}): 4-7 blocks on a grand prix's short lap, 14-19 on a
-	 * sprint's, and at A / S pace (1.4 / 2.2 blocks a tick) a short one went by in two or three
-	 * ticks, far too quick to swing out to the detour. Slowed to this, the swing is made.
-	 */
-	public static final double CONNECTOR_TICKS = 5.5D;
 	/** Blocks before a connector a racer starts braking for it (ground friction sheds half the speed a tick). */
 	public static final double CONNECTOR_BRAKE_LEAD = 6.0D;
 	/** Terminal ground speed, blocks a tick, per unit of movement speed x pace (vanilla ground friction). */
 	public static final double GROUND_BLOCKS_PER_SPEED = 2.9D;
+	/**
+	 * Ticks a bird's line lags its heading on the ground: each tick keeps 0.546 of the last
+	 * tick's movement (vanilla ground friction), so a turn takes 1 / (1 - 0.546) ticks of travel
+	 * to come through, and the bird runs that many ticks' worth of the old heading's sideways part wide.
+	 */
+	public static final double GROUND_LAG_TICKS = 1.0D / (1.0D - 0.546D);
+	/** Sideways swing across a connector on the way in: from the band's outside lane to the detour's. */
+	public static final double CONNECTOR_SWING = RaceTrack.DETOUR_WAIT - RaceTrack.DETOUR_HOLD;
+	/**
+	 * Blocks the line into a detour may run wide and still clear the feature's corner: the detour
+	 * lane ({@link RaceTrack#DETOUR_HOLD}, 10.25 out) less the ridge band's reach (the ridge's
+	 * outermost column reaches 6.9 out, and a bird is 0.875 wide either side of its centre).
+	 */
+	public static final double CONNECTOR_ROOM = -RaceTrack.DETOUR_HOLD - (RaceTrack.ROAD_HALF + 1.4D + 0.875D);
+
+	/**
+	 * Fastest a racer can take the swing into a detour through a connector of
+	 * {@code connectorBlocks}, blocks a tick: the speed at which its lag through the turn
+	 * ({@link #GROUND_LAG_TICKS} x speed x the sine of the swing's angle) stays inside
+	 * {@link #CONNECTOR_ROOM}. The swing is {@link #CONNECTOR_SWING} across the connector, so a
+	 * short grand prix connector (4-7 blocks, 40-55 degrees) is taken at 1.4-1.8 blocks a tick,
+	 * about an A bird's pace, and a sprint's (14-19 blocks) at 3.5 and more, which nothing runs.
+	 * The old rule (every connector in 5.5 ticks, both ends) held an A bird to 0.8-1.2 and cost
+	 * the field most of a lap in a heat; the way out has the rejoin's flare
+	 * ({@link RaceTrack#REJOIN_FLARE}) and is not braked at all.
+	 */
+	public static double connectorSpeed(double connectorBlocks) {
+		if (!(connectorBlocks > 0.0D)) {
+			return Double.POSITIVE_INFINITY;
+		}
+		double sin = CONNECTOR_SWING / Math.hypot(CONNECTOR_SWING, connectorBlocks);
+		return CONNECTOR_ROOM / (GROUND_LAG_TICKS * sin);
+	}
 
 	/**
 	 * Pace scale for a connector of {@code connectorBlocks} for a racer that would cruise at
-	 * {@code cruiseBlocksPerTick}: at most the speed that takes {@link #CONNECTOR_TICKS} to cross
-	 * it, never faster than its own pace. A sprint's long connector costs nothing.
+	 * {@code cruiseBlocksPerTick}: down to {@link #connectorSpeed}, never faster than its own
+	 * pace. A sprint's long connector costs nothing.
 	 */
 	public static double connectorPace(double connectorBlocks, double cruiseBlocksPerTick) {
 		if (!(connectorBlocks > 0.0D) || cruiseBlocksPerTick <= 1.0E-6D) {
 			return 1.0D;
 		}
-		return Math.min(1.0D, connectorBlocks / CONNECTOR_TICKS / cruiseBlocksPerTick);
+		return Math.min(1.0D, connectorSpeed(connectorBlocks) / cruiseBlocksPerTick);
 	}
 
 	// ------------------------------------------------------------ walls

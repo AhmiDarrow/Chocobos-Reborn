@@ -540,6 +540,39 @@ public class RaceSession {
 		return sb.toString();
 	}
 
+	/**
+	 * Where every AI racer is, for the race harness's field log: name, laps, lap progress,
+	 * position, lane, on-ground and wall-contact flags, colour and recovery mode.
+	 */
+	public List<java.util.Map<String, Object>> aiReport() {
+		List<java.util.Map<String, Object>> out = new ArrayList<>();
+		for (Racer r : racers) {
+			if (r.human()) {
+				continue;
+			}
+			ChocoboEntity e = r.entity();
+			java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+			m.put("name", r.name);
+			m.put("laps", r.laps);
+			m.put("finished", r.finishIndex >= 0);
+			if (e != null) {
+				double p = track.progressAt(e.getX(), e.getZ(), r.progress.lastProgress());
+				m.put("progress", Math.round(p * 1.0E4D) / 1.0E4D);
+				m.put("x", Math.round(e.getX() * 100.0D) / 100.0D);
+				m.put("y", Math.round(e.getY() * 100.0D) / 100.0D);
+				m.put("z", Math.round(e.getZ() * 100.0D) / 100.0D);
+				m.put("lane", Math.round(track.laneAt(p, e.getX(), e.getZ()) * 100.0D) / 100.0D);
+				m.put("onGround", e.onGround());
+				m.put("horizontalCollision", e.horizontalCollision);
+				m.put("colour", e.color().name());
+				m.put("held", e.raceHeld());
+				m.put("mode", r.goal == null ? "" : r.goal.recoveryMode().name());
+			}
+			out.add(m);
+		}
+		return out;
+	}
+
 	/** Read-only diagnostics, retaining timing after teardown for race QA. */
 	public record Timing(int laps, int place, boolean forfeited, double observedTick, double creditedTick,
 	                     int startLatencyMs, int finishLatencyMs) {}
@@ -1326,8 +1359,7 @@ public class RaceSession {
 	 */
 	private void rescue(Racer r, ChocoboEntity e) {
 		double t = r.progress.lastProgress();
-		double lane = track.detourLaneAt(t, 0.0D, e.color(), true);
-		RacePoint at = track.pointAtLane(t, lane);
+		RacePoint at = setBackPoint(level, track, e, t);
 		moveRidden(e, at.x(), at.y(), at.z());
 		double[] tg = track.tangent(t);
 		face(e, (float) Math.toDegrees(Math.atan2(-tg[0], tg[1])));
@@ -1345,6 +1377,26 @@ public class RaceSession {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.rescued"), true);
 			player.playNotifySound(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.2F);
 		}
+	}
+
+	/**
+	 * Where a set-back puts {@code e} down at lap progress {@code t}: its line there
+	 * ({@link RaceTrack#setBackPoint}: a climber on top of a ridge, anyone else round it), lifted
+	 * clear of any block its box would stand in. The old point was the road level whatever the
+	 * course laid there, so a climber set back on a ridge was put inside it and never moved again
+	 * ("Serah", S_SKYWAY, 1600 ticks at 0 + 0.17).
+	 */
+	public static RacePoint setBackPoint(ServerLevel level, RaceTrack track, ChocoboEntity e, double t) {
+		RacePoint at = track.setBackPoint(t, e.color());
+		double y = at.y();
+		for (int up = 0; up < 8; up++) {
+			net.minecraft.world.phys.AABB box = e.getDimensions(e.getPose()).makeBoundingBox(at.x(), y, at.z());
+			if (level.noCollision(e, box)) {
+				break;
+			}
+			y += 1.0D;
+		}
+		return new RacePoint(at.x(), y, at.z());
 	}
 
 	/** Another solid racer within contact reach of {@code e} (a set-back bird stays a ghost until clear). */

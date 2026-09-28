@@ -138,9 +138,16 @@ public final class RaceHarnessPair {
             }
         }
         if (ticks % 10 == 0) {
-            write("field.jsonl", JSON.toJson(Map.of("track", TRACKS[course].name(), "ticks", ticks,
-                    "server_tick_ms", (System.nanoTime() - tickStart) / 1_000_000.0,
-                    "field", session.fieldSize(), "finished", session.finished(), "progress", session.progressReport())));
+            // the original keys unchanged; "ai" (added) is where each AI bird is and what it is doing
+            var line = new LinkedHashMap<String, Object>();
+            line.put("server_tick_ms", (System.nanoTime() - tickStart) / 1_000_000.0);
+            line.put("track", TRACKS[course].name());
+            line.put("finished", session.finished());
+            line.put("field", session.fieldSize());
+            line.put("progress", session.progressReport());
+            line.put("ticks", ticks);
+            line.put("ai", session.aiReport());
+            write("field.jsonl", JSON.toJson(line));
         }
         if (!session.live() || stuck || ticks > 11000) {
             var result = new LinkedHashMap<String, Object>();

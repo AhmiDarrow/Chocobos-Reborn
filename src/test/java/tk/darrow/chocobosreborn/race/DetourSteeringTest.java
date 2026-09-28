@@ -155,42 +155,130 @@ class DetourSteeringTest {
     }
 
     /**
-     * Carried wide out of a rejoin and past the end of the opening, a bird stands outside the
-     * band's rail ("Vincent", A_CRYSTAL 0 + 0.75, 50 s): it steers back into the opening it came
-     * out of, never at the rail post ahead.
+     * Carried wide out of a rejoin and past the end of the opening, a bird used to stand outside
+     * the band's rail ("Vincent", A_CRYSTAL 0 + 0.75, 50 s). Past every rejoin the rail now flares
+     * back to the kerb ({@link RaceTrack#REJOIN_FLARE}): that spot is open road inside it. Beyond
+     * the flare, outside the kerb rail (over it, say), a bird still steers back into the opening it
+     * came out of, never at the rail post ahead.
      */
     @Test void aBirdOutsideTheRailPastARejoinSteersBackIntoTheOpening() {
         for (var track : RaceTrack.values()) for (var f : track.terrainFeatures()) {
             double lap = track.lapLength();
             double past = f.end() + RaceTrack.DETOUR_CONNECT + 1.1 / lap;
             if (track.inOpening(past)) continue;   // merged with the next opening: there is no rail here
-            double back = track.openingBehind(past, -7.25, RacerRecovery.BACK_BLOCKS);
+            assertTrue(track.inDetourOpening(past, -7.25), track.name() + " " + f.type() + ": Vincent's spot is in the flare");
+            assertTrue(Double.isNaN(track.openingBehind(past, -7.25, RacerRecovery.BACK_BLOCKS)), "nothing to steer back to in the flare");
+            double beyond = f.end() + RaceTrack.DETOUR_CONNECT + (RaceTrack.REJOIN_FLARE + 1.5) / lap;
+            if (track.inOpening(beyond)) continue;
+            double back = track.openingBehind(beyond, -7.25, RacerRecovery.BACK_BLOCKS + RaceTrack.REJOIN_FLARE);
             assertFalse(Double.isNaN(back), track.name() + " " + f.type());
-            assertTrue(back < past && track.inOpening(back), track.name());
+            assertTrue(back < beyond && track.inDetourOpening(back, -(RaceTrack.ROAD_HALF + 1.0)), track.name());
             var target = track.pointAtLane(back, RaceTrack.DETOUR_WAIT);
             assertTrue(RaceCourseLayout.of(track).onCourse(target.x(), target.z()), track.name());
             // on the band, or in the opening, nothing to steer back to
-            assertTrue(Double.isNaN(track.openingBehind(past, -3.0, RacerRecovery.BACK_BLOCKS)));
+            assertTrue(Double.isNaN(track.openingBehind(beyond, -3.0, RacerRecovery.BACK_BLOCKS)));
             assertTrue(Double.isNaN(track.openingBehind(f.end(), -12.5, RacerRecovery.BACK_BLOCKS)));
         }
     }
 
-    @Test void aShortLapsConnectorIsBrakedForALongLapsIsNot() {
-        // A_CRYSTAL's 4.5-block connector at A pace (1.4 blocks a tick) went by in three ticks
+    /**
+     * The swing into a short connector is braked only as far as its angle needs at the bird's
+     * speed ({@link RacerLine#connectorSpeed}): the lag through the turn stays inside the room
+     * between the detour's lane and the feature's corner. The old rule (5.5 ticks per connector,
+     * both ends) held an A bird to 0.8 blocks a tick on A_CRYSTAL and cost the field on A_CANOPY
+     * and A_GROTTO a lap or two a heat.
+     */
+    @Test void aShortLapsConnectorIsBrakedOnlyAsMuchAsItsSwingNeeds() {
         double crystal = RaceTrack.DETOUR_CONNECT * RaceTrack.A_CRYSTAL.lapLength();
-        double pace = RacerLine.connectorPace(crystal, 1.4);
-        assertTrue(pace < 0.65 && pace > 0.5, "braked to " + pace);
-        assertEquals(RacerLine.CONNECTOR_TICKS, crystal / (1.4 * pace), 1e-9);
+        double v = RacerLine.connectorSpeed(crystal);
+        // the lag through the swing at that speed is exactly the room there is
+        double sin = RacerLine.CONNECTOR_SWING / Math.hypot(RacerLine.CONNECTOR_SWING, crystal);
+        assertEquals(RacerLine.CONNECTOR_ROOM, RacerLine.GROUND_LAG_TICKS * v * sin, 1e-9);
+        assertTrue(v > 1.3 && v < 1.6, "A_CRYSTAL's swing at " + v);
+        assertEquals(1.0, RacerLine.connectorPace(crystal, 1.35), 1e-9, "an A bird (1.3-1.5 blocks a tick) barely brakes");
+        double s = RacerLine.connectorPace(crystal, 2.2);
+        assertTrue(s > 0.6 && s < 0.7, "an S bird brakes to " + s);
+        // a longer connector is a shallower swing: less braking
+        assertTrue(RacerLine.connectorSpeed(crystal * 1.5) > v);
         // a sprint's 17-19 blocks at S pace cost nothing
         assertEquals(1.0, RacerLine.connectorPace(RaceTrack.DETOUR_CONNECT * RaceTrack.S_ABYSS.lapLength(), 2.5), 1e-9);
         assertEquals(1.0, RacerLine.connectorPace(crystal, 0.5), 1e-9, "a C-pace bird is slow enough already");
-        // only for a detour the colour takes, and only on or just before a connector
+        // only for a detour the colour takes, only on or just before its fork: the way out is free
         var crystalTrack = RaceTrack.A_CRYSTAL;
+        double lap = crystalTrack.lapLength();
         var ridge = crystalTrack.terrainFeatures().get(2);
-        assertFalse(Double.isNaN(crystalTrack.connectorAhead(ridge.start() - 2.0 / crystalTrack.lapLength(), ChocoboColor.BLUE, true, 6.0)));
-        assertTrue(Double.isNaN(crystalTrack.connectorAhead(ridge.start() - 2.0 / crystalTrack.lapLength(), ChocoboColor.GREEN, true, 6.0)));
+        assertFalse(Double.isNaN(crystalTrack.connectorAhead(ridge.start() - 2.0 / lap, ChocoboColor.BLUE, true, 6.0)));
+        assertTrue(Double.isNaN(crystalTrack.connectorAhead(ridge.start() - 2.0 / lap, ChocoboColor.GREEN, true, 6.0)));
         double middle = (ridge.start() + ridge.end()) / 2.0;
         assertTrue(Double.isNaN(crystalTrack.connectorAhead(middle, ChocoboColor.BLUE, true, 6.0)), "free along the detour");
+        assertTrue(Double.isNaN(crystalTrack.connectorAhead(ridge.end() + 2.0 / lap, ChocoboColor.BLUE, true, 6.0)), "free on the way out");
+    }
+
+    /**
+     * B_KOPJE (ridge 0.53-0.65), the Green harness bot: recovered at 0.5284, lane -6.5, on each of
+     * three laps. A climber has no detour to swing out for there: its line is its own lane all the
+     * way up to and over the ridge. It met the face in the outside lane (-4.5), slid outward along
+     * the face's staircase while it climbed and dropped off the climb band at 5.5: the band now
+     * reaches every lane a bird touching the ridge can be in, so from there it climbs on.
+     */
+    @Test void kopjeGreenGoesStraightOverTheRidgeFromEveryLane() {
+        var track = RaceTrack.B_KOPJE;
+        var ridge = track.terrainFeatures().get(0);
+        double lap = track.lapLength();
+        for (double lane = -RacerLine.LANE_LIMIT; lane <= RacerLine.LANE_LIMIT; lane += 0.5) {
+            for (double t = ridge.start() - 30.0 / lap; t <= ridge.end() + 10.0 / lap; t += 0.5 / lap) {
+                assertEquals(lane, track.steerLaneAt(t, lane, ChocoboColor.GREEN, true), 1e-9, "Green swings out at " + t);
+                assertTrue(Double.isNaN(track.connectorAhead(t, ChocoboColor.GREEN, true, RacerLine.CONNECTOR_BRAKE_LEAD)), "and brakes at " + t);
+            }
+        }
+        // the bot's spot: pressed on the ridge's corner, off the old band, on the new one
+        double x = -4518.6044, z = 1636.875;
+        double t = track.progressAt(x, z);
+        double lane = track.laneAt(t, x, z);
+        assertTrue(lane < -RaceTrack.ROAD_HALF, "the bot sat off the old band: " + lane);
+        assertTrue(track.ridgeBandAt(t, lane), "and may climb from there now");
+    }
+
+    /**
+     * A_MACHETE (pool 0.4125-0.4525, bog 0.48-0.53, ridge 0.5825-0.6225), the Black harness bots
+     * (water walkers and climbers, bog-savvy): all three recovered at 0.5544, lane -7.09, four times
+     * each. Black swings out for the bog only: straight over the pool, straight over the ridge. Out
+     * of the bog's rejoin its line is back on the band's outside lane by the connector's end and in
+     * its own lane before the ridge's gantry; what carried the bots wide was braking off the
+     * throttle, which leaves a bird no grip to turn with, into a rail that started square at the
+     * kerb. The flare ({@link RaceTrack#REJOIN_FLARE}) now takes a bird that runs wide there.
+     */
+    @Test void macheteBlackSwingsOutForTheBogOnly() {
+        var track = RaceTrack.A_MACHETE;
+        double lap = track.lapLength(), c = RaceTrack.DETOUR_CONNECT * lap;
+        var pool = track.terrainFeatures().get(0);
+        var bog = track.terrainFeatures().get(1);
+        var ridge = track.terrainFeatures().get(2);
+        for (double lane = -RacerLine.LANE_LIMIT; lane <= RacerLine.LANE_LIMIT; lane += 0.75) {
+            // over the pool (merged with the bog's opening) and up to the bog's fork: its own lane
+            double prep = bog.start() - (c + RaceTrack.DETOUR_PREP) / lap;
+            for (double t = pool.start() - 20.0 / lap; t < prep; t += 0.5 / lap) {
+                assertEquals(lane, track.steerLaneAt(t, lane, ChocoboColor.BLACK, true), 1e-9, "before the bog at " + t);
+            }
+            // the bog: out to the detour lane
+            assertEquals(RaceTrack.DETOUR_HOLD, track.steerLaneAt((bog.start() + bog.end()) / 2.0, lane, ChocoboColor.BLACK, true), 1e-9);
+            // out of the rejoin: on the band's outside lane by the connector's end, then its own lane
+            double end = bog.end() + c / lap;
+            assertEquals(RaceTrack.DETOUR_WAIT, track.steerLaneAt(end, lane, ChocoboColor.BLACK, true), 1e-9);
+            for (double t = end + RaceTrack.DETOUR_SETTLE / lap; t <= ridge.end() + 10.0 / lap; t += 0.5 / lap) {
+                assertEquals(lane, track.steerLaneAt(t, lane, ChocoboColor.BLACK, true), 1e-9, "after the bog at " + t);
+                assertTrue(Double.isNaN(track.connectorAhead(t, ChocoboColor.BLACK, true, RacerLine.CONNECTOR_BRAKE_LEAD)));
+            }
+            // and nothing on the way out is braked
+            for (double t = bog.end() - 6.0 / lap; t <= end; t += 0.5 / lap) {
+                assertTrue(Double.isNaN(track.connectorAhead(t, ChocoboColor.BLACK, true, RacerLine.CONNECTOR_BRAKE_LEAD)), "braked at " + t);
+            }
+        }
+        // where the bots came out, wide, is the flare's road, not the far side of a rail
+        double end = bog.end() + RaceTrack.DETOUR_CONNECT;
+        for (double d = 0.25; d <= 3.0; d += 0.25) {
+            assertTrue(track.inDetourOpening(end + d / lap, -7.09), "open road " + d + " blocks past the rejoin");
+        }
     }
 
     @Test void abilitiesAndBogKnowledgeStillChooseTheDirectRoute() {

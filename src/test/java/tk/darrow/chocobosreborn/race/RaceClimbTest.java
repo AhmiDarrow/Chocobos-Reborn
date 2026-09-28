@@ -53,7 +53,9 @@ class RaceClimbTest {
 		double mid = (ridge.start() + ridge.end()) / 2.0D, lap = track.lapLength();
 		assertTrue(track.ridgeBandAt(mid, 0.0D));
 		assertTrue(track.ridgeBandAt(ridge.start() - 1.0D / lap, 3.0D), "a bird's nose meets the face before its centre does");
-		assertFalse(track.ridgeBandAt(mid, RaceTrack.ROAD_HALF + 1.0D), "the rail beside the ridge");
+		assertTrue(track.ridgeBandAt(mid, -(RaceTrack.ROAD_HALF + 1.0D)), "pressed on its flank from the connector side");
+		assertTrue(track.ridgeBandAt(mid, RaceTrack.ROAD_HALF + 1.0D), "pressed on its flank from the infield");
+		assertFalse(track.ridgeBandAt(mid, RaceTrack.RIDGE_BAND_HALF + 0.25D), "clear of the ridge");
 		assertFalse(track.ridgeBandAt(mid, -12.5D), "the detour round it");
 		assertFalse(track.ridgeBandAt(ridge.start() - 10.0D / lap, 0.0D), "the road before it");
 		// where the Black bird went up the rail: progress 0.12-0.15, past the start straight
@@ -96,6 +98,43 @@ class RaceClimbTest {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Wherever a bird's body touches a ridge, it may climb it: the band reaches every lane from
+	 * which the ridge's outermost column is within a bird's half width. "Serah" and a Black bird in
+	 * the field GameTest sat wedged in a notch of S_SKYWAY's first ridge at lane -6.6 (the ridge's
+	 * columns reach 6.2 out on that diagonal leg) with the band ending at 5.5; the Green harness bot
+	 * on B_KOPJE slid off the face to -6.5 the same way, every lap. No ridge column reaches a lane
+	 * the detour's road would put a bird in.
+	 */
+	@Test
+	void aBirdTouchingARidgeIsOnItsClimbBand() {
+		double widest = 0.0D;
+		for (RaceTrack track : RaceTrack.values()) {
+			RaceCourseLayout layout = RaceCourseLayout.of(track);
+			for (var e : layout.blocks().entrySet()) {
+				var c = e.getKey();
+				double cx = c.x() + 0.5D, cz = c.z() + 0.5D;
+				double t = track.progressAt(cx, cz);
+				RaceTrack.Feature ft = track.terrainAt(t);
+				if (ft == null || ft.type() != RaceTrack.Feature.Type.RIDGE || c.y() != (int) track.groundY(t)
+						|| !layout.surfaceCells().contains(c)) {
+					continue;
+				}
+				double lane = Math.abs(track.laneAt(t, cx, cz));
+				if (lane > RaceTrack.DETOUR_INNER) {
+					continue;   // another leg of the lap
+				}
+				widest = Math.max(widest, lane);
+				// the column's far corner, and a bird's half width past it
+				double reach = lane + Math.sqrt(0.5D) + 0.875D;
+				assertTrue(reach <= RaceTrack.RIDGE_BAND_HALF + 0.35D, track + ": a ridge column " + lane + " out");
+				assertTrue(track.ridgeBandAt(t, lane + 0.875D), track + ": touching the column at " + lane);
+			}
+		}
+		assertTrue(widest > RaceTrack.ROAD_HALF, "the ridge's columns reach past the road's edge: " + widest);
+		assertTrue(RaceTrack.RIDGE_BAND_HALF + 0.875D < RaceTrack.DETOUR_INNER + 0.5D, "a bird on the detour's road never climbs");
 	}
 
 	@Test

@@ -530,9 +530,10 @@ class RaceTrackTest {
 		// strips and set pieces follow the new format); 12: an island an older plan laid is swept over its
 		// whole slot; 13: rails, pool rims and scenery kept out of the racing lanes
 		// (CourseClearanceTest); 14: two detour openings under RaceTrack.DETOUR_MERGE blocks
-		// apart are laid as one, no rail stub between them.
+		// apart are laid as one, no rail stub between them; 15: past every rejoin the outside rail
+		// flares back from the detour's rail to the kerb (RaceTrack.REJOIN_FLARE), road inside it.
 		// Older islands have to be re-laid either way.
-		assertEquals(14, SquareBuilder.COURSE_VERSION);
+		assertEquals(15, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

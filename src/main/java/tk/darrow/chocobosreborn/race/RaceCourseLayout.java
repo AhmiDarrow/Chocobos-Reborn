@@ -65,6 +65,10 @@ public final class RaceCourseLayout {
 	private final RaceTrack.Theme theme;
 	private final Map<Cell, String> blocks = new LinkedHashMap<>();
 	private final Set<Tile> road = new HashSet<>();
+	/** The road of every rejoin's flare, with its surface level: nothing but road at body height there ({@link #put}). */
+	private final Map<Tile, Integer> flareRoad = new HashMap<>();
+	/** The flares' rail cells: a set piece built later leaves them standing ({@link #put}). */
+	private final Set<Cell> flareRail = new HashSet<>();
 	/** Sorted {@link #roadKey} values so {@link #onCourse} does not allocate a tile per probe. */
 	private long[] roadKeys = new long[0];
 	private final Set<Long> chunks = new HashSet<>();
@@ -150,6 +154,7 @@ public final class RaceCourseLayout {
 			stampEdges(i, t, lap);
 			stampEdges(i, t + 0.5D / steps, lap);
 		}
+		flareRails();
 		for (int i = 0; i < steps; i++) {
 			double t = i / (double) steps;
 			boolean nearFeature = nearFeature(t);
@@ -158,27 +163,30 @@ public final class RaceCourseLayout {
 			boolean innerStand = (sides & 1) != 0, outerStand = (sides & 2) != 0;
 			boolean corner = corner(t, lap);
 			int surf = surf(t);
+			// a rejoin's flare (and a little past it) keeps its outside clear: a bird carried wide
+			// out of the connector slides along the flared rail, and nothing stands in its way
+			boolean flared = outsideFlare(t, lap);
 			// decoration in the margins: set pieces every 8 blocks alternating sides, small
 			// ground details between them, flag lines along the straights; none in front of a stand
-			if (!sky && !nearFeature && !startZone && !outerStand && i % 16 == 0) {
+			if (!sky && !nearFeature && !flared && !startZone && !outerStand && i % 16 == 0) {
 				decorate(t, -(RaceTrack.ROAD_HALF + 5.5D), surf);
 			}
 			if (!nearFeature && !innerStand && !startZone && i % 16 == 8) {
 				decorate(t, RaceTrack.ROAD_HALF + 5.5D, surf);
 			}
 			int vergeSide = i % 12 == 3 ? -1 : 1;
-			if (!sky && !nearFeature && !startZone && i % 6 == 3 && !(vergeSide > 0 ? innerStand : outerStand)) {
+			if (!sky && !nearFeature && !startZone && i % 6 == 3 && !(vergeSide > 0 ? innerStand : outerStand || flared)) {
 				verge(t, vergeSide * (RaceTrack.ROAD_HALF + 2.5D + (i % 5)), surf);
 			}
 			if (!nearFeature && !startZone && !corner && i % 24 == 12) {
-				if (!outerStand) {
+				if (!outerStand && !flared) {
 					flag(t, -(RaceTrack.ROAD_HALF + 2.0D), surf, i / 24);
 				}
 				if (!sky && !innerStand) {
 					flag(t, RaceTrack.ROAD_HALF + 2.0D, surf, i / 24 + 1);
 				}
 			}
-			if (sky && !nearFeature && !startZone && !outerStand && i % 40 == 0) {
+			if (sky && !nearFeature && !flared && !startZone && !outerStand && i % 40 == 0) {
 				decorate(t, -(RaceTrack.ROAD_HALF + 1.0D), surf);
 			}
 		}
@@ -503,9 +511,14 @@ public final class RaceCourseLayout {
 	 */
 	private void stampGround(double t, double lap, boolean sky) {
 		boolean nearFeature = nearFeature(t);
+		double flare = track.flareLane(t);
+		boolean inFlare = !Double.isNaN(flare);
 		int surf = surf(t);
 		double margin = sky ? 1.5D : MARGIN;
 		double normalOuter = nearFeature ? RaceTrack.DETOUR_OUTER + 3.0D : RaceTrack.ROAD_HALF + 1.0D + margin;
+		if (inFlare) {
+			normalOuter = Math.max(normalOuter, -flare + 3.0D);   // the rejoin's flare and a margin past its rail
+		}
 		double normalInner = RaceTrack.ROAD_HALF + 1.0D + margin;
 		// the island reaches out under every stand (either side), easing back past its ends
 		double outer = stands.groundReach(t, -1, normalOuter);
@@ -517,7 +530,8 @@ public final class RaceCourseLayout {
 			if ((o > normalInner || o < -normalOuter) && nearRoad(x, z)) {
 				continue;   // a stand's apron reaching toward another leg of the lap: leave that leg alone
 			}
-			boolean underRoad = Math.abs(o) <= RaceTrack.ROAD_HALF + 1.0D || (nearFeature && o <= -RaceTrack.ROAD_HALF - 1.0D);
+			boolean underRoad = Math.abs(o) <= RaceTrack.ROAD_HALF + 1.0D || (nearFeature && o <= -RaceTrack.ROAD_HALF - 1.0D)
+					|| (inFlare && o <= -RaceTrack.ROAD_HALF - 1.0D && o >= flare - 1.0D);
 			int depth = underRoad ? (sky ? 2 : 5) : taper(o, -outer, inner);
 			for (int d = 1; d <= depth; d++) {
 				put(x, surf - d, z, theme.base);
@@ -639,6 +653,19 @@ public final class RaceCourseLayout {
 				}
 			}
 		}
+		double flare = track.flareLane(t);
+		if (!Double.isNaN(flare)) {
+			// past a rejoin the apron narrows back to the band inside the flared rail (RaceTrack.REJOIN_FLARE)
+			surfacing = true;
+			for (double o = flare + 1.0D; o <= -(RaceTrack.ROAD_HALF + 0.5D); o += LANE_STEP) {
+				RacePoint q = track.pointAtLane(t, o);
+				int x = floor(q.x()), z = floor(q.z());
+				road.add(new Tile(x, z));
+				flareRoad.putIfAbsent(new Tile(x, z), surf);
+				put(x, surf, z, theme.road);
+			}
+			surfacing = false;
+		}
 	}
 
 
@@ -653,11 +680,19 @@ public final class RaceCourseLayout {
 		boolean corner = corner(t, lap);
 		int surf = surf(t);
 		boolean liquid = ft != null && (ft.type() == RaceTrack.Feature.Type.WATER || ft.type() == RaceTrack.Feature.Type.LAVA);
+		double flare = track.flareLane(t);
 		for (int side = -1; side <= 1; side += 2) {
 			double o = side * (RaceTrack.ROAD_HALF + 1.0D);
 			if (side < 0 && nearFeature && !liquid) {
 				continue;   // the detour opens here; a pool keeps its kerb on both sides, or the
 				            // water drains over the island the first time a block update reaches it
+			}
+			if (side < 0 && !Double.isNaN(flare)) {
+				// the rail is out on the flare: the kerb stays flush where the flare's road has not
+				// already covered its column (put leaves road alone)
+				RacePoint q = track.pointAtLane(t, o);
+				put(floor(q.x()), surf, floor(q.z()), theme.wall);
+				continue;
 			}
 			RacePoint q = track.pointAtLane(t, o);
 			int x = floor(q.x()), z = floor(q.z());
@@ -691,6 +726,107 @@ public final class RaceCourseLayout {
 		}
 	}
 
+	/**
+	 * The rail of every rejoin's flare ({@link RaceTrack#REJOIN_FLARE}): from the detour's outer
+	 * rail at the end of the opening back to the kerb, on a slant. It goes on every column beside
+	 * the flare's road that is not road itself, cell by cell like a pool's rim, so it follows the
+	 * road's edge without a gap: laid a lane offset out, on the outside of a tight bend (S_BASTION's
+	 * star points) the offsets fan apart and left five-block gaps a bird could go out through.
+	 */
+	private void flareRails() {
+		int[][] sides = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+		// the opening's own road reaches into the flare where the lap bends (its last stamps fan
+		// out past the flare's line): its edge there is the flare's edge too
+		Map<Tile, Integer> edgeOf = new HashMap<>(flareRoad);
+		double lap = track.lapLength();
+		for (double t = 0.0D; t < 1.0D; t += 0.25D / lap) {
+			if (Double.isNaN(track.flareLane(t))) {
+				continue;
+			}
+			for (double o = -(RaceTrack.ROAD_HALF + 0.5D); o >= -(RaceTrack.DETOUR_OUTER + 2.0D); o -= LANE_STEP) {
+				RacePoint q = track.pointAtLane(t, o);
+				Tile tile = new Tile(floor(q.x()), floor(q.z()));
+				if (road.contains(tile)) {
+					edgeOf.putIfAbsent(tile, surf(t));
+				}
+			}
+		}
+		java.util.ArrayDeque<Tile> work = new java.util.ArrayDeque<>(edgeOf.keySet());
+		List<Tile> edge = new ArrayList<>();
+		while (!work.isEmpty()) {
+			Tile tile = work.poll();
+			int surf = edgeOf.get(tile);
+			for (int[] d : sides) {
+				Tile n = new Tile(tile.x() + d[0], tile.z() + d[1]);
+				if (road.contains(n)) {
+					continue;
+				}
+				double tn = track.progressAt(n.x() + 0.5D, n.z() + 0.5D);
+				double lane = track.laneAt(tn, n.x() + 0.5D, n.z() + 0.5D);
+				double flare = track.flareLane(tn);
+				// a column the lap's stamps skipped inside the flare (the outside of a bend fans them
+				// apart) is road too, or the rail would ring it as a stub in the middle of the flare
+				if (!Double.isNaN(flare) && lane >= flare + 0.5D && lane <= -RaceTrack.ROAD_HALF) {
+					surfacing = true;
+					put(n.x(), surf, n.z(), theme.road);
+					surfacing = false;
+					for (int y = surf + 1; y <= surf + CLEAR_UP; y++) {
+						blocks.remove(new Cell(n.x(), y, n.z()));   // a verge plant or a kerb post laid before
+					}
+					road.add(n);
+					flareRoad.put(n, surf);
+					edgeOf.put(n, surf);
+					work.add(n);
+				} else {
+					edge.add(n);
+				}
+			}
+		}
+		for (Tile n : edge) {
+			if (road.contains(n)) {
+				continue;   // paved after it was queued
+			}
+			// beside road at two levels (a hill step) the rail stands to the upper one's height too
+			int surf = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
+			for (int[] d : sides) {
+				Integer guess = edgeOf.get(new Tile(n.x() + d[0], n.z() + d[1]));
+				if (guess != null) {
+					int s = surfaceTop(n.x() + d[0], n.z() + d[1], guess);
+					surf = Math.min(surf, s);
+					high = Math.max(high, s);
+				}
+			}
+			put(n.x(), surf, n.z(), theme.wall);
+			for (int y = surf + 1; y <= high + 1; y++) {
+				boolean top = y == high + 1;
+				String block = top ? theme.rail : theme.wall;
+				if (top && theme.rail.equals("air")) {
+					break;
+				}
+				put(n.x(), y, n.z(), block);
+				flareRail.add(new Cell(n.x(), y, n.z()));
+			}
+		}
+	}
+
+	/** The top of the driving surface laid in a road column, near {@code guess} (a hill step moves it). */
+	private int surfaceTop(int x, int z, int guess) {
+		for (int y = guess + 2; y >= guess - 2; y--) {
+			if (surfaceCells.contains(new Cell(x, y, z))) {
+				return y;
+			}
+		}
+		return guess;
+	}
+
+	/**
+	 * In a rejoin's flare ({@link RaceTrack#flareLane}) or the few blocks past it: no scenery,
+	 * flags or verge on the outside there, only the flared rail.
+	 */
+	private boolean outsideFlare(double t, double lap) {
+		return !Double.isNaN(track.flareLane(t)) || !Double.isNaN(track.flareLane(t - 4.0D / lap));
+	}
+
 	/** Inside a feature or one of its connectors: the detour is open and the band is terrain. */
 	private boolean nearFeature(double t) {
 		return nearFeature(track, t);
@@ -720,6 +856,13 @@ public final class RaceCourseLayout {
 				if (nearFeature(track, t)) {
 					double from = track.terrainAt(t) != null ? RaceTrack.DETOUR_INNER : RaceTrack.ROAD_HALF + 0.5D;
 					for (double o = -RaceTrack.DETOUR_OUTER; o <= -from; o += LANE_STEP) {
+						RacePoint q = track.pointAtLane(t, o);
+						out.add(new Tile(floor(q.x()), floor(q.z())));
+					}
+				}
+				double flare = track.flareLane(t);
+				if (!Double.isNaN(flare)) {
+					for (double o = flare + 1.0D; o <= -(RaceTrack.ROAD_HALF + 0.5D); o += LANE_STEP) {
 						RacePoint q = track.pointAtLane(t, o);
 						out.add(new Tile(floor(q.x()), floor(q.z())));
 					}
@@ -779,6 +922,9 @@ public final class RaceCourseLayout {
 			for (int side : new int[]{-1, 1}) {
 				if ((sides & (side > 0 ? 1 : 2)) != 0) {
 					continue;   // the stand has its own lamps on its front posts
+				}
+				if (side < 0 && outsideFlare(t, lap)) {
+					continue;   // a rejoin's flare: only its rail stands there
 				}
 				RacePoint q = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.5D));
 				int x = floor(q.x()), z = floor(q.z());
@@ -867,6 +1013,9 @@ public final class RaceCourseLayout {
 				default -> "yellow";
 			};
 			for (int side : new int[]{-1, 1}) {
+				if (side < 0 && outsideFlare(t, lap)) {
+					continue;   // the previous detour's flare: only its rail stands there
+				}
 				RacePoint q = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.0D));
 				int x = floor(q.x()), z = floor(q.z());
 				put(x, surf + 1, z, theme.post);
@@ -2812,6 +2961,15 @@ public final class RaceCourseLayout {
 		if (!surfacing && !block.equals("air") && inLanes(x, y, z)) {
 			return;   // a rim, a rail, a post or scenery reaching into a racing bird's body
 		}
+		if (landmarking && flareRail.contains(new Cell(x, y, z))) {
+			return;   // the set piece stands against a rejoin's flare, never through it
+		}
+		if (!surfacing && !block.equals("air")) {
+			Integer fs = flareRoad.get(new Tile(x, z));
+			if (fs != null && y > fs && y <= fs + CLEAR_UP) {
+				return;   // a rejoin's flare is road a bird carried wide runs on (a set piece's leg, say)
+			}
+		}
 		Cell cell = new Cell(x, y, z);
 		if (landmarking) {
 			landmarkCells.put(cell, block);
@@ -2974,6 +3132,11 @@ public final class RaceCourseLayout {
 	/** Marshal-tower sign that names the course, facing the grid. */
 	public BoardPost courseBoard() {
 		return board;
+	}
+
+	/** Exactly a road tile (band, detour, connector apron, flare), for tests; {@link #onCourse} allows a block either side. */
+	boolean roadTile(int x, int z) {
+		return Arrays.binarySearch(roadKeys, roadKey(x, z)) >= 0;
 	}
 
 	public boolean onCourse(double x, double z) {

@@ -281,7 +281,8 @@ public class RacerGoal extends Goal {
 		if (finished) {
 			mul *= 0.6D;   // finished: coast
 		}
-		// a detour connector on a short lap is a hairpin: brake for it like one
+		// the swing into a detour through a short connector: brake as far as its angle needs at this
+		// pace (RacerLine#connectorSpeed); the way out runs into the rejoin's flare and is not braked
 		double connector = track.connectorAhead(t, color, bogSavvy, RacerLine.CONNECTOR_BRAKE_LEAD);
 		if (!Double.isNaN(connector)) {
 			mul *= RacerLine.connectorPace(connector,

@@ -2370,3 +2370,172 @@ C/B/A speeds rarely end a step past the edge.
   loops, but it leaves the lane. Consider a pool wall of 2 at road level, or keeping it out of reach.
 - No server-side loop breaker yet. The earlier plan still stands if some other disagreement ever loops: count
   corrections per rider and set it back through the rescue path.
+
+## Last harness snags (2026-09-28, unreleased, branch `last-snags`; from the 24-heat hub harness run)
+
+The final hub run (24 short grands prix, dedicated server, three client bots on the AI's detour line, three AI
+field birds) had no stuck rider and 13 corrections, and three snags left: an AI bird frozen on S_SKYWAY's first
+ridge, bots pinned at the same spot every lap on B_KOPJE and A_MACHETE, and AI birds a lap or two behind on
+A_CANOPY and A_GROTTO.
+
+### Harness logging (`harness/RaceHarnessPair`, `RaceSession.aiReport`)
+
+Each `field.jsonl` line keeps its keys (`track`, `ticks`, `server_tick_ms`, `field`, `finished`, `progress`) and adds
+`ai`: one object per AI bird with `name`, `laps`, `finished`, `progress`, `x`, `y`, `z`, `lane`, `onGround`,
+`horizontalCollision`, `colour`, `held` and `mode` (the `RacerRecovery` mode). Old readers are unaffected.
+
+### 1. "Serah" frozen on S_SKYWAY's first ridge
+
+**Reproduced** by the new GameTest `FieldHeatGameTests.skywayFieldClearsTheFirstRidge`: six S climbers (White, Black,
+Green) off the real grid (`stallPos(i, 6)`, lanes `stallOffset`, set up as `RaceSession.spawnField`: grade, class
+training +-4, +-5 % form, field pace), held 20 ticks, released together, bumping on, three heats of two laps with the
+session's set-backs. On the old code heat 2's Black bird from stall 0 (lane -4.5) stopped at 0 + 0.1696, 8.8 blocks
+up the ridge, at lane -6.63: wedged into an inside corner of the ridge's staircase edge (the ridge is on a diagonal
+leg, so its side is a row of block steps), jumping in place with `onClimbable` false. Serah's spot to the block.
+
+**Causes.**
+- *The climb band was narrower than the ridge.* `RaceTrack.ridgeBandAt` allowed climbing only with the bird's centre
+  within ROAD_HALF (5.5). The ridge is laid on every column the band covers; on a diagonal leg a column's centre
+  reaches 6.2 out (its corner 6.9), and a bird is 0.875 wide either side of its centre. So a climber whose body
+  touched the ridge's outer corner or flank from lane 5.6 out could not climb it. A bird meeting the face in an outer
+  lane slides sideways along the staircase while it climbs (the face is stepped block by block and its heading is not
+  square to the steps), drops off the band and is left pressed on the ridge.
+- *The recovery could not help.* Re-aim and back-off aimed back into the same flank; after two rounds
+  `RaceSession.rescue` set the bird back at `pointAtLane(t, lane)`, the road's own level. On a ridge that is inside
+  the ridge's blocks, and a climber (its detour lane is lane 0) set back there never moved again.
+- Contact was not involved: no set-back ghost loop and no lateral shove (the guard gives none off the band).
+
+**Fix.**
+- `RaceTrack.RIDGE_BAND_HALF` = ROAD_HALF + 2.25 (7.75): the band now covers every lane from which a bird can touch
+  the ridge. It is still only the ridge feature from 4 blocks before its face to 4 past its end, where the outside is
+  always the open detour mouth (no rail). A bird on the detour road (9 out and more) is past it.
+- `RaceTrack.setBackPoint(t, colour)`: a climber set back on a ridge stands on top of it (`groundY + ridgeHeight`).
+  `RaceSession.setBackPoint` then lifts the point until the bird's box is clear of blocks (up to 8), the net for anything
+  else a plan lays there. `RaceSession.rescue` and both GameTest rescues use it.
+
+### 2. Bots pinned at B_KOPJE 0.5284 and A_MACHETE 0.5544
+
+The brief suspected the line swinging out for detours the bird will not take. It does not: `steerLaneAt` only
+swings for detours the colour takes, and the new tests pin that for both spots. The two snags had other causes.
+
+- **B_KOPJE** (Green bot, climber): the bot on lane -4.5 met the ridge face, slid outward along the staircase while
+  it climbed (-4.9 to -6.3 in 20 ticks) and fell off the old 5.5 band at -6.5. It was then pressed on the ridge's
+  corner, unable to climb, on each lap. This is the same cause as issue 1, and the wider band is the fix: from -6.5 it
+  climbs on.
+- **A_MACHETE** (Black bot: walks water, climbs, knows bogs, so it detours the bog only): all three bots came out of
+  the bog's rejoin still at -7.1, just as the band's outside rail started at the kerb. They ran along the rail's far
+  side and stopped against a flag post behind it at 0.5544. Two things carried them wide:
+  - The bot's connector braking took its foot off the throttle. A bird with no input has no grip to turn with, so it
+    ran straight on at 1.2-1.8 blocks a tick. It now brakes with part throttle (`forwardImpulse = cap / speed`, at
+    least 0.3).
+  - A rail that starts square at the kerb traps anything wide of it. A human rider drifting wide out of a rejoin had
+    the same trap.
+
+**Is there anything solid at lane 5.5-8 near openings or rejoins?** A scan of every course's mouths (the fork and
+rejoin aprons, and the 12 blocks either side) found:
+- Inside the openings: only the feature's own blocks (ridge flanks, pool rims), plus a handful of rail end posts.
+- Just past every rejoin, behind the kerb rail: flags, warning posts, lamps, verge scenery and set pieces. These are
+  exactly what a bird on the wrong side of the rail runs into. The flag at 4443, 68-69, 2541 is the one the bots sat
+  on.
+
+**Fix: the rejoin flare.**
+- Past every opening's end, the band's outside rail no longer starts at the kerb. Over `RaceTrack.REJOIN_FLARE`
+  (8 blocks, under `DETOUR_MERGE`, so it always ends before the next opening) it slants back from the detour's outer
+  rail (lane -17) to the kerb (-6.5), with road laid inside it (`RaceTrack.flareLane`, `RaceCourseLayout.stampRoad`
+  and `roadTiles`). A bird carried wide meets the flare from inside and slides along it back onto the band.
+- The rail goes on every non-road column next to the flare's road, cell by cell like a pool rim
+  (`RaceCourseLayout.flareRails`). Laid at a lane offset, it left gaps of up to five blocks on the outside of tight
+  bends (S_BASTION), where the lap's stamps fan apart.
+  - Unpaved pockets inside the flare are paved.
+  - The opening's own road, where it reaches past the flare line, is edged too.
+  - Beside a hill step the post is stacked to the upper level.
+- `put` keeps anything but road off the flare at body height, and a set piece never replaces its rail (B_FORD's cairn
+  stands against one).
+- No flag, lamp, warning post, verge or set piece is placed on the outside within the flare or 4 blocks past it.
+- `inDetourOpening` counts the flare as open road, so `openingBehind` (the AI's "back into the opening" rescue) only
+  fires beyond it, for a bird that got over a rail.
+- `COURSE_VERSION` 14 -> 15, so every island is re-laid.
+
+### 3. AI pace on A_CANOPY and A_GROTTO
+
+Between the last two hub runs the AI's laps on A_CANOPY went from 284 to 402 ticks, and on A_GROTTO from 274 to 308.
+The rosters differed (Yellow and Green, the colours with the most detours, drew both courses the second time), but
+Yellow alone went from 295 to 411 on A_CANOPY. `RaceSimTest` and the ladder are single-bird and never run `RacerGoal`,
+so they could not see it.
+
+**Cause.** The old rule capped every connector, fork and rejoin alike, to 5.5 ticks from 6 blocks out. That is
+0.81-0.96 blocks a tick on a 4.5-5.3 block connector, where an A bird runs about 1.5, and it held the whole detour
+(13-22 blocks) braked on these short laps. A kinematic model of the AI's steering (vanilla ground friction, a
+40-degree yaw cap, the 4-block lookahead) put the bird 1.2-1.4 blocks inside the detour lane at the feature's face
+whatever its speed from 1.0 to 2.2, because the lookahead takes the swing early. Only the way out ran wide at pace
+(-5.3 to -6.3 at the connector's end), and the flare now takes that.
+
+**Fix** (`RacerLine.connectorSpeed`).
+- The way in only (`RaceTrack.connectorAhead` no longer flags the rejoin). The way out runs into the flare at pace.
+- Braked only as far as the swing's angle needs: the lag through the turn is `GROUND_LAG_TICKS` (1 / (1 - 0.546)) x
+  speed x sin(angle), with the swing `CONNECTOR_SWING` (5.75) across the connector. It must stay inside
+  `CONNECTOR_ROOM` (2.475: the detour lane 10.25 less the ridge's 6.9 reach and half a bird).
+- Resulting caps on grands prix: 1.38 blocks a tick on B_CANYON (4.1-block connector), 1.42 on A_CRYSTAL, 1.53 on
+  A_CANOPY, 1.75 on A_MACHETE. Sprints (14-19 blocks) get 3.5 and more, so they are never braked. In practice an A
+  bird barely brakes, and an S bird (2.2) brakes to about 1.4-1.5.
+- The harness bot uses the same cap, with part throttle.
+- No rubber-banding, and nothing looks at the player.
+
+**Field pace, before -> after** (`FieldHeatGameTests`: six A birds, Yellow, Green, Blue, Black, White, Blue, off the
+grid, two laps; mean lap ticks after the first lap, two seeds):
+
+| course | before | after |
+|---|---|---|
+| A_CANOPY | 287.5, 294.3 | 229.7, 240.0 (about -20 %) |
+| A_GROTTO | 235.8, 231.5 | 195.3, 208.0 (about -13 %) |
+| S_SKYWAY (six climbers) | 314.2, 323.2, DNF | 302.7, 292.7, 292.5 |
+
+Sweep (`AiLapSweepGameTests`, same seeds, mean ticks to the lap credit):
+
+| class | before -> after |
+|---|---|
+| A grands prix | -12.1 % (A_CANOPY -16.0, A_CRYSTAL -14.4, A_GROTTO -13.2, A_MOONSHELF -12.2, A_EMBER -9.8, A_MACHETE -8.4) |
+| B grands prix | -4.3 % |
+| S grands prix | -10.6 % |
+| sprints | within 1.7 % |
+
+Still 336 birds, all lapped, no stall, no set-back. `RaceSimTest` unchanged and green; no ladder expectation moved.
+
+### Tests
+
+**New or changed unit tests:**
+- `CourseClearanceTest.aDetoursMouthsAreOpenRoad`: nothing solid at body height across a fork's and rejoin's whole
+  apron, from a block into the fork, or on a flare's road; the feature's own ridge and pool rim excepted. It also
+  checks the A_MACHETE spot: the bots' exit lane (-7.1 for 3 blocks past the rejoin) is flare road, and the flag post
+  is gone.
+- `CourseClearanceTest.everyRejoinFlaresItsRailBackToTheKerb`: the flare runs from -17 to -6.5 over 8 blocks, and
+  every column beside the flare's road is road or walled (no way out).
+- `RaceClimbTest.aBirdTouchingARidgeIsOnItsClimbBand`: every ridge column's reach is inside the band, and the band
+  stays clear of the detour road. `theRidgeBandIsTheRidgeFeatureAcrossTheRoad` now climbs the flank.
+- `DetourSteeringTest`:
+  - `kopjeGreenGoesStraightOverTheRidgeFromEveryLane`: no swing and no braking, and the bot's spot is on the band.
+  - `macheteBlackSwingsOutForTheBogOnly`: straight over the pool and the ridge, back on the outside lane by the
+    connector's end, no braking on the way out, and the exit is flare road.
+  - `aShortLapsConnectorIsBrakedOnlyAsMuchAsItsSwingNeeds` replaces the 5.5-tick test.
+  - `aBirdOutsideTheRailPastARejoinSteersBackIntoTheOpening`: Vincent's spot is now flare road, and the steer-back is
+    tested beyond the flare.
+- `RaceTrackTest`: version 15.
+
+**New GameTests** (`FieldHeatGameTests`, one batch each): `skywayFieldClearsTheFirstRidge`, `canopyFieldHoldsItsPace`
+and `grottoFieldHoldsItsPace`. Each fails on any stall (100 ticks without 3 blocks of ground), a set-back or a DNF,
+and logs `FIELD-HEAT` lap times. The sweep's rescue now uses `RaceSession.setBackPoint`.
+
+**Results:** `test` 285, 0 failures, 1 skipped (AtlasTint). `runVerification` 71 of 71. `build` passes.
+
+### Needs an in-game or hub-harness look
+
+- The flares: eight blocks of road slanting back to the kerb past every rejoin, the rail following its edge block by
+  block (ragged on diagonals and bends, stacked at hill steps), and no scenery on the outside there. B_FORD's cairn
+  and S_SKYWAY's glass arch stand beside a flare; the arch lost the part of one leg that stood on the flare's road.
+- Climbers going up a ridge's corner and flank from lanes 5.5-7.75, including a human rider (the server replays a
+  climb as it always has).
+- A human rider on the way out of a short connector at A/S pace: no braking needed, the flare takes a wide line.
+- The AI at A and S pace into a short connector with the lighter braking. The sweep and heats saw no stall, but an S
+  bird is still braked on the way in.
+- The rerun of the hub harness: the bots on B_KOPJE and A_MACHETE, S_SKYWAY's first ridge, and AI pace against the
+  bots on A_CANOPY and A_GROTTO. The `ai` block in `field.jsonl` now says where any stuck bird is.

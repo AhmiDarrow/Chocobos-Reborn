@@ -372,8 +372,7 @@ public class AiLapSweepGameTests {
 	private static void rescue(RaceTrack track, Runner r, int tick) {
 		ChocoboEntity e = r.bird;
 		double t = r.lap.lastProgress();
-		double lane = track.detourLaneAt(t, 0.0D, e.color(), true);
-		RacePoint at = track.pointAtLane(t, lane);
+		RacePoint at = tk.darrow.chocobosreborn.race.RaceSession.setBackPoint((ServerLevel) e.level(), track, e, t);
 		double[] tg = track.tangent(t);
 		e.moveTo(at.x(), at.y(), at.z(), (float) Math.toDegrees(Math.atan2(-tg[0], tg[1])), 0.0F);
 		e.setDeltaMovement(Vec3.ZERO);
@@ -388,6 +387,19 @@ public class AiLapSweepGameTests {
 
 	private static String describe(RaceTrack track, RaceCourseLayout layout, Runner r, double progress, ServerLevel level) {
 		ChocoboEntity e = r.bird;
+		String near = nearFeature(track, progress);
+		BlockPos bp = e.blockPosition();
+		return String.format(Locale.ROOT,
+				"%s %s start-lane %.1f from %.4f: progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b feet=%s below=%s rescues=%d setBacks=%d mode=%s near %s",
+				track.name(), r.colour, r.lane, r.start, progress, track.laneAt(progress, e.getX(), e.getZ()), e.getX(), e.getY(), e.getZ(),
+				layout.onCourse(e.getX(), e.getZ()), e.horizontalCollision, e.onGround(),
+				level.getBlockState(bp).getBlock().getDescriptionId().replace("block.minecraft.", ""),
+				level.getBlockState(bp.below()).getBlock().getDescriptionId().replace("block.minecraft.", ""), r.rescues, r.setBacks,
+				r.goal.recoveryMode(), near);
+	}
+
+	/** The terrain feature nearest {@code progress}: "on RIDGE[...] +3.1b", "WATER[...] end+5.6b". */
+	static String nearFeature(RaceTrack track, double progress) {
 		double lap = track.lapLength();
 		String near = "";
 		double bestD = Double.MAX_VALUE;
@@ -410,18 +422,11 @@ public class AiLapSweepGameTests {
 				near = s;
 			}
 		}
-		BlockPos bp = e.blockPosition();
-		return String.format(Locale.ROOT,
-				"%s %s start-lane %.1f from %.4f: progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b feet=%s below=%s rescues=%d setBacks=%d mode=%s near %s",
-				track.name(), r.colour, r.lane, r.start, progress, track.laneAt(progress, e.getX(), e.getZ()), e.getX(), e.getY(), e.getZ(),
-				layout.onCourse(e.getX(), e.getZ()), e.horizontalCollision, e.onGround(),
-				level.getBlockState(bp).getBlock().getDescriptionId().replace("block.minecraft.", ""),
-				level.getBlockState(bp.below()).getBlock().getDescriptionId().replace("block.minecraft.", ""), r.rescues, r.setBacks,
-				r.goal.recoveryMode(), near);
+		return near;
 	}
 
 	/** The 3 x 3 columns round the bird's feet, one below to one above: "y:dx,dz=block" for anything not air. */
-	private static String around(ServerLevel level, ChocoboEntity e) {
+	static String around(ServerLevel level, ChocoboEntity e) {
 		StringBuilder sb = new StringBuilder();
 		BlockPos c = e.blockPosition();
 		for (int dy = -1; dy <= 2; dy++) {
@@ -454,7 +459,7 @@ public class AiLapSweepGameTests {
 		return d - Math.floor(d + 0.5D);
 	}
 
-	private static void force(ServerLevel level, RaceTrack track, boolean on) {
+	static void force(ServerLevel level, RaceTrack track, boolean on) {
 		for (long key : RaceCourseLayout.of(track).chunks()) {
 			level.setChunkForced((int) (key >> 32), (int) key, on);
 		}
