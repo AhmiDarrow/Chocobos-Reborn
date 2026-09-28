@@ -1628,3 +1628,130 @@ point and Horseshoe heels, A Ammonite inner coil and Grotto tail, S Abyssal Spir
 Star Bastion tips, the floating comet head); S ladder: a maxed Gold driven well beats Teiyo by
 ~8.4 % (test bound 9 %), 90-trained Black wins S; no new S course carries lava (only Gold would
 gain in S now that Flame does not race).
+
+## Racer collision (kart bumps) (2026-09-28, unreleased, branch `racer-collision`; Ahmi: "Racers need collision, being able to phase through the other racers makes it less fun or challenging. This will make it more fair and complicated." Chose **kart bumps** over a solid wall or a soft vanilla push)
+
+### The model (`race/RacerContact`, pure, `RacerContactTest`)
+
+Two racers touch when their centres are under `REACH` 1.6 blocks apart (the bird box is 1.75)
+and within `HEIGHT` 1.5 in height (one over a ridge passes over). The resolving bird looks at
+where the other one sits against its own heading (a 50-degree cone, `CONE` 0.64):
+
+| contact | this bird | numbers |
+|---|---|---|
+| rear-end (other ahead) | takes out all of the closing speed, bounces back 30 % x weight ratio of it, loses pace | loss = ratio x (0.10 + 0.5 x closing), cap 0.25, fading linearly over 15 ticks (`Slow`); a 20 % bump costs ~1.6 ticks of running, ~2 blocks at a gallop |
+| front (other behind) | a nudge on along its own heading only, no pace loss | 0.25 x 1.3 x closing x share, at most 0.06 b/t |
+| side | pushed apart square to its heading, pace kept | ratio x (0.12 + 0.6 x lateral closing) when closing > 0.03 b/t |
+| head-on | the other bird is ahead of both: both take the rear-end | |
+| any overlap | eased out of it | 0.15 x overlap, at most 0.1 b/t |
+
+A tick's shove is capped at 0.45 b/t (`MAX_IMPULSE`); friction (0.546 a tick on the ground)
+turns that into at most ~1 block of drift. Rubbing at the same pace is a rub, not a bump (no
+pace loss). A clean pass (the AI swings 2.4 out) never comes within reach: it costs nothing.
+
+**Weight**: 1, +0.5 dashing, +0.5 on a boost pad (`RacerContact.weight`); every effect scales
+with `ratio` = 2 x other / (self + other), 1 at equal weight. So a dashing or boosted bird shoves
+harder and is shoved less, and a dasher rear-ending pays less than a plain bird would. Class,
+grade and stats are left out on purpose: speed already enters as closing speed.
+
+**Rail / void guard** (`Guard`, `guardLateral`): the sideways part of a shove never carries a bird
+past `RacerLine.LANE_LIMIT` (4.5, half a block of air before the rail on the kerb at 6.5; drift
+counted as dv / (1 - 0.546)); inward is always allowed; off the road band (|lane| > 5.5: a detour,
+a connector, a set-back) there is no sideways shove at all, only the bounce along the road. Nothing
+is ever vertical. Vanilla pushing stays off for racers (`isPushable` false via `squareProtected`), so
+nothing doubles up.
+
+**Exempt (ghosts)** (`RacerContact.solid`, `ChocoboEntity.contactSolid`): solid = racing, not held,
+not a ghost. So birds on the grid (held), during a set-back hold, finished AI (set ghost at the line,
+parking in lane -3.5), finished and forfeited riders (racing is already cleared), and a set-back bird
+for `RESCUE_GHOST_TICKS` (40) after its hold **and until it is clear of every solid racer**
+(`RaceSession.touchesRacer`) all pass through the field. Grid stalls are 1.8 apart, more than the
+1.6 reach (`theGridIsWiderThanTheContactReach`). Synced flags: new `DATA_CONTACT` int (bit 1 ghost,
+bit 2 dashing).
+
+### Netcode: each bird is resolved by whoever simulates it
+
+`ChocoboEntity.travel` -> `applyRacerContact` runs only where the bird is simulated: the server for AI
+birds (after `RacerMoveControl` set the speed), the **driving client** for a rider's own bird (after
+`getRiddenSpeed`); remote birds on a client return early (lerped) and a rider's bird on the server
+never travels. It changes only this bird's own velocity (the shove) and its own speed setting (the
+fading pace loss). Nobody moves another racer, and the server gets the rider's bumped position as an
+ordinary vehicle move, so there is nothing to correct: impulses are at most 0.45 b/t against vanilla's
+10-block per-step check, and entity-to-entity contact is not part of the server's collision replay.
+The zero-correction result should hold; the hub harness has to confirm it.
+
+What each side knows of the others: velocities come from positions (`contactVx/Vz`, smoothed, teleports
+ignored), since a rider's bird has no server velocity and remote birds have none on a client. Weight:
+the driving client knows its own dash (the predicted frame) and pad (`localBoostTicks`); everyone else
+goes by the synced dash flag (AI: `RacerGoal`; a rider: set from each acknowledged input frame in
+`drainRaceInputs`) and `DATA_BOOST`. **Lead**: a remote bird is drawn half a round trip plus the lerp
+(~2 ticks) behind the server, and the server sees this client's bird half a round trip late, so the
+driving client leads every remote bird by its velocity x `leadTicks(rtt)` = 2 + rtt / 50 ms, capped at
+10 (host 2, 150 ms 5, 300 ms 8). That compares the same moment the server compares for its AI. RTT is
+vanilla's player-list latency (`CLIENT_RTT_MS`, installed by the client mod; it updates slowly).
+
+### AI (`RacerGoal.traffic`, helpers in `RacerLine`, tests in `RacerLineTest`)
+
+Skill = the profile's `lineHold` (C 0.35, B 0.60, A 0.80, S and the rivals 0.95). Scans solid racers
+within 12 blocks every 5 ticks; positions along the road by lap progress (`blocksAhead`), lanes at the
+other bird's own progress.
+* **A bird ahead in the lane we aim for** (within `trafficLook` = 2 + 4 x skill + 25 x skill x closing
+  blocks): pass on the side with room (`passSide`), or the other side if a bird alongside holds that
+  lane; a pass now wins over a boost strip's lane. Both sides boxed in and about to touch its tail:
+  match its pace (`followScale`, 0.5..1, never faster than its own pace). Rolled once per bird met:
+  `trafficMiss` = 0.5 x (1 - skill), so a C bird drives into the tail about one time in three (30 ticks),
+  an S bird one in forty.
+* **A bird alongside** (within 2.5 blocks along the road): never aim nearer than `sideClear`
+  (1.7 + 0.3 x skill) on its side (`keepClear`); C wobble still rubs sometimes.
+* **Defend**: a leader with a faster bird up to 6 blocks behind and lining up on the inside (1.6-3.5
+  blocks in) drifts up to 1 x skill blocks across (`defendLane`), holds it 40 ticks, then not again for
+  80: one move, never a weave. Only on the road band.
+* Speeds of the others come from `contactVx/Vz`: the old pass check compared server velocities, and a
+  rider's bird has none on the server, so the AI tried to pass every rider it met.
+`RaceSimTest` is single-bird and does not run `RacerGoal`: no ladder line moved. No rubber-banding
+(`RacerProfileTest` still passes; nothing new looks at the player).
+
+### Harness (`harness/RaceHarnessClient.input`)
+
+Each bot takes its lane from its grid stall while held (clamped to 4.5) and drives it instead of the
+centre line, and swings `PASS_OFFSET` round a solid racer 1-10 blocks ahead within 2 blocks of its lane
+(sticky 40 ticks). Output files and formats are unchanged. This changes the bots' lines, so finish-time
+comparisons against older reports are not like for like.
+
+### Tests
+
+`RacerContactTest` (15: apart, clean overtake, rear-end, harder rear-end up to the cap, tailgating rub,
+side-by-side, head-on at 45 degrees, dash/boost weight, ghosts/held, grid wider than reach, clamp,
+never past the lane limit, no sideways shove off the band, the fade, the lead); `RacerLineTest` +5
+(traffic skill C..S and the rivals, blocksAhead, keepClear, followScale, defend). GameTest
+`twoAiBirdsInOneLaneNeverOverlapAndBothLap` (batch `ai_contact`, C_MEADOW): a 1.3x-pace AI bird six
+blocks behind a 1.0x one in the same lane; centres never under 0.9, the two meet (closest under 4.5)
+and both earn a full lap. Results: 244 unit tests (1 skipped, AtlasTint), all 29 GameTests, `build` green. The GameTests ran twice: the first run was on a build from before the last traffic fix (a bird nose-to-tail within 2.5 blocks now counts as ahead, not alongside, and a faster bird ahead is no obstacle); the second, on the committed code, also passed.
+
+### Known limits
+
+* **Anti-cheat**: a modified client can ignore bumps (it simulates its own bird). The server does not
+  check it; any check that corrects an honest client would bring corrections back. A possible later
+  check: count server-side overlaps of a rider's bird with AI birds that never produced a velocity
+  drop, log only.
+* The two sides judge from different views: the server sees a rider half a round trip late, the rider
+  sees remote birds led by an estimate. Straight-line running leads well; a bird turning or braking
+  inside the lead window can give a bump the other side did not see (or miss one). Rider vs rider:
+  each client leads by its own RTT only, so the error is about the sum of the two half-trips.
+* A remote bird is still drawn where the lerp puts it, so at high ping a guest can be bumped by a bird
+  drawn a little behind the contact point.
+* The RTT source is vanilla's player-list latency, which refreshes slowly.
+
+### Needs an in-game / hub-harness look
+
+* **Corrections**: the hub harness (three clients, 150 / 300 ms + jitter) must still report zero vehicle
+  corrections with the bots now in lanes and bumping.
+* Feel: is a rear-end noticeable but not brutal (10-25 % for ~0.75 s), is a side rub felt without
+  knocking anyone off, is a dasher's shove visibly harder?
+* Narrow spots: detour roads and connectors (no sideways shove there), ridges, the tight corners the class
+  agents flagged (C Heart point, Horseshoe heels, A Ammonite coil, S Abyssal Spiral terraces, Star Bastion
+  tips).
+* The start: six birds 1.8 apart at GO, then the AI blending to the inside line with `keepClear`.
+* AI: C birds bumping about one pass in three, S and the rivals clean, leaders covering the inside once
+  without weaving, nobody stuck behind a slower bird for long.
+* Ghosts: a set-back bird dropped into traffic, finished AI parking, a finished rider coasting.

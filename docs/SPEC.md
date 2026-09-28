@@ -187,6 +187,27 @@ into the lock, a final push, no look at the player).
 `RaceSession` force-loads them for the heat. `CourseMapDumpTest` draws every course to
 `build/track_maps/`.
 
+Racer contact, kart bumps (`RacerContact`): racers are solid to each other during a heat
+(vanilla pushing stays off). Birds touch when their centres are under 1.6 blocks apart and
+within 1.5 in height. Running into a bird's tail (it sits in the 50-degree cone ahead) bounces
+the rear bird back and costs it 10 % + half the closing speed of its pace, capped at 25 %,
+fading out over 15 ticks; the bird in front only gets a nudge on along its own line (at most
+0.06 blocks a tick). Side by side, both push themselves apart square to their heading
+(0.12 + 0.6 x the closing speed, plus a push out of any overlap) and both keep their pace.
+Head-on, both take the rear-end. Weight 1, +0.5 dashing, +0.5 on a boost pad: every effect
+scales with 2 x other / (self + other). A tick's shove is capped at 0.45 blocks a tick, never
+carries a bird past lane 4.5 (half a block inside the rail), and off the road band (a detour or
+connector) there is no sideways shove. Solid means racing, not held and not a ghost: birds on the
+grid and during a set-back hold, finished AI parking in lane -3.5, finished or forfeited riders,
+and a set-back bird for 2 s after its hold and until it is clear of everyone go through the
+field. Each bird is resolved by the side that simulates it: the server for AI birds, the driving
+client for a rider's own bird (it leads the remote birds by its round trip plus the lerp,
+`RacerContact.leadTicks`). The AI goes round a bird ahead in its lane on the side with room
+(both sides boxed in: it matches the pace ahead), keeps clear of a bird alongside, and a leader
+may drift up to a block (x skill) to cover the inside from a chaser, once, then not again for
+4 s. Skill is the profile's line hold: a C bird reacts late and misses the bird ahead about one
+time in three; S birds and the rivals race clean.
+
 Ranked heats run on a timetable (`HeatSchedule`): one per class on every five-minute
 mark of game time (entrants see the timer on the action bar; a title announces the
 transport, a settle period and a five-second title countdown precede GO). The first rider to see Esther picks the course

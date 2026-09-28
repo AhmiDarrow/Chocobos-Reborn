@@ -553,6 +553,82 @@ public class ChocobosRebornGameTests {
 		}).thenSucceed();
 	}
 
+	/**
+	 * Racer contact: a faster AI bird starts six blocks behind a slower one in the same
+	 * lane. It must never phase through or sit inside the other (contact starts at 1.6
+	 * blocks between centres, the bird box is 1.75 wide: kart bumps, or a clean pass), and
+	 * both must still get round a full lap with it credited.
+	 */
+	@GameTest(template = EMPTY, timeoutTicks = 3500, batch = "ai_contact")
+	public static void twoAiBirdsInOneLaneNeverOverlapAndBothLap(GameTestHelper helper) {
+		RaceTrack track = RaceTrack.C_MEADOW;
+		ServerLevel level = helper.getLevel();
+		RaceManager.testLevel = level;
+		forceTrack(level, track, true);
+		SquareBuilder.buildTrack(level, track);
+		double start = 0.03D;
+		double behind = start - 6.0D / track.lapLength();
+		ChocoboEntity front = contactRacer(level, track, start, 1.0D, 1.0D, 11L);
+		ChocoboEntity rear = contactRacer(level, track, behind, 1.0D, 1.3D, 12L);
+		var frontLap = new tk.darrow.chocobosreborn.race.RaceLapProgress(start);
+		var rearLap = new tk.darrow.chocobosreborn.race.RaceLapProgress(behind);
+		boolean[] lapped = {false, false};
+		double[] closest = {Double.MAX_VALUE};
+		helper.onEachTick(() -> {
+			if (front.isRemoved() || rear.isRemoved()) return;
+			double d = Math.hypot(front.getX() - rear.getX(), front.getZ() - rear.getZ());
+			if (Math.abs(front.getY() - rear.getY()) < tk.darrow.chocobosreborn.race.RacerContact.HEIGHT) {
+				closest[0] = Math.min(closest[0], d);
+				helper.assertTrue(d > 0.9D, "racers inside each other: d=" + d + " front=" + front.position() + " rear=" + rear.position());
+			}
+		});
+		helper.startSequence().thenWaitUntil(() -> {
+			lapped[0] |= frontLap.update(track.progressAt(front.getX(), front.getZ(), frontLap.lastProgress()),
+					RaceCourseLayout.of(track).onCourse(front.getX(), front.getZ()));
+			lapped[1] |= rearLap.update(track.progressAt(rear.getX(), rear.getZ(), rearLap.lastProgress()),
+					RaceCourseLayout.of(track).onCourse(rear.getX(), rear.getZ()));
+			helper.assertTrue(lapped[0] && lapped[1], "both lap: front=" + lapped[0] + " rear=" + lapped[1]
+					+ " closest=" + closest[0]);
+		}).thenExecute(() -> {
+			helper.assertTrue(closest[0] < 4.5D, "the two actually met on the road: closest " + closest[0]);
+			front.discard();
+			rear.discard();
+			forceTrack(level, track, false);
+			RaceManager.testLevel = null;
+		}).thenSucceed();
+	}
+
+	private static ChocoboEntity contactRacer(ServerLevel level, RaceTrack track, double progress, double lane,
+			double pace, long seed) {
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		bird.setColor(ChocoboColor.YELLOW);
+		bird.setAge(0);
+		bird.setPersistenceRequired();
+		bird.setRaceClass(track.getRaceClass());
+		bird.setGrade(ChocoboGrade.byRank(track.getRaceClass().getId() + 1));
+		bird.setGenes(40, 40, 40, 40);
+		int training = RaceScoring.fieldTraining(track.getRaceClass().getId(), false);
+		bird.addTraining(training, training, training, training);
+		bird.setRaceNpc(true);
+		bird.setRacing(true);
+		bird.setRaceTrack(track.ordinal());
+		bird.fillStamina();
+		bird.getRandom().setSeed(seed);
+		RacePoint at = track.pointAtLane(progress, lane);
+		RacePoint toward = track.pointAt(progress + .01);
+		bird.moveTo(at.x(), at.y(), at.z(),
+				(float) Math.toDegrees(Math.atan2(-(toward.x() - at.x()), toward.z() - at.z())), 0);
+		level.addFreshEntity(bird);
+		var goal = new tk.darrow.chocobosreborn.race.RacerGoal(bird, track, lane,
+				tk.darrow.chocobosreborn.race.RacerProfile.of(track.getRaceClass(),
+						tk.darrow.chocobosreborn.race.RacerProfile.Role.FIELD));
+		goal.paceScale = pace;
+		goal.running = true;
+		bird.installRacer(goal);
+		bird.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
+		return bird;
+	}
+
 	/** Exercise Minecraft's normalization too, not only our multiplier arithmetic. */
 	private static double riddenAcceleration(ChocoboEntity bird, Player rider) {
 		try {

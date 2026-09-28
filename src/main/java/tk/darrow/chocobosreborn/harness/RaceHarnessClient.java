@@ -16,6 +16,7 @@ import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.race.RacePoint;
 import tk.darrow.chocobosreborn.race.RaceTrack;
+import tk.darrow.chocobosreborn.race.RacerLine;
 
 /** Drives only ordinary client movement input and yaw; physics and packets remain real. */
 @EventBusSubscriber(modid = ChocobosReborn.MOD_ID, value = Dist.CLIENT)
@@ -23,6 +24,10 @@ public final class RaceHarnessClient {
     private static int ticks, run;
     private static boolean held;
     private static double hint = Double.NaN;
+    /** This bot's lane, taken from its grid stall, so three bots do not pile onto the centre line. */
+    private static double botLane;
+    private static int passTicks;
+    private static double passSide;
     private static final java.util.concurrent.atomic.AtomicInteger corrections = new java.util.concurrent.atomic.AtomicInteger();
     private static int correctionBase;
     private static RaceTrack activeTrack;
@@ -33,6 +38,13 @@ public final class RaceHarnessClient {
             field.setAccessible(true);
             return field.getInt(bird);
         } catch (ReflectiveOperationException e) { throw new IllegalStateException(e); }
+    }
+
+    /** Signed lane of a point at progress t: positive = inside the loop, like {@link RaceTrack#pointAtLane}. */
+    private static double laneOf(RaceTrack track, double t, double x, double z) {
+        RacePoint c = track.pointAt(t);
+        double[] tg = track.tangent(t);
+        return (x - c.x()) * -tg[1] + (z - c.z()) * tg[0];
     }
 
     private static boolean enabled() {
@@ -93,7 +105,25 @@ public final class RaceHarnessClient {
         double progress = Double.isNaN(hint) ? track.progressAt(bird.getX(), bird.getZ())
                 : track.progressAt(bird.getX(), bird.getZ(), hint);
         hint = progress;
-        RacePoint target = track.pointAt(progress + Math.max(5.0D, bird.getDeltaMovement().horizontalDistance() * 6.0D) / track.lapLength());
+        if (bird.raceHeld() && ticks == 0) botLane = RacerLine.clampLane(laneOf(track, progress, bird.getX(), bird.getZ()));
+        double aim = botLane;
+        // steer round a solid racer directly ahead in this lane (racer contact would bump us)
+        if (passTicks > 0) passTicks--;
+        else {
+            for (ChocoboEntity other : mc.level.getEntitiesOfClass(ChocoboEntity.class, bird.getBoundingBox().inflate(10.0D, 2.0D, 10.0D),
+                    e -> e != bird && e.contactSolid())) {
+                double ot = track.progressAt(other.getX(), other.getZ(), progress);
+                double ahead = (ot - progress - Math.floor(ot - progress + 0.5D)) * track.lapLength();
+                double otherLane = laneOf(track, ot, other.getX(), other.getZ());
+                if (ahead > 1.0D && ahead < 10.0D && Math.abs(otherLane - botLane) < 2.0D) {
+                    passSide = RacerLine.passSide(botLane, otherLane);
+                    passTicks = 40;
+                    break;
+                }
+            }
+        }
+        if (passTicks > 0) aim = RacerLine.clampLane(botLane + passSide * RacerLine.PASS_OFFSET);
+        RacePoint target = track.pointAtLane(progress + Math.max(5.0D, bird.getDeltaMovement().horizontalDistance() * 6.0D) / track.lapLength(), aim);
         event.getEntity().setYRot((float) Math.toDegrees(Math.atan2(-(target.x() - bird.getX()), target.z() - bird.getZ())));
         event.getEntity().setXRot(0);
         var input = event.getInput();

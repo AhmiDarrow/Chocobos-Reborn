@@ -17,6 +17,13 @@ import tk.darrow.chocobosreborn.entity.ChocoboEntity;
  */
 public class RacerGoal extends Goal {
 	private static final int STUMBLE_TICKS = 20;
+	/** Look this far round for traffic (blocks). */
+	private static final double TRAFFIC_RANGE = 12.0D;
+	/** A bird within this many blocks along the road is alongside, not ahead or behind. */
+	private static final double ALONGSIDE = 2.5D;
+	/** A chaser this close behind (blocks) makes a leader think about covering the inside. */
+	private static final double CHASER_RANGE = 6.0D;
+	private static final int PASS_TICKS = 40, MISS_TICKS = 30, DEFEND_TICKS = 40, DEFEND_COOLDOWN = 80;
 	/** Look this far ahead for a boost strip to line up with. */
 	private static final double BOOST_LOOK = 24.0D;
 
@@ -48,6 +55,13 @@ public class RacerGoal extends Goal {
 	private int stumble;
 	private int passTicks;
 	private double passSide;
+	/** Did not see the bird ahead this time (sloppy classes): no pass, no lift, until this runs out. */
+	private int missTicks;
+	/** Covering the inside from a chaser: held for a while, then not again for a while (no weaving). */
+	private int defendTicks, defendCooldown;
+	private double defendLane;
+	/** The bird last found ahead in our lane (entity id, -1 none): the miss roll is once per bird met. */
+	private int lastBlocker = -1;
 	private boolean dashing;
 	/** Boost strip being lined up for (its feature index), and whether this bird goes for it. */
 	private int boostStrip = -1;
@@ -124,6 +138,7 @@ public class RacerGoal extends Goal {
 		boolean push = RacerProfile.finalPush(totalLaps - (lapsDone + t), totalLaps);
 		dashing = !finished && !locked && st > 0
 				&& profile.wantsDash(energy, dashing, track.isStraight(t), lift, push);
+		bird.setRaceDashFlag(dashing);   // dashing birds shove harder (RacerContact weight)
 		if (dashing) {
 			boolean skip = RaceScoring.intelSkipsDashDrain(bird.intelligenceStat(), bird.tickCount,
 					bird.getRandom().nextInt(100));
@@ -150,30 +165,17 @@ public class RacerGoal extends Goal {
 		if (onBoostLine) {
 			lane = boostLane;
 		}
-		// --- overtaking: a slower bird just ahead and in our lane -> go round it, on the side with room
+		// --- traffic: go round a bird ahead in our lane on the side with room, lift if boxed in,
+		// keep clear of a bird alongside, cover the inside from a chaser (RacerContact bumps otherwise)
 		if (ticks % 5 == 0) {
-			nearby = bird.level().getEntitiesOfClass(ChocoboEntity.class, bird.getBoundingBox().inflate(3.5D, 1.0D, 3.5D),
-					e -> e != bird && e.racing());
+			nearby = bird.level().getEntitiesOfClass(ChocoboEntity.class,
+					bird.getBoundingBox().inflate(TRAFFIC_RANGE, 2.0D, TRAFFIC_RANGE),
+					e -> e != bird && e.contactSolid());
 		}
-		if (passTicks > 0) {
-			passTicks--;
-		} else if (!finished) {
-			for (ChocoboEntity other : nearby) {
-				double dt = track.progressAt(other.getX(), other.getZ(), t) - t;
-				if (dt < 0.0D) {
-					dt += 1.0D;
-				}
-				double otherLane = laneOf(t, other.getX(), other.getZ());
-				if (dt < 0.03D && Math.abs(otherLane - lane) < 1.9D
-						&& other.getDeltaMovement().horizontalDistanceSqr() < bird.getDeltaMovement().horizontalDistanceSqr()) {
-					passSide = RacerLine.passSide(lane, otherLane);
-					passTicks = 40;
-					break;
-				}
-			}
-		}
-		if (passTicks > 0 && !onBoostLine) {
-			lane += passSide * RacerLine.PASS_OFFSET;
+		double follow = 1.0D;
+		if (!finished && bird.contactSolid()) {
+			follow = traffic(t, lane);
+			lane = trafficLane;
 		}
 		if (finished) {
 			lane = RacerLine.PARK_LANE;   // out of the racing line: the riders behind are still racing
@@ -218,6 +220,7 @@ public class RacerGoal extends Goal {
 		if (stumble > 0) {
 			mul *= 0.55D;
 		}
+		mul *= follow;   // boxed in behind a slower bird: match it rather than ram it
 		// lift for the corners: hairpins and chicanes are taken slower, sweepers barely
 		mul *= lift;
 		if (finished) {
@@ -279,6 +282,120 @@ public class RacerGoal extends Goal {
 		}
 		boostStrip = -1;   // clear of every strip: the next lap's pass rolls afresh
 		return Double.NaN;
+	}
+
+	/** The lane {@link #traffic} settled on. */
+	private double trafficLane;
+
+	/**
+	 * Traffic for this tick, from the birds {@link #nearby}. Sets {@link #trafficLane}
+	 * (from the aimed {@code lane}) and returns a pace scale (1 = none). Skill is the
+	 * profile's lineHold: a C bird looks late and sometimes not at all, an S bird (and
+	 * the rivals) early and nearly always ({@link RacerLine#trafficLook},
+	 * {@link RacerLine#trafficMiss}).
+	 */
+	private double traffic(double t, double lane) {
+		double skill = profile.lineHold();
+		double clear = RacerLine.sideClear(skill);
+		double myLane = laneOf(t, bird.getX(), bird.getZ());
+		double mySpeed = bird.getDeltaMovement().horizontalDistance();
+		double lap = track.lapLength();
+		ChocoboEntity blocker = null;
+		double blockerAhead = Double.MAX_VALUE, blockerLane = 0.0D, blockerSpeed = 0.0D;
+		double chaserLane = Double.NaN;
+		java.util.List<double[]> alongside = new java.util.ArrayList<>(2);
+		for (ChocoboEntity other : nearby) {
+			if (!other.isAlive() || !other.contactSolid()) {
+				continue;
+			}
+			double ot = track.progressAt(other.getX(), other.getZ(), t);
+			double ahead = RacerLine.blocksAhead(t, ot, lap);
+			double oLane = laneOf(ot, other.getX(), other.getZ());
+			double oSpeed = Math.hypot(other.contactVx(), other.contactVz());
+			if (Math.abs(ahead) < ALONGSIDE && Math.abs(oLane - myLane) >= RacerContact.REACH * 0.5D) {
+				alongside.add(new double[]{oLane});   // beside us, not nose to tail
+			} else if (ahead > 0.0D) {
+				double closing = mySpeed - oSpeed;
+				boolean inLane = RacerLine.laneTaken(lane, oLane, clear)
+						|| (ahead < ALONGSIDE && RacerLine.laneTaken(myLane, oLane, RacerContact.REACH));
+				// slower, or already on its tail: a faster bird ahead is no obstacle
+				boolean inTheWay = closing > 0.02D || ahead < RacerContact.REACH + 1.0D;
+				if (inLane && inTheWay && ahead < RacerLine.trafficLook(skill, closing) && ahead < blockerAhead) {
+					blocker = other;
+					blockerAhead = ahead;
+					blockerLane = oLane;
+					blockerSpeed = oSpeed;
+				}
+			} else if (ahead > -CHASER_RANGE && oSpeed > mySpeed + 0.02D
+					&& (Double.isNaN(chaserLane) || oLane > chaserLane)) {
+				chaserLane = oLane;
+			}
+		}
+		if (passTicks > 0) {
+			passTicks--;
+		}
+		if (missTicks > 0) {
+			missTicks--;
+		}
+		if (defendTicks > 0) {
+			defendTicks--;
+		} else if (defendCooldown > 0) {
+			defendCooldown--;
+		}
+		double follow = 1.0D;
+		int blockerId = blocker == null ? -1 : blocker.getId();
+		boolean fresh = blockerId != lastBlocker;
+		lastBlocker = blockerId;
+		if (blocker != null && fresh && bird.getRandom().nextDouble() < RacerLine.trafficMiss(skill)) {
+			missTicks = MISS_TICKS;   // did not see this one: straight on into its tail
+		}
+		if (blocker != null && missTicks == 0 && passTicks == 0) {
+			// the side with room, unless a bird alongside already has that lane
+			double side = RacerLine.passSide(lane, blockerLane);
+			if (sideTaken(lane + side * RacerLine.PASS_OFFSET, alongside, clear)) {
+				side = -side;
+			}
+			double aim = lane + side * RacerLine.PASS_OFFSET;
+			if (Math.abs(aim) <= RacerLine.LANE_LIMIT + 0.5D && !sideTaken(aim, alongside, clear)) {
+				passSide = side;
+				passTicks = PASS_TICKS;
+			}
+		}
+		if (passTicks > 0) {
+			lane += passSide * RacerLine.PASS_OFFSET;   // a pass wins over a boost strip's lane
+			defendTicks = 0;
+		} else if (blocker == null && !Double.isNaN(chaserLane) && defendTicks == 0 && defendCooldown == 0
+				&& Math.abs(myLane) <= RacerLine.LANE_LIMIT) {
+			double covered = RacerLine.defendLane(myLane, chaserLane, skill);
+			if (covered != myLane) {
+				defendLane = covered;
+				defendTicks = DEFEND_TICKS;
+				defendCooldown = DEFEND_COOLDOWN;
+			}
+		}
+		if (defendTicks > 0) {
+			lane = defendLane;
+		}
+		if (missTicks == 0) {
+			for (double[] a : alongside) {
+				lane = RacerLine.keepClear(lane, myLane, a[0], clear);
+			}
+			// boxed in (no pass open) and about to touch its tail: match its pace
+			if (blocker != null && passTicks == 0 && RacerLine.laneTaken(myLane, blockerLane, RacerContact.REACH)) {
+				follow = RacerLine.followScale(mySpeed, blockerSpeed, blockerAhead);
+			}
+		}
+		trafficLane = lane;
+		return follow;
+	}
+
+	private static boolean sideTaken(double aim, java.util.List<double[]> alongside, double clear) {
+		for (double[] a : alongside) {
+			if (RacerLine.laneTaken(aim, a[0], clear)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** Signed lane of a point: positive = inside the loop, like {@link RaceTrack#pointAtLane}. */

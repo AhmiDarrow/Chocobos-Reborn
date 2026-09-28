@@ -71,6 +71,8 @@ public class RaceSession {
 		double roadX = Double.NaN, roadZ = Double.NaN;
 		/** Tick a rescue hold ends (0 = none). */
 		int heldUntil;
+		/** Tick the ghosting after a set-back may end (0 = none): it lasts until the bird is clear of everyone. */
+		int ghostUntil;
 		/** The terrain feature this rider was last told about (lap * 100 + index), so each approach warns once. */
 		int warnedFeature = -1;
 
@@ -733,6 +735,10 @@ public class RaceSession {
 				r.heldUntil = 0;
 				e.setRaceHeld(false);
 			}
+			if (r.ghostUntil > 0 && tick >= r.ghostUntil && !touchesRacer(e)) {
+				r.ghostUntil = 0;
+				e.setRaceGhost(false);   // solid again only once clear: never set down inside someone
+			}
 			RaceLapProgress.Step step = fell ? RaceLapProgress.Step.RESCUE
 					: r.progress.step(progress, onCourse, RaceLapProgress.allowance(track.lapLength()));
 			if (onCourse && !r.progress.offCourse()) {
@@ -767,6 +773,9 @@ public class RaceSession {
 					r.observedFinishTime = tick - 1 + RaceScoring.crossFraction(fineBefore, fine);
 					r.finishLatencyMs = player == null ? 0 : tk.darrow.chocobosreborn.net.RaceLatency.millis(player);
 					r.finishTime = r.observedFinishTime - RaceScoring.lagCreditTicks(r.startLatencyMs, r.finishLatencyMs);
+					if (!r.human()) {
+						e.setRaceGhost(true);   // parks in the outside lane: no bumps for the birds still racing
+					}
 					if (r.human()) {
 						e.setRacing(false);   // unlock dismount; grace must not DNF a placed rider
 						if (firstFinishTick < 0) {
@@ -1313,7 +1322,9 @@ public class RaceSession {
 		face(e, (float) Math.toDegrees(Math.atan2(-tg[0], tg[1])));
 		e.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
 		e.setRaceHeld(true);
+		e.setRaceGhost(true);
 		r.heldUntil = tick + RaceScoring.RESCUE_HOLD_TICKS;
+		r.ghostUntil = r.heldUntil + RacerContact.RESCUE_GHOST_TICKS;
 		r.progress.rescued();
 		r.roadX = at.x();
 		r.roadZ = at.z();
@@ -1323,6 +1334,21 @@ public class RaceSession {
 			player.displayClientMessage(Component.translatable("chocobosreborn.race.rescued"), true);
 			player.playNotifySound(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.2F);
 		}
+	}
+
+	/** Another solid racer within contact reach of {@code e} (a set-back bird stays a ghost until clear). */
+	private boolean touchesRacer(ChocoboEntity e) {
+		for (Racer o : racers) {
+			ChocoboEntity b = o.entity();
+			if (b == null || b == e || !b.contactSolid()) {
+				continue;
+			}
+			if (Math.abs(b.getY() - e.getY()) < RacerContact.HEIGHT
+					&& Math.hypot(b.getX() - e.getX(), b.getZ() - e.getZ()) < RacerContact.REACH + 0.25D) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public boolean hasRacer(UUID bird) {

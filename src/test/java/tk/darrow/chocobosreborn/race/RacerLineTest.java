@@ -124,4 +124,67 @@ class RacerLineTest {
 		assertTrue(new RaceTrack.Feature(RaceTrack.Feature.Type.LAVA, 0.1, 0.2).suits(RaceScoring.joloColor(RaceClass.S)));
 		assertFalse(new RaceTrack.Feature(RaceTrack.Feature.Type.LAVA, 0.1, 0.2).suits(ChocoboColor.BLACK));
 	}
+
+	@Test
+	void trafficSkillRunsFromClumsyCToCleanS() {
+		double c = RacerProfile.of(RaceClass.C, RacerProfile.Role.FIELD).lineHold();
+		double s = RacerProfile.of(RaceClass.S, RacerProfile.Role.FIELD).lineHold();
+		double rival = RacerProfile.of(RaceClass.C, RacerProfile.Role.TEIYO).lineHold();
+		assertTrue(RacerLine.trafficMiss(c) > 0.25D, "a C bird misses the bird ahead about one time in three");
+		assertTrue(RacerLine.trafficMiss(s) < 0.05D, "an S bird nearly always sees it");
+		assertEquals(RacerLine.trafficMiss(s), RacerLine.trafficMiss(rival), 1e-12, "the rivals race clean in every class");
+		assertTrue(RacerLine.trafficLook(s, 0.3D) > RacerLine.trafficLook(c, 0.3D), "S looks further up the road");
+		assertTrue(RacerLine.trafficLook(c, 0.4D) > RacerLine.trafficLook(c, 0.0D), "closing fast: react earlier");
+		assertTrue(RacerLine.trafficLook(c, 0.0D) > RacerContact.REACH, "even a C bird reacts before touching");
+		assertTrue(RacerLine.sideClear(c) > RacerContact.REACH && RacerLine.sideClear(s) > RacerLine.sideClear(c));
+		assertTrue(RacerLine.PASS_OFFSET > RacerLine.sideClear(1.0D), "a pass swings wide enough to clear the bird");
+	}
+
+	@Test
+	void blocksAheadGoesTheShortWayRoundTheLap() {
+		assertEquals(6.0D, RacerLine.blocksAhead(0.10D, 0.11D, 600.0D), 1e-9);
+		assertEquals(-6.0D, RacerLine.blocksAhead(0.11D, 0.10D, 600.0D), 1e-9);
+		assertEquals(6.0D, RacerLine.blocksAhead(0.995D, 0.005D, 600.0D), 1e-9, "across the line");
+		assertEquals(-6.0D, RacerLine.blocksAhead(0.005D, 0.995D, 600.0D), 1e-9, "behind, across the line");
+	}
+
+	@Test
+	void aBirdAlongsideIsNotSqueezed() {
+		double clear = RacerLine.sideClear(0.95D);
+		// aiming at the inside line with a bird just inside of us: stop short of it
+		assertEquals(1.5D - clear, RacerLine.keepClear(1.0D, 0.0D, 1.5D, clear), 1e-9);
+		// aiming away from it: untouched
+		assertEquals(-2.0D, RacerLine.keepClear(-2.0D, 0.0D, 1.5D, clear), 1e-9);
+		// a bird on the outside
+		assertEquals(-1.5D + clear, RacerLine.keepClear(-1.0D, 0.0D, -1.5D, clear), 1e-9);
+		// a lane and more away: nothing to squeeze
+		assertEquals(3.0D, RacerLine.keepClear(3.0D, 0.0D, 3.5D, clear), 1e-9);
+		assertTrue(RacerLine.laneTaken(1.0D, 1.5D, clear));
+		assertFalse(RacerLine.laneTaken(1.0D, 1.0D + RacerLine.PASS_OFFSET, clear));
+	}
+
+	@Test
+	void boxedInABirdMatchesThePaceAheadRatherThanRamming() {
+		assertEquals(0.75D, RacerLine.followScale(1.2D, 0.9D, 5.0D), 1e-9);
+		assertEquals(0.75D * 0.9D, RacerLine.followScale(1.2D, 0.9D, 1.8D), 1e-9, "about to touch: a touch under");
+		assertEquals(1.0D, RacerLine.followScale(0.9D, 1.2D, 5.0D), 1e-9, "never faster than its own pace");
+		assertEquals(0.5D, RacerLine.followScale(1.2D, 0.0D, 3.0D), 1e-9, "never a dead stop");
+		assertEquals(1.0D, RacerLine.followScale(0.0D, 0.5D, 3.0D), 1e-9);
+	}
+
+	@Test
+	void aLeaderCoversTheInsideOnceWithoutWeaving() {
+		double s = 0.95D;
+		// a chaser lining up an inside pass two blocks in: move across, less than a lane
+		double covered = RacerLine.defendLane(1.0D, 3.0D, s);
+		assertTrue(covered > 1.0D && covered - 1.0D <= RacerLine.DEFEND_MAX * s + 1e-9, "covered " + covered);
+		// a C bird barely moves
+		assertTrue(RacerLine.defendLane(1.0D, 3.0D, 0.35D) - 1.0D < 0.4D);
+		// a chaser straight behind, on the outside, or already well inside: no move
+		assertEquals(1.0D, RacerLine.defendLane(1.0D, 1.5D, s), 1e-12);
+		assertEquals(1.0D, RacerLine.defendLane(1.0D, -1.5D, s), 1e-12);
+		assertEquals(1.0D, RacerLine.defendLane(1.0D, 5.0D, s), 1e-12);
+		// never through the rail
+		assertTrue(RacerLine.defendLane(4.0D, 6.0D, s) <= RacerLine.LANE_LIMIT);
+	}
 }

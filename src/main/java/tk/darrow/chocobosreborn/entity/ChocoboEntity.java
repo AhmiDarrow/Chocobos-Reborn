@@ -5,6 +5,8 @@ import tk.darrow.chocobosreborn.net.RiderPayloads;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.server.level.ServerPlayer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -67,7 +69,10 @@ import tk.darrow.chocobosreborn.item.ModItems;
 import tk.darrow.chocobosreborn.item.NutItem;
 import tk.darrow.chocobosreborn.item.SaddleItem;
 import tk.darrow.chocobosreborn.race.RaceClass;
+import tk.darrow.chocobosreborn.race.RacePoint;
 import tk.darrow.chocobosreborn.race.RaceScoring;
+import tk.darrow.chocobosreborn.race.RaceTrack;
+import tk.darrow.chocobosreborn.race.RacerContact;
 import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.sound.ModSounds;
 
@@ -117,6 +122,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private static final EntityDataAccessor<Boolean> DATA_TOWN_BIRD = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Boosting from a pad (synced: the rider's client scales its own input from it). */
 	private static final EntityDataAccessor<Boolean> DATA_BOOST = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
+	/**
+	 * Racer contact flags ({@link #CONTACT_GHOST}, {@link #CONTACT_DASH}), synced so every
+	 * side resolving a bump knows which birds are solid and which are dashing.
+	 */
+	private static final EntityDataAccessor<Integer> DATA_CONTACT = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final int CONTACT_GHOST = 1, CONTACT_DASH = 2;
 	/** {@link Command} ordinal, synced so the equipment screen shows the current order. */
 	private static final EntityDataAccessor<Integer> DATA_COMMAND = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 
@@ -222,6 +233,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		builder.define(DATA_RACE_NPC, false);
 		builder.define(DATA_TOWN_BIRD, false);
 		builder.define(DATA_BOOST, false);
+		builder.define(DATA_CONTACT, 0);
 		builder.define(DATA_COMMAND, Command.FOLLOW.ordinal());
 	}
 
@@ -495,7 +507,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
         RiderPrediction.Frame frame;
         var rules = new RiderPrediction.Rules(maxStamina(), intelligenceStat(), raceInputSeed);
         while ((frame = raceInputs.poll(System.nanoTime())) != null) {
-            var after = RiderPrediction.step(new RiderPrediction.State(stamina(), dashLocked()), frame, rules);
+            var before = new RiderPrediction.State(stamina(), dashLocked());
+            var after = RiderPrediction.step(before, frame, rules);
+            setRaceDashFlag(RiderPrediction.dashing(before, frame));
             setStamina(after.stamina());
             setDashLocked(after.locked());
         }
@@ -657,6 +671,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
             racePrediction = null;
             frameReady = false;
 			setRaceHeld(false);
+			this.entityData.set(DATA_CONTACT, 0);
+			contactSlow.clear();
 		}
 		if (racing) {
 			dropSquareLeash();
@@ -680,6 +696,150 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public boolean isPushable() {
 		return !squareProtected() && super.isPushable();
 	}
+
+	// ------------------------------------------------------ racer contact
+
+	/** Pace loss from the last bump, fading (see {@link RacerContact.Slow}). */
+	private final RacerContact.Slow contactSlow = new RacerContact.Slow();
+	/** Where this bird was at the end of the last tick, and its smoothed velocity from that (every side). */
+	private double contactPrevX = Double.NaN, contactPrevZ, contactVx, contactVz;
+
+	/**
+	 * Installed by the client mod: this client's round trip in ms (vanilla's player-list
+	 * latency). Null on a dedicated server.
+	 */
+	@Nullable
+	public static java.util.function.IntSupplier CLIENT_RTT_MS;
+
+	/** Exempt from contact: finished and parking, or just set back on the road. */
+	public boolean raceGhost() {
+		return (this.entityData.get(DATA_CONTACT) & CONTACT_GHOST) != 0;
+	}
+
+	public void setRaceGhost(boolean ghost) {
+		setContactFlag(CONTACT_GHOST, ghost);
+	}
+
+	/** Dashing, as the server last knew it (AI: its goal; a rider: its acknowledged input). */
+	public boolean raceDashFlag() {
+		return (this.entityData.get(DATA_CONTACT) & CONTACT_DASH) != 0;
+	}
+
+	public void setRaceDashFlag(boolean dash) {
+		setContactFlag(CONTACT_DASH, dash);
+	}
+
+	private void setContactFlag(int bit, boolean on) {
+		int was = this.entityData.get(DATA_CONTACT);
+		int now = on ? was | bit : was & ~bit;
+		if (now != was) {
+			this.entityData.set(DATA_CONTACT, now);
+		}
+	}
+
+	/** Solid for racer contact: in a live heat, not held on the grid or after a set-back, not a ghost. */
+	public boolean contactSolid() {
+		return RacerContact.solid(racing(), raceHeld(), raceGhost()) && isAlive() && !isPassenger();
+	}
+
+	/** Velocity for contact and traffic: measured from positions, so it holds for birds this side does not simulate. */
+	public double contactVx() {
+		return contactVx;
+	}
+
+	public double contactVz() {
+		return contactVz;
+	}
+
+	/** Weight for contact: the simulating client knows its own dash and pad; everyone else goes by the synced flags. */
+	private double contactWeight() {
+		if (level().isClientSide && isControlledByLocalInstance()) {
+			return RacerContact.weight(predictingRace() && frameDash, localBoostTicks > 0);
+		}
+		return RacerContact.weight(raceDashFlag(), boosting());
+	}
+
+	private void trackContactVelocity() {
+		if (!racing()) {
+			contactPrevX = Double.NaN;
+			contactVx = contactVz = 0.0D;
+			return;
+		}
+		if (!Double.isNaN(contactPrevX)) {
+			double dx = getX() - contactPrevX, dz = getZ() - contactPrevZ;
+			if (dx * dx + dz * dz > 16.0D) {
+				dx = dz = 0.0D;   // a teleport (set-back, grid) is not a speed
+			}
+			// a rider's bird moves in packet bursts on the server: smooth them
+			contactVx = contactVx * 0.5D + dx * 0.5D;
+			contactVz = contactVz * 0.5D + dz * 0.5D;
+		}
+		contactPrevX = getX();
+		contactPrevZ = getZ();
+	}
+
+	/**
+	 * Kart bumps, resolved for this bird by the side that simulates it (the server for
+	 * an AI bird, the driving client for a rider's), against the other solid racers
+	 * as this side sees them. Only this bird's own velocity and pace change. The
+	 * driving client leads the remote birds it sees by its round trip, so it compares
+	 * the moment the server will see ({@link RacerContact#leadTicks}).
+	 */
+	private void applyRacerContact() {
+		contactSlow.tick();
+		if (!contactSolid()) {
+			contactSlow.clear();
+			return;
+		}
+		int lead = level().isClientSide && CLIENT_RTT_MS != null ? RacerContact.leadTicks(CLIENT_RTT_MS.getAsInt()) : 0;
+		double reach = RacerContact.REACH + 2.0D + lead * 0.5D;
+		List<ChocoboEntity> near = level().getEntitiesOfClass(ChocoboEntity.class,
+				getBoundingBox().inflate(reach, RacerContact.HEIGHT, reach), e -> e != this && e.contactSolid());
+		if (!near.isEmpty()) {
+			List<RacerContact.Body> others = new ArrayList<>(near.size());
+			for (ChocoboEntity o : near) {
+				others.add(new RacerContact.Body(o.getX(), o.getY(), o.getZ(), o.contactVx, o.contactVz,
+						o.contactWeight(), true).ahead(o.isControlledByLocalInstance() ? 0 : lead));
+			}
+			Vec3 v = getDeltaMovement();
+			double hx = v.x, hz = v.z;
+			if (hx * hx + hz * hz < 0.0025D) {
+				float yaw = getYRot() * ((float) Math.PI / 180F);
+				hx = -Mth.sin(yaw);
+				hz = Mth.cos(yaw);
+			}
+			RacerContact.Push push = RacerContact.resolve(
+					new RacerContact.Body(getX(), getY(), getZ(), v.x, v.z, contactWeight(), true),
+					hx, hz, others, contactGuard());
+			if (push.any()) {
+				setDeltaMovement(v.add(push.dvx(), 0.0D, push.dvz()));
+				if (push.loss() > 0.0D) {
+					contactSlow.hit(push.loss());
+				}
+			}
+		}
+		double pace = contactSlow.factor();
+		if (pace < 1.0D) {
+			setSpeed((float) (getSpeed() * pace));
+		}
+	}
+
+	/** Where this bird sits across its course's road, for {@link RacerContact.Guard}. */
+	private RacerContact.Guard contactGuard() {
+		int id = raceTrack();
+		if (id < 0) {
+			return RacerContact.Guard.NONE;
+		}
+		RaceTrack track = RaceTrack.byId(id);
+		double t = track.progressAt(getX(), getZ(), contactHint);
+		contactHint = t;
+		RacePoint c = track.pointAt(t);
+		double[] tg = track.tangent(t);
+		double lx = -tg[1], lz = tg[0];
+		return new RacerContact.Guard((getX() - c.x()) * lx + (getZ() - c.z()) * lz, lx, lz);
+	}
+
+	private double contactHint = -1.0D;
 
 	/** Town / NPC / live heat, including the finish-grace while the bird still carries a course. */
 	private boolean squareProtected() {
@@ -1772,6 +1932,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (dashLocked() && !locked) {
 				setDashLocked(false);
 			}
+			if (racing()) {
+				setRaceDashFlag(wantsDash && !locked && st > 0);
+			}
 			if (wantsDash && !locked && st > 0) {
 				boolean skip = RaceScoring.intelSkipsDashDrain(intelligenceStat(), tickCount, random.nextInt(100));
 				int next = skip ? st : st - 1;
@@ -1859,8 +2022,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			pendingJump = -1;
 			flapTicks = 0;
 			setDeltaMovement(Vec3.ZERO);
+			contactSlow.clear();
 			super.travel(Vec3.ZERO);
 			return;
+		}
+		if (racing()) {
+			// this side simulates the bird (the early return above takes remote birds)
+			applyRacerContact();
 		}
 		ChocoboColor c = color();
 		Player player = getControllingPassenger() instanceof Player p ? p : null;
@@ -2102,6 +2270,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public void tick() {
 		super.tick();
+		trackContactVelocity();
 		if (level().isClientSide) {
             if (!racing()) { racePrediction = null; frameReady = false; }
 			if (getControllingPassenger() instanceof Player rider && isControlledByLocalInstance()) {

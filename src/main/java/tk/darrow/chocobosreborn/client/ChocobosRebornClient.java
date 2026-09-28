@@ -45,6 +45,16 @@ public final class ChocobosRebornClient {
 		};
 		tk.darrow.chocobosreborn.entity.ChocoboEntity.SPRINT_KEY =
 				() -> net.minecraft.client.Minecraft.getInstance().options.keySprint.isDown();
+		// racer contact leads the remote birds by this client's round trip (RacerContact.leadTicks)
+		tk.darrow.chocobosreborn.entity.ChocoboEntity.CLIENT_RTT_MS = () -> {
+			var mc = net.minecraft.client.Minecraft.getInstance();
+			var conn = mc.getConnection();
+			if (conn == null || mc.player == null) {
+				return 0;
+			}
+			var info = conn.getPlayerInfo(mc.player.getUUID());
+			return info == null ? 0 : info.getLatency();
+		};
 	}
 
 	private void layers(EntityRenderersEvent.RegisterLayerDefinitions event) {
