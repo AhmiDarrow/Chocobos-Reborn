@@ -21,6 +21,26 @@ class RaceBettingTest {
 	}
 
 	@Test
+	void rookNeverPaysMoreThanThePurse() {
+		// a C sprint pays 6: 3 GP at evens-plus-one, 2 at 3x, 1 at 6x, never nothing
+		assertEquals(3, RaceScoring.maxStake(6, 2));
+		assertEquals(2, RaceScoring.maxStake(6, 3));
+		assertEquals(1, RaceScoring.maxStake(6, 6));
+		assertEquals(1, RaceScoring.maxStake(1, 5));
+		// an S grand prix (120) still stops at the sixteen a hand may hold
+		assertEquals(16, RaceScoring.maxStake(120, 2));
+		assertEquals(3, RaceScoring.clampStake(16, 3));
+		assertEquals(2, RaceScoring.clampStake(2, 3));
+		assertEquals(0, RaceScoring.clampStake(5, 0));
+		assertEquals(6, RaceScoring.basePurse(0));
+		assertEquals(48, RaceScoring.basePurse(3));
+		// a duel pot is capped at the course purse: the winner nets one purse
+		assertEquals(6, RaceScoring.clampDuelStake(32, 6));
+		assertEquals(4, RaceScoring.clampDuelStake(4, 48));
+		assertEquals(0, RaceScoring.clampDuelStake(8, 0));
+	}
+
+	@Test
 	void booksOnlyWhileIdleOrInCountdownAndOncePerHeat() {
 		assertTrue(RaceScoring.mayPlaceBet(true, false, 4));
 		assertFalse(RaceScoring.mayPlaceBet(false, false, 4));
@@ -79,11 +99,12 @@ class RaceBettingTest {
 	}
 
 	@Test
-	void aDnfAfterGoKeepsTheStakeAndAScratchRefundsSpectators() {
+	void aDnfAfterGoKeepsTheStakeAndOnlyAHeatNobodyFinishedScratches() {
 		assertFalse(RaceScoring.refundBookieOnForfeit(true));
 		assertTrue(RaceScoring.refundBookieOnForfeit(false));
 		assertTrue(RaceScoring.scratchRefundsLeftoverBets(false));
 		assertFalse(RaceScoring.scratchRefundsLeftoverBets(true));
+		assertEquals(0, RaceScoring.payout(16, 5, false));
 		assertTrue(RaceScoring.spectatorMayBetOnFun(true, false));
 		assertTrue(RaceScoring.spectatorMayBetOnFun(false, true));
 		assertFalse(RaceScoring.spectatorMayBetOnFun(false, false));

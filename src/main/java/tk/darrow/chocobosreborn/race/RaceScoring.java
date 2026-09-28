@@ -531,9 +531,12 @@ public final class RaceScoring {
 		return !raceHasStarted;
 	}
 
-	/** Nobody placed: leftover spectator stakes scratch instead of paying as losses. */
-	public static boolean scratchRefundsLeftoverBets(boolean anyHumanFinished) {
-		return !anyHumanFinished;
+	/**
+	 * No result at all (nobody, human or AI, crossed the line): leftover stakes scratch. A heat with a
+	 * winner settles every bet against that winner, and a lost bet pays nothing.
+	 */
+	public static boolean scratchRefundsLeftoverBets(boolean anyoneFinished) {
+		return !anyoneFinished;
 	}
 
 	/** Fun heats only take bets from a rider in that heat (SELF/OPPONENT). */
@@ -924,15 +927,45 @@ public final class RaceScoring {
 	}
 
 	public static int clampStake(int held) {
-		if (held < 1) {
+		return clampStake(held, MAX_STAKE);
+	}
+
+	public static int clampStake(int held, int cap) {
+		if (held < 1 || cap < 1) {
 			return 0;
 		}
-		return Math.min(MAX_STAKE, held);
+		return Math.min(cap, held);
+	}
+
+	/**
+	 * Rook never pays more than the heat's first-place purse: the most a bettor may stake at
+	 * {@code odds} on a heat worth {@code purse} GP, at least 1 GP and never above {@link #MAX_STAKE}.
+	 */
+	public static int maxStake(int purse, int odds) {
+		if (odds < 1) {
+			return 1;
+		}
+		return Math.max(1, Math.min(MAX_STAKE, purse / odds));
+	}
+
+	/** A sprint's first-place GP by class id (0 C .. 3 S). */
+	public static int basePurse(int classId) {
+		return switch (Math.max(0, Math.min(3, classId))) {
+			case 0 -> 6;
+			case 1 -> 12;
+			case 2 -> 24;
+			default -> 48;
+		};
 	}
 
 	/** Course picker offers 0, 4, 8, 16, 32; the packet is clamped to that range. */
 	public static int clampDuelStake(int stake) {
 		return Math.max(0, Math.min(32, stake));
+	}
+
+	/** A duel pot never beats the course: the stake is capped at its first-place purse, so the winner nets one purse. */
+	public static int clampDuelStake(int stake, int purse) {
+		return Math.min(clampDuelStake(stake), Math.max(0, purse));
 	}
 
 	public static boolean mayPlaceBet(boolean booksOpen, boolean alreadyBet, int clampedStake) {

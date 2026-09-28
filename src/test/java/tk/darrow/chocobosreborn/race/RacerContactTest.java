@@ -237,4 +237,14 @@ class RacerContactTest {
 		RacerContact.Body b = bird(0.0D, 0.0D, 1.0D).ahead(3);
 		assertEquals(3.0D, b.z(), 1e-12);
 	}
+
+	@Test
+	void riddenBirdsAreSolidOutsideHeatsToo() {
+		assertTrue(RacerContact.solid(true, false, false, false));
+		assertFalse(RacerContact.solid(true, true, false, true));
+		assertFalse(RacerContact.solid(true, false, true, true));
+		assertTrue(RacerContact.solid(false, false, false, true));
+		assertFalse(RacerContact.solid(false, false, false, false));
+		assertFalse(RacerContact.solid(false, false, false));
+	}
 }

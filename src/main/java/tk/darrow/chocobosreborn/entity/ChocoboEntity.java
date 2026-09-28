@@ -742,7 +742,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Solid for racer contact: in a live heat, not held on the grid or after a set-back, not a ghost. */
 	public boolean contactSolid() {
-		return RacerContact.solid(racing(), raceHeld(), raceGhost()) && isAlive() && !isPassenger();
+		return RacerContact.solid(racing(), raceHeld(), raceGhost(), getControllingPassenger() instanceof Player)
+				&& isAlive() && !isPassenger();
 	}
 
 	/** Velocity for contact and traffic: measured from positions, so it holds for birds this side does not simulate. */
@@ -2042,8 +2043,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			super.travel(Vec3.ZERO);
 			return;
 		}
-		if (racing()) {
-			// this side simulates the bird (the early return above takes remote birds)
+		if (racing() || getControllingPassenger() instanceof Player) {
+			// this side simulates the bird (the early return above takes remote birds); ridden birds
+			// bump each other outside heats too, since vanilla never pushes a vehicle
 			applyRacerContact();
 		}
 		ChocoboColor c = color();

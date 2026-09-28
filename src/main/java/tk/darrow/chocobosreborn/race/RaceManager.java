@@ -332,7 +332,7 @@ public final class RaceManager {
 			return;
 		}
 		if (mode == 1) {
-			DuelDesk.post(player, track, RaceScoring.clampDuelStake(stake));
+			DuelDesk.post(player, track, RaceScoring.clampDuelStake(stake, RaceScoring.purse(track)));
 		} else {
 			if (sessionOf(player.getUUID()) != null) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.race.already"), true);
@@ -444,6 +444,12 @@ public final class RaceManager {
 			DuelDesk.giveGp(player, n);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
 			return 0;
+		}
+		int cap = s.maxStake(legal);
+		if (n > cap) {
+			DuelDesk.giveGp(player, n - cap);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.capped", n - cap, cap), false);
+			n = cap;
 		}
 		s.takeBookieBet(player.getUUID(), legal, n);
 		return n;

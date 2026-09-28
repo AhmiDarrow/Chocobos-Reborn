@@ -185,6 +185,22 @@ public class RaceSession {
 				humans().size() > 1);
 	}
 
+	/** The most Rook takes on {@code pick} in this heat: a payout never beats the purse. */
+	public int maxStake(RaceScoring.BetPick pick) {
+		return RaceScoring.maxStake(RaceScoring.purse(track), odds(pick));
+	}
+
+	/** A waiting stake placed before the heat was known: anything over this heat's cap goes back. */
+	private int capStake(ServerPlayer p, RaceScoring.BetPick pick, int n) {
+		int cap = maxStake(pick);
+		if (n > cap) {
+			DuelDesk.giveGp(p, n - cap);
+			p.displayClientMessage(Component.translatable("chocobosreborn.bet.capped", n - cap, cap), false);
+			return cap;
+		}
+		return n;
+	}
+
 	void takeBookieBet(UUID player, RaceScoring.BetPick pick, int amount) {
 		RaceScoring.BetPick legal = legalLivePick(pick, player);
 		bets.add(new BookieBet(player, legal, amount));
@@ -282,6 +298,7 @@ public class RaceSession {
 					continue;
 				}
 				RaceScoring.BetPick legal = legalLivePick(pending, p.getUUID());
+				n = capStake(p, legal, n);
 				if (n > 0) {
 					bets.add(new BookieBet(p.getUUID(), legal, n));
 					hold(p.getUUID(), n);
@@ -1022,7 +1039,7 @@ public class RaceSession {
 			}
 		}
 		recordWinner();
-		boolean anyPlaced = humans().stream().anyMatch(h -> h.finishIndex >= 0);
+		boolean anyPlaced = racers.stream().anyMatch(r -> r.finishIndex >= 0);
 		if (RaceScoring.scratchRefundsLeftoverBets(anyPlaced)) {
 			refundAllBets();
 		} else {

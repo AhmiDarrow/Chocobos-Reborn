@@ -189,7 +189,8 @@ into the lock, a final push, no look at the player).
 `RaceSession` force-loads them for the heat. `CourseMapDumpTest` draws every course to
 `build/track_maps/`.
 
-Racer contact, kart bumps (`RacerContact`): racers are solid to each other during a heat
+Racer contact, kart bumps (`RacerContact`): racers are solid to each other during a heat, and any bird a
+player rides is solid outside one (a ridden bird is a vehicle, which vanilla never pushes);
 (vanilla pushing stays off). Birds touch when their centres are under 1.6 blocks apart and
 within 1.5 in height. Running into a bird's tail (it sits in the 50-degree cone ahead) bounces
 the rear bird back and costs it 10 % + half the closing speed of its pace, capped at 25 %,
@@ -222,11 +223,13 @@ Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own b
 speed included, by `RaceScoring.rivalPaceAbs`; field birds run their class's land speed and
 keep a quarter of their colour's edge, `RaceScoring.fieldLandSpeed`; the ladder is simulated
 in `RaceSimTest`); 36 points promote (nine sprint wins; a grand prix by its length), never demote; prizes GP + greens / nuts for a finished
-course. Bets at Rook before the heat (pending in player data) or during the hold. No
-racing in armour.
+course. Bets at Rook before the heat (pending in player data) or during the hold; Rook never pays more than
+the purse (`RaceScoring.maxStake` = purse / odds, at most 16; a pending stake over the heat's cap is handed back
+when it attaches), a lost bet pays nothing, and only a heat nobody at all finished scratches
+(`scratchRefundsLeftoverBets`). No racing in armour.
 
 Duels: Sable (`TownRole.DUEL`, `DuelDesk`): a rider posts a challenge (course of their
-class + 0..32 GP stake, taken up front); the next rider on a saddled bird accepts;
+class + 0..32 GP stake capped at the course purse, taken up front); the next rider on a saddled bird accepts;
 `RaceSession` with the two riders alone on the centre stalls (no AI field), unranked;
 the winner takes the pot and no purse is paid (two riders would always place first and second).
 

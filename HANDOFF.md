@@ -1,4 +1,5 @@
-# Current release: 1.1.0 - Full Grid
+# Current release: 1.1.0 - Full Grid (1.1.1 "Fair Odds" staged 2026-09-28: rider-vs-rider contact outside heats,
+Rook's stake cap = purse / odds, duel stake capped at the purse, heats with any finisher settle; not yet published)
 
 Forty-eight courses (twelve a class): sprints one long lap, grands prix short 3-5 lap circuits about 1.3x a sprint. Racers bump (kart style). Win points and purses scale with the heat (sprint 4, promote 36; old points convert once, SAVE_FORMAT 3). AI rebuilt: honest rival pace, gap picking, detour and ridge fixes. Courses: no solids in the lanes, climbers climb only ridges in a race, race step 1.1, flared detour exits, rider/server landing agreement (COURSE_VERSION 15). Flame and Purple birds do not race. Verified by the hub harness (3 real clients, dedicated server on the hub PC): 24 grands prix, 0 stuck, analyzer clean. See [release notes](docs/RELEASE_1.1.0.md). Server and every rider need this jar. Publication records are in docs/curseforge.md.
 

@@ -62,7 +62,7 @@ The town: a plaza round the arrival medallion, the chocobo fountain, awninged ma
 
 **Race with friends on equal terms.** The host gets no edge: each rider's ping is credited at the finish, photo finishes are timed inside the tick, boost pads fire on the pad for every rider, and the countdown holds every bird still, so racing a friend across the internet is fair and smooth. Distant birds draw lighter, so a full field runs well on slower machines.
 
-- **Rook the Bookie** takes one bet per heat.
+- **Rook the Bookie** takes one bet per heat and never pays more than the purse.
 - **Sable the Duel Master** runs one-on-one races outside the ladder: just the two of you on the track, for the pot you both put up.
 - **Pell the Broker** swaps birds between players or hands over a gift.
 - Stalls, all priced in **GP**: Sage Wynn (greens), Bilo the Nutkeeper (nuts), Tack (saddles, lures), the Fair (the Almanac, pocketwatches, fireworks, leads) and **Marl's GP Exchange**.

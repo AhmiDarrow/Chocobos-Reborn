@@ -108,7 +108,15 @@ public final class RacerContact {
 
 	/** Solid for contact: in a live heat, not held (grid countdown, set-back) and not a ghost (finished, just set back). */
 	public static boolean solid(boolean racing, boolean held, boolean ghost) {
-		return racing && !held && !ghost;
+		return solid(racing, held, ghost, false);
+	}
+
+	/**
+	 * Outside a heat a bird a player is riding is solid too: a ridden bird is a vehicle, and
+	 * vanilla never pushes a vehicle, so without this two riders pass straight through each other.
+	 */
+	public static boolean solid(boolean racing, boolean held, boolean ghost, boolean riddenByPlayer) {
+		return racing ? !held && !ghost : riddenByPlayer;
 	}
 
 	public static double weight(boolean dashing, boolean boosting) {
