@@ -134,11 +134,14 @@ class RaceTrackTest {
 	 */
 	@Test
 	void everyClassHasAsManySprintsAsGrandsPrix() {
-		int perClass = RaceTrack.courseCount(RaceClass.C);
-		assertTrue(perClass == 6 || perClass == RaceTrack.MAX_COURSES_PER_CLASS, "6 (phase 1) or 12 (phase 2) courses a class: " + perClass);
+		// while the phase 2 class branches land one at a time a class has 6 or 12;
+		// twelveCoursesPerClass holds them all to 12 once every class is in
+		int total = 0;
 		for (RaceClass rc : RaceClass.values()) {
 			var tracks = RaceTrack.ofClass(rc);
-			assertEquals(perClass, tracks.size(), rc.name() + " has as many courses as every other class");
+			int perClass = tracks.size();
+			total += perClass;
+			assertTrue(perClass == 6 || perClass == RaceTrack.MAX_COURSES_PER_CLASS, rc.name() + ": 6 (phase 1) or 12 (phase 2) courses: " + perClass);
 			assertEquals(perClass / 2, RaceTrack.sprintsOf(rc).size(), rc.name() + " sprints");
 			assertEquals(perClass / 2, RaceTrack.grandsPrixOf(rc).size(), rc.name() + " grands prix");
 			for (int i = 0; i < tracks.size(); i++) {
@@ -152,7 +155,7 @@ class RaceTrackTest {
 			assertEquals(tracks.get(tracks.size() - 1), RaceTrack.forClass(rc, 99), "forClass clamps");
 			assertEquals(tracks.get(0), RaceTrack.forClass(rc, -1), "forClass clamps");
 		}
-		assertEquals(RaceClass.values().length * perClass, RaceTrack.values().length);
+		assertEquals(total, RaceTrack.values().length);
 		assertEquals(RaceTrack.values().length, java.util.Arrays.stream(RaceTrack.values()).map(RaceTrack::shape).distinct().count(),
 				"every course has its own silhouette");
 	}

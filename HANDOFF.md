@@ -1487,3 +1487,41 @@ use; nothing existing changes).
   `custom_chocobo_kweh*`) stay deleted.
 * Beak orange, plumage tint only via `isPlumage`; white vcol × atlas, no double tint.
 * Do not remesh / re-bake / repaint the Meshy bird; do not touch the eyes unasked.
+
+### Phase 2: class C courses
+
+Six new class C courses (rows 6-11 of the C block, open road and boosts only, as class C
+always is). The fun is in the silhouette, rolling hills (up to 8 blocks on Harvest Hills)
+and gentle, flowing corners. Every new course has its own set piece.
+
+| id | name | theme | shape | lap x laps | features | landmark |
+|---|---|---|---|---|---|---|
+| c_harvest | Harvest Hills | FARMLAND | SCYTHE (handle straight, blade sweeping up and back to its tip; hills to 8) | 1200 x 1 | 5 boosts (0.16, 0.30, 0.57, 0.66, 0.78) | scarecrow in a pumpkin hat (the FARMLAND piece) |
+| c_honeycomb | Honeycomb Trail | ORCHARD | HONEYCOMB (three hex cells, twelve sides, climbing cell to cell) | 1160 x 1 | 5 boosts (0.14, 0.31, 0.48, 0.64, 0.81) | honeycomb tower with hives, honey crown, potted flowers |
+| c_scallop | Scallop Sands | SHORE | SCALLOP (hinge and two ears on the start, ribbed rim over the top) | 1240 x 1 | 5 boosts (0.17, 0.32, 0.43, 0.61, 0.76) | sandcastle: four turrets, keep, flag |
+| c_heartfield | Heartfield Grand Prix | MEADOW | HEART (point just before the line, two lobes, the dip) | 630 x 5 | 3 boosts (0.36, 0.71, 0.93) | striped hot-air balloon moored on a post |
+| c_kite_hill | Kite Hill | MEADOW | KITE (diamond up to its tip, a tail of bows back to the line) | 700 x 4 | 3 boosts (0.21, 0.46, 0.93) | kite with birch spars and a tail, flying on a chain |
+| c_horseshoe | Horseshoe Farm | FARMLAND | HORSESHOE (heels up: round the toe, over one heel, down the inside, over the other) | 800 x 3 | 3 boosts (0.15, 0.36, 0.76) | red barn with a hay loft and a copper-capped silo |
+
+Signatures in `CourseIdentityTest`: carved pumpkin + z hay (scarecrow), honeycomb + honey
+block, chiseled sandstone + sandstone wall, red + yellow wool (balloon), chain + light blue
+wool (kite), red terracotta + waxed cut copper (barn and silo).
+
+**Outside the C markers** (small, needed by every class branch; the merge should keep one copy):
+* `build.gradle`: the test JVM gets `maxHeapSize = '2g'`. Every course's plan is cached while
+  the course tests run and 30 islands already ran the default 512 MB heap out of memory; 48
+  will need it too.
+* `RaceTrackTest.everyClassHasAsManySprintsAsGrandsPrix`: each class may have 6 or 12 courses
+  on its own while the class branches land one at a time (it demanded every class match class
+  C). `twelveCoursesPerClass` still holds all four to 12 once it is enabled.
+
+**Shape notes**: the honeycomb's bottom edge is a little longer than the other eleven: the main
+stand runs about 50 blocks up the start straight on the inside, and a hex corner inside that
+put the stand's back wall over its own seats (`CourseCrowdTest`). The heart's point is the
+sharpest corner of the six (a hairpin-ish V onto the start straight, boost on the exit).
+
+**Ladder** (`RaceSimTest`, all green, no expectation moved; phase 1 -> with these six): C
+field avg 197.7 -> 202.0 s, field best 190.9 -> 195.1, fresh Good Yellow driven well 174.7 ->
+178.8 (still wins, by 8.4 % vs 8.5 %), cruising 206.8 -> 211.7 (still loses to the field
+average, by 4.8 % vs 4.6 %). The means rise about 2 % because the new heats are a little longer
+on average (the new grands prix run 2400-3150 blocks).

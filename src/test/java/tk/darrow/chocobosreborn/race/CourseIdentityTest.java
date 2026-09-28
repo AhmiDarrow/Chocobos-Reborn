@@ -32,6 +32,12 @@ class CourseIdentityTest {
 			case C_CIDER -> List.of("barrel[facing=up]", "hay_block[axis=y]");  // cider barn
 			case C_LAGOON -> List.of("oak_log[axis=y]", "white_wool");        // shipwreck
 			// ---- new C signatures (phase 2) begin ----
+			case C_HARVEST -> List.of("carved_pumpkin[facing=north]", "hay_block[axis=z]");   // scarecrow
+			case C_KITE_HILL -> List.of("chain[axis=y]", "light_blue_wool");               // kite
+			case C_SCALLOP -> List.of("chiseled_sandstone", "sandstone_wall");             // sandcastle
+			case C_HEARTFIELD -> List.of("red_wool", "yellow_wool");                        // hot-air balloon
+			case C_HONEYCOMB -> List.of("honeycomb_block", "honey_block");                  // apiary
+			case C_HORSESHOE -> List.of("red_terracotta", "waxed_cut_copper");              // barn and silo
 			// ---- new C signatures (phase 2) end ----
 			// ---- B
 			case B_CANYON -> List.of("yellow_terracotta", "red_terracotta");  // hoodoo

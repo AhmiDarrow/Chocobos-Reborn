@@ -76,6 +76,12 @@ public enum RaceTrack {
 	// markers (course indices 6-11 in order: three sprints, then three grands prix), one
 	// row per line, every row ending in a comma. ====
 	// ---- new C courses (phase 2) begin ----
+	C_HARVEST(RaceClass.C, 6, Theme.FARMLAND, Shape.SCYTHE, 1200, 1, boost(0.16), boost(0.30), boost(0.57), boost(0.66), boost(0.78)),
+	C_HONEYCOMB(RaceClass.C, 7, Theme.ORCHARD, Shape.HONEYCOMB, 1160, 1, boost(0.14), boost(0.31), boost(0.48), boost(0.64), boost(0.81)),
+	C_SCALLOP(RaceClass.C, 8, Theme.SHORE, Shape.SCALLOP, 1240, 1, boost(0.17), boost(0.32), boost(0.43), boost(0.61), boost(0.76)),
+	C_HEARTFIELD(RaceClass.C, 9, Theme.MEADOW, Shape.HEART, 630, 5, boost(0.36), boost(0.71), boost(0.93)),
+	C_KITE_HILL(RaceClass.C, 10, Theme.MEADOW, Shape.KITE, 700, 4, boost(0.21), boost(0.46), boost(0.93)),
+	C_HORSESHOE(RaceClass.C, 11, Theme.FARMLAND, Shape.HORSESHOE, 800, 3, boost(0.15), boost(0.36), boost(0.76)),
 	// ---- new C courses (phase 2) end ----
 
 	// ---- new B courses (phase 2) begin ----
@@ -231,6 +237,18 @@ public enum RaceTrack {
 		// Rules: HANDOFF.md "How to add a course" (first three points collinear along +x,
 		// last point (-30, 0), legs far enough apart for detours, hills 2-12 blocks). ====
 		// ---- new C shapes (phase 2) begin ----
+		/** A scythe: the handle is the start straight, the blade sweeps up and back over rolling hills to its tip. */
+		SCYTHE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 1), p(170, 0, 2), p(208, 12, 3), p(230, 45, 5), p(238, 95, 6), p(226, 145, 5), p(192, 190, 7), p(140, 220, 8), p(80, 232, 6), p(20, 226, 7), p(-24, 206, 8), p(-40, 176, 8), p(-18, 150, 7), p(30, 152, 5), p(84, 150, 6), p(128, 136, 4), p(158, 108, 3), p(164, 76, 2), p(140, 56, 1), p(90, 52, 1), p(30, 52, 0), p(-20, 50, 0), p(-46, 30, 0), p(-30, 0, 0)),
+		/** A kite: a diamond climbing to its tip, and its tail of bows swinging back to the line. */
+		KITE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(110, 0, 1), p(160, 2, 2), p(186, 28, 3), p(198, 90, 4), p(210, 150, 5), p(222, 190, 5), p(212, 214, 5), p(190, 222, 5), p(150, 210, 4), p(90, 198, 3), p(28, 186, 2), p(2, 160, 1), p(-14, 126, 1), p(10, 94, 0), p(-18, 62, 0), p(-40, 30, 0), p(-30, 0, 0)),
+		/** A scallop shell: the hinge and its two ears along the bottom, a ribbed rim rolling over the top. */
+		SCALLOP(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(132, 6, 1), p(146, 30, 1), p(124, 52, 2), p(150, 84, 2), p(196, 110, 3), p(224, 150, 4), p(206, 176, 4), p(196, 214, 5), p(164, 234, 5), p(140, 262, 6), p(100, 266, 6), p(70, 282, 6), p(30, 282, 6), p(0, 266, 5), p(-40, 262, 5), p(-64, 234, 4), p(-96, 214, 4), p(-106, 176, 3), p(-124, 150, 3), p(-96, 110, 2), p(-50, 84, 1), p(-24, 52, 1), p(-46, 30, 0), p(-40, 6, 0), p(-30, 0, 0)),
+		/** A heart: the point on the start line, two round lobes and the dip between them. */
+		HEART(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 1), p(190, 10, 2), p(224, 44, 3), p(232, 90, 4), p(214, 132, 4), p(170, 150, 3), p(150, 170, 3), p(132, 214, 4), p(90, 232, 4), p(44, 224, 3), p(10, 190, 2), p(-4, 140, 1), p(-12, 100, 0), p(-22, 60, 0), p(-44, 20, 0), p(-30, 0, 0)),
+		/** Three honeycomb cells: twelve short sides and gentle corners, climbing cell to cell. */
+		HONEYCOMB(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(90, 0, 0), p(120, 0, 0), p(135, 52, 0), p(150, 104, 1), p(210, 104, 2), p(270, 104, 3), p(300, 156, 3), p(330, 208, 4), p(300, 260, 4), p(270, 312, 5), p(210, 312, 5), p(150, 312, 5), p(120, 364, 6), p(90, 416, 6), p(30, 416, 6), p(-30, 416, 5), p(-60, 364, 5), p(-90, 312, 4), p(-60, 260, 3), p(-30, 208, 3), p(-60, 156, 2), p(-90, 104, 1), p(-60, 52, 0), p(-30, 0, 0)),
+		/** A horseshoe, heels up: round the toe, over one heel, down the inside and over the other. */
+		HORSESHOE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(98, 8, 1), p(122, 34, 2), p(130, 70, 3), p(130, 110, 4), p(136, 146, 5), p(126, 170, 5), p(100, 174, 5), p(84, 150, 4), p(82, 112, 3), p(78, 80, 2), p(60, 56, 1), p(35, 48, 1), p(10, 56, 1), p(-8, 80, 2), p(-12, 112, 3), p(-14, 150, 4), p(-30, 174, 4), p(-56, 170, 4), p(-66, 146, 3), p(-60, 110, 2), p(-60, 70, 1), p(-50, 30, 0), p(-30, 0, 0)),
 		// ---- new C shapes (phase 2) end ----
 
 		// ---- new B shapes (phase 2) begin ----

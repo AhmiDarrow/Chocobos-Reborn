@@ -94,6 +94,8 @@ dependencies {
 
 tasks.named('test', Test).configure {
     useJUnitPlatform()
+    // every course's plan is cached while the course tests run; 48 islands outgrow the 512 MB default
+    maxHeapSize = '2g'
     testLogging {
         events 'passed', 'skipped', 'failed'
     }

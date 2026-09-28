@@ -1093,6 +1093,12 @@ public final class RaceCourseLayout {
 			case C_CIDER -> onPlinth(t, surf, this::ciderBarn);
 			case C_LAGOON -> onPlinth(t, surf, this::shipwreck);
 			// ---- new C landmarks (phase 2) begin ----
+			case C_HARVEST -> onPlinth(t, surf, this::scarecrow);
+			case C_KITE_HILL -> onPlinth(t, surf, this::kite);
+			case C_SCALLOP -> onPlinth(t, surf, this::sandcastle);
+			case C_HEARTFIELD -> onPlinth(t, surf, this::balloon);
+			case C_HONEYCOMB -> onPlinth(t, surf, this::apiary);
+			case C_HORSESHOE -> onPlinth(t, surf, this::barnAndSilo);
 			// ---- new C landmarks (phase 2) end ----
 			default -> onPlinth(t, surf, this::themeLandmark);
 		}
@@ -1209,6 +1215,160 @@ public final class RaceCourseLayout {
 	}
 
 	// ---- new C set pieces (phase 2): private methods, begin ----
+	/** C_KITE_HILL: a kite flying high over its anchor post, spars across, a tail of bows. */
+	private void kite(int x, int y, int z) {
+		put(x, y, z, "oak_fence");
+		for (int h = 1; h <= 7; h++) {
+			put(x, y + h, z, "chain[axis=y]");
+		}
+		int cy = y + 11;
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dy = -3; dy <= 3; dy++) {
+				if (Math.abs(dx) + Math.abs(dy) > 3) {
+					continue;
+				}
+				String cloth = dy > 0 ? (dx <= 0 ? "red_wool" : "light_blue_wool") : (dx <= 0 ? "light_blue_wool" : "red_wool");
+				if (dx == 0) {
+					cloth = "stripped_birch_log[axis=y]";
+				} else if (dy == 0) {
+					cloth = "stripped_birch_log[axis=x]";
+				}
+				put(x + dx, cy + dy, z, cloth);
+			}
+		}
+		// the tail streams off the bottom point in bows
+		put(x + 1, y + 7, z, "white_wool");
+		put(x + 2, y + 6, z, "red_wool");
+		put(x + 2, y + 5, z, "white_wool");
+		put(x + 3, y + 4, z, "light_blue_wool");
+	}
+
+	/** C_SCALLOP: a sandcastle, four turrets round a keep, a flag on top. */
+	private void sandcastle(int x, int y, int z) {
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				boolean corner = Math.abs(dx) == 2 && Math.abs(dz) == 2;
+				boolean wall = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+				if (corner) {
+					for (int h = 0; h < 4; h++) {
+						put(x + dx, y + h, z + dz, "chiseled_sandstone");
+					}
+					put(x + dx, y + 4, z + dz, "sandstone_wall");
+				} else if (wall) {
+					put(x + dx, y, z + dz, "cut_sandstone");
+					put(x + dx, y + 1, z + dz, "cut_sandstone");
+					if ((dx + dz) % 2 == 0) {
+						put(x + dx, y + 2, z + dz, "sandstone_slab[type=bottom]");
+					}
+				} else {
+					for (int h = 0; h < 6; h++) {
+						put(x + dx, y + h, z + dz, "smooth_sandstone");
+					}
+					if ((dx + dz) % 2 != 0) {
+						put(x + dx, y + 6, z + dz, "sandstone_slab[type=bottom]");
+					}
+				}
+			}
+		}
+		for (int h = 6; h <= 9; h++) {
+			put(x, y + h, z, "oak_fence");
+		}
+		put(x + 1, y + 9, z, "cyan_wool");
+		put(x + 1, y + 8, z, "cyan_wool");
+		put(x + 2, y + 9, z, "cyan_wool");
+	}
+
+	/** C_HEARTFIELD: a striped hot-air balloon moored beside the road, burner lit. */
+	private void balloon(int x, int y, int z) {
+		put(x, y, z, "oak_fence");
+		put(x, y + 1, z, "oak_fence");
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -1; dz <= 1; dz++) {
+				put(x + dx, y + 2, z + dz, "spruce_planks");
+				if (dx != 0 || dz != 0) {
+					put(x + dx, y + 3, z + dz, "spruce_fence");
+				}
+				if (Math.abs(dx) == 1 && Math.abs(dz) == 1) {
+					for (int h = 4; h <= 7; h++) {
+						put(x + dx, y + h, z + dz, "oak_fence");   // the ropes up to the envelope
+					}
+				}
+			}
+		}
+		put(x, y + 3, z, "lantern[hanging=false]");
+		for (int dx = -3; dx <= 3; dx++) {
+			for (int dy = -3; dy <= 3; dy++) {
+				for (int dz = -3; dz <= 3; dz++) {
+					int r2 = dx * dx + (dy < 0 ? dy * dy * 2 : dy * dy) + dz * dz;
+					if (r2 > 11 || r2 < 5) {
+						continue;
+					}
+					put(x + dx, y + 10 + dy, z + dz, Math.floorMod(dx + dz, 2) == 0 ? "red_wool" : "yellow_wool");
+				}
+			}
+		}
+		put(x, y + 14, z, "red_wool");
+	}
+
+	/** C_HONEYCOMB: a honeycomb tower of hives, honey dripping off its crown, flowers at its foot. */
+	private void apiary(int x, int y, int z) {
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				int w = Math.abs(dz) == 2 ? 0 : 1;
+				if (Math.abs(dx) > w) {
+					continue;
+				}
+				for (int h = 0; h < 6; h++) {
+					put(x + dx, y + h, z + dz, "honeycomb_block");
+				}
+				put(x + dx, y + 6, z + dz, "honey_block");
+			}
+		}
+		put(x - 2, y + 1, z, "beehive[facing=west,honey_level=5]");
+		put(x + 2, y + 3, z, "bee_nest[facing=east,honey_level=5]");
+		put(x - 2, y + 4, z + 1, "beehive[facing=west,honey_level=5]");
+		put(x, y + 7, z, "honey_block");
+		put(x + 2, y, z - 2, "potted_oxeye_daisy");
+		put(x - 2, y, z + 2, "potted_cornflower");
+		put(x + 2, y, z + 2, "potted_allium");
+		put(x - 2, y, z - 2, "potted_dandelion");
+	}
+
+	/** C_HORSESHOE: a red barn with a hay loft and a copper-capped silo. */
+	private void barnAndSilo(int x, int y, int z) {
+		for (int dx = -3; dx <= 0; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				boolean wall = dx == -3 || dx == 0 || Math.abs(dz) == 2;
+				if (wall) {
+					for (int h = 0; h < 3; h++) {
+						if (dx == 0 && dz == 0 && h < 2) {
+							continue;   // the barn door, open
+						}
+						put(x + dx, y + h, z + dz, Math.abs(dz) == 2 && (dx == -3 || dx == 0) ? "white_terracotta" : "red_terracotta");
+					}
+				}
+				put(x + dx, y + 3, z + dz, "dark_oak_planks");
+				if (Math.abs(dz) <= 1) {
+					put(x + dx, y + 4, z + dz, "dark_oak_planks");
+				}
+				if (dz == 0) {
+					put(x + dx, y + 5, z + dz, "dark_oak_slab[type=bottom]");
+				}
+			}
+		}
+		put(x - 1, y, z, "hay_block[axis=x]");
+		put(x + 1, y, z + 2, "hay_block[axis=z]");
+		for (int dx = 2; dx <= 3; dx++) {
+			for (int dz = -2; dz <= -1; dz++) {
+				for (int h = 0; h < 9; h++) {
+					put(x + dx, y + h, z + dz, "smooth_stone");
+				}
+				put(x + dx, y + 9, z + dz, "waxed_cut_copper");
+			}
+		}
+		put(x + 2, y + 10, z - 2, "waxed_cut_copper_slab[type=bottom]");
+		put(x + 3, y + 10, z - 1, "lightning_rod");
+	}
 	// ---- new C set pieces (phase 2) end ----
 
 	// ================================================================ B landmarks
