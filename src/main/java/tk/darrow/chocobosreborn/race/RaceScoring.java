@@ -797,6 +797,31 @@ public final class RaceScoring {
 		return racing ? RACE_STEP : colourStep;
 	}
 
+	/**
+	 * How far below a bird's feet {@link #riderStepGround} looks for footing. A hair: the
+	 * rider's client and the server's replay stand the bird at exactly the same coordinates
+	 * (the server copies the packet), so only float noise from a step has to fit in it.
+	 */
+	public static final double FOOTING_PROBE = 1.0E-3D;
+
+	/**
+	 * The on-ground flag a bird moves with. Minecraft steps a moving box up when its fall
+	 * was stopped this move, or when its on-ground flag is set; that flag is left over from
+	 * the side's own last move. A rider's bird is moved twice with different histories:
+	 * the client moves it with gravity (a step up lands it: on ground), then the server
+	 * replays the net move from the packet (a step up is a climb: not on ground). After a
+	 * fast step the box can end wholly over the lower side, level with the top it stepped
+	 * onto (the end of a bog, the top of a pool wall): the client, still "on ground", then
+	 * slides along that top at a zero-height step while the server, not on ground, is
+	 * stopped by the block's side one micro-epsilon above its feet ("moved wrongly!"), every
+	 * tick (S_ORBIT, S_RIFT hub harness). So a rider's bird goes by its footing right now,
+	 * which both sides read from the same box in the same world; everything else (AI
+	 * birds, the server simulating them) keeps vanilla's flag.
+	 */
+	public static boolean riderStepGround(boolean riderDriven, boolean onGround, boolean footing) {
+		return riderDriven ? footing : onGround;
+	}
+
 	public static boolean stallFitsTrack(double offset, double halfWidth) {
 		return Math.abs(offset) <= halfWidth;
 	}

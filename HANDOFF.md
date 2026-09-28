@@ -2183,3 +2183,82 @@ was not run. **Needs an in-game look:** the pool rims on the ford/lava courses (
 cell by cell, so it is a little more ragged on diagonals). Rails that stepped out a column on diagonal legs
 (a kerb block under each). Climbers on A_CRYSTAL's ridge still climbing it and nothing else. A Black bird no
 longer mounting rails in a race. The AI back-off at a ridge face on a short lap.
+
+## Rider correction loops (2026-09-28, unreleased, branch `race-step`; from the 3-client hub harness)
+
+**Evidence.** On S_ORBIT two riders froze for the rest of the heat: LatencyHost at lap 1 + 0.722 (the second
+pool) and LatencyGuest at lap 2 + 0.482 (the end of the bog). They took 592 and 692 `ClientboundMoveVehiclePacket`s,
+and the server logged 807 and 647 `Chocobo (vehicle of ...) moved wrongly!`. On S_RIFT LatencyHost froze in the pool
+at 0.7279 with 982 corrections. The harness files (`build/latency-hub/results`, `server.csv` against
+`client-*.csv`) show the pattern:
+- The server held the bird at one spot S: (3633.70, 66, 3402.39) for the host and (3715.70, 65, 3438.05) for the guest.
+- Each client sat at the same spot C every sample, 2.663 blocks ahead of S along its heading. That is one tick's
+  move at the Gold's pace: the 1.4542 speed field is velocity after ground friction, 2.663 x 0.546.
+- The logged mismatch puts the server's replay against a block face. For the host, 2.663 - 1.487 = 1.176 of travel
+  brings the box's minX from 3632.82 to exactly 3632.00. For the guest, the 2.1135 mismatch stops both axes on faces
+  (x 3714, z 3439).
+- Against the course plan, S is "the lip". For the guest, the box is wholly over mud (top 64.875) with the feet at
+  65.0, level with the road's top. For the host, the box is over the pool with the feet at 66, level with the pool
+  wall's top (the wall is at y 64-65 beside the lane). The rider had just stepped up there: 1.21's step leaves the
+  box at the stepped height (it no longer drops back), and at S-class speed the box ends past the edge.
+
+**Cause.** Minecraft steps a moving box up (`Entity.collide`) when its fall was stopped this move, or when
+`onGround()` is set. The flag is whatever the side's own last move left, and the two sides moved differently:
+- The client moved with gravity, so the step landed it: on ground.
+- The server replays the net packet delta, and our `vehicleValidationY` makes an upward replay climb first. So the
+  same step was a climb for the server: not on ground.
+
+From the lip, the client's next move fell 0.078, hit the road's (or wall's) side, and still-"on ground" took a
+zero-height step. It slid along the top at full pace and stayed on ground. The server replays the move with a fall
+of 1e-6. That fall is free, then the side stops it (its top is 1e-6 above the feet), and there's no step because
+the server isn't on ground. The server logs "moved wrongly" and sends the bird back to S. Vanilla's client correction
+(`ClientPacketListener.handleMoveVehicle`) only calls `absMoveTo`. Our `lerpTo` is not involved, and `RiderPrediction`
+is stamina only. The client kept its velocity and its stale flag, so it replayed the identical move every tick. The
+echo packet at S also re-cleared the server's flag. That is a fixed point.
+
+**Ruled out.** The bird was never set back:
+- No RaceSession set-back, rescue, finish grace or hold moved it. Those dismount, teleport and remount, and never
+  produce "moved wrongly".
+- `onCourse` is true at both spots.
+
+It is not a fluid effect:
+- `canStandOnFluid` isn't involved: the server never runs `travel` for a rider's bird, so `descending` stays false.
+  The bot never sneaks, and Gold is `deepWater`, so `waterIsShallow` never matters. The guest's loop has no fluid at
+  all.
+
+The remaining candidates don't differ between the sides:
+- `maxUpStep`, mud's shape and flight read the same synced state on both sides.
+- "Moved too quickly" fired once (Guest2) and isn't the loop.
+
+C/B/A speeds rarely end a step past the edge.
+
+**Fix.**
+- `ChocoboEntity.move` (a rider's bird only, SELF or PLAYER moves) sets the flag from `hasFooting()` before moving.
+  `hasFooting()` reads the box and the world, which are the same on both sides: something solid (or water a water
+  bird stands on) within `RaceScoring.FOOTING_PROBE` (1e-3) under the feet. The pure rule is
+  `RaceScoring.riderStepGround`, with tests in `RaceClimbTest`. AI birds keep vanilla's flag.
+- From the lip neither side steps now. The bird falls off the lip, and the server replays that exactly. Steps from
+  real footing are unchanged.
+- The loop is broken by the new client mixin `ChocoboVehicleCorrectionMixin`, which runs at the TAIL of
+  `handleMoveVehicle`. After a correction the client also takes the server's state: velocity zero, flag from
+  footing, fall distance reset, and the boost-sweep origin cleared. It no longer replays the rejected move from S.
+- Vanilla's checks are untouched.
+- The GameTest `riderMoveFromTheLipReplaysOnTheServer` covers it. It performs the client move from the lip on a
+  mock-ridden bird, feeds it to `handleMoveVehicle`, and does the same for a real step from the bog. With the rule
+  disabled it fails exactly like the harness ("off by 1.5").
+
+**Results.**
+- `test`: 269 tests, 0 failures, 1 skipped.
+- `runVerification`: 30/30 passed.
+- `build` passes.
+- The control run, with the fix disabled, also failed `templeBlackAiKeepsItsLapValid`. That test is AI only and
+  can't be reached by this change, and it passed in the fixed run: treat it as flaky.
+
+**Remaining risks.**
+- The client mixin is only exercised by a real client. The target signature was checked against 21.1.249 and
+  `defaultRequire` is 1, so a mismatch would crash at client start, not silently fail. Rerun the hub harness.
+- A correction now costs the rider its momentum, a hitch on the rare legit correction.
+- A bird stepping onto a pool wall (1.0 above the road, under the 1.1 race step) is still possible. It no longer
+  loops, but it leaves the lane. Consider a pool wall of 2 at road level, or keeping it out of reach.
+- No server-side loop breaker yet. The earlier plan still stands if some other disagreement ever loops: count
+  corrections per rider and set it back through the rescue path.

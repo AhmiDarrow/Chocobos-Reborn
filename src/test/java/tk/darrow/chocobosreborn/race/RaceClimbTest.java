@@ -32,6 +32,20 @@ class RaceClimbTest {
 	}
 
 	@Test
+	void aRidersBirdStepsFromItsFootingNotALeftOverFlag() {
+		assertFalse(RaceScoring.riderStepGround(true, true, false),
+				"left 'on ground' by a step that ended over the bog: no zero-height slide the server cannot replay");
+		assertTrue(RaceScoring.riderStepGround(true, false, true),
+				"the server's replay climbed onto the top: standing on it, it steps like the client");
+		assertTrue(RaceScoring.riderStepGround(true, true, true));
+		assertFalse(RaceScoring.riderStepGround(true, false, false));
+		assertTrue(RaceScoring.riderStepGround(false, true, false), "an AI bird keeps vanilla's flag");
+		assertFalse(RaceScoring.riderStepGround(false, false, true), "an AI bird keeps vanilla's flag");
+		assertTrue(RaceScoring.FOOTING_PROBE > 0.0D && RaceScoring.FOOTING_PROBE < 1.0D / 16.0D,
+				"a hair under the feet, never the depth of a carpet or a snow layer");
+	}
+
+	@Test
 	void theRidgeBandIsTheRidgeFeatureAcrossTheRoad() {
 		RaceTrack track = RaceTrack.A_CRYSTAL;
 		RaceTrack.Feature ridge = track.terrainFeatures().stream()

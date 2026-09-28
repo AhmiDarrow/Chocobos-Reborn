@@ -409,31 +409,7 @@ public class ChocobosRebornGameTests {
 			for (int y = 1; y <= 5; y++) helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
 		}
 		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
-		ServerPlayer rider = (ServerPlayer) owner(helper, bird);
-		bird.setSaddledForPreview(true);
-		rider.startRiding(bird, true);
-		// Mounting also sends a teleport; a real client acknowledges it before moving.
-		try {
-			var teleport = net.minecraft.server.network.ServerGamePacketListenerImpl.class.getDeclaredField("awaitingTeleport");
-			teleport.setAccessible(true);
-			rider.connection.handleAcceptTeleportPacket(new net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket(teleport.getInt(rider.connection)));
-		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
-		helper.assertTrue(bird.getControllingPassenger() == rider, "fixture rider controls the bird");
-		// Establish the same baselines as connection.tick without doTick moving the
-		// just-created mock player back to its distant login coordinates.
-		try {
-			var type = net.minecraft.server.network.ServerGamePacketListenerImpl.class;
-			var lastVehicle = type.getDeclaredField("lastVehicle");
-			lastVehicle.setAccessible(true);
-			lastVehicle.set(rider.connection, bird);
-			for (String prefix : new String[]{"vehicleFirstGood", "vehicleLastGood"}) {
-				for (String axis : new String[]{"X", "Y", "Z"}) {
-					var field = type.getDeclaredField(prefix + axis);
-					field.setAccessible(true);
-					field.setDouble(rider.connection, axis.equals("X") ? bird.getX() : axis.equals("Y") ? bird.getY() : bird.getZ());
-				}
-			}
-		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+		ServerPlayer rider = packetRider(helper, bird);
 		double start = bird.getX();
 		for (int i = 1; i <= 30; i++) {
 			vehiclePacket(rider, bird, start + i * 2);
@@ -447,6 +423,105 @@ public class ChocobosRebornGameTests {
 		}
 		vehiclePacket(rider, bird, accepted + 4);
 		helper.assertTrue(Math.abs(bird.getX() - accepted) < 1e-5, "a small movement cannot pass through a solid wall");
+		bird.discard();
+		helper.succeed();
+	}
+
+	/** A mock rider in the saddle, with vanilla's per-tick vehicle baselines, sending its own vehicle packets. */
+	private static ServerPlayer packetRider(GameTestHelper helper, ChocoboEntity bird) {
+		ServerPlayer rider = (ServerPlayer) owner(helper, bird);
+		bird.setSaddledForPreview(true);
+		rider.startRiding(bird, true);
+		// Mounting also sends a teleport; a real client acknowledges it before moving.
+		try {
+			var teleport = net.minecraft.server.network.ServerGamePacketListenerImpl.class.getDeclaredField("awaitingTeleport");
+			teleport.setAccessible(true);
+			rider.connection.handleAcceptTeleportPacket(new net.minecraft.network.protocol.game.ServerboundAcceptTeleportationPacket(teleport.getInt(rider.connection)));
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+		helper.assertTrue(bird.getControllingPassenger() == rider, "fixture rider controls the bird");
+		vehicleBaseline(rider, bird);
+		return rider;
+	}
+
+	/**
+	 * Establish the same baselines as connection.tick (the bird where it stands) without
+	 * doTick moving the just-created mock player back to its distant login coordinates.
+	 */
+	private static void vehicleBaseline(ServerPlayer rider, ChocoboEntity bird) {
+		try {
+			var type = net.minecraft.server.network.ServerGamePacketListenerImpl.class;
+			var lastVehicle = type.getDeclaredField("lastVehicle");
+			lastVehicle.setAccessible(true);
+			lastVehicle.set(rider.connection, bird);
+			for (String prefix : new String[]{"vehicleFirstGood", "vehicleLastGood"}) {
+				for (String axis : new String[]{"X", "Y", "Z"}) {
+					var field = type.getDeclaredField(prefix + axis);
+					field.setAccessible(true);
+					field.setDouble(rider.connection, axis.equals("X") ? bird.getX() : axis.equals("Y") ? bird.getY() : bird.getZ());
+				}
+			}
+		} catch (ReflectiveOperationException e) { throw new AssertionError(e); }
+	}
+
+	/** The rider's client says the bird is at {@code to}. */
+	private static void vehiclePacketTo(ServerPlayer rider, ChocoboEntity bird, Vec3 to) {
+		var before = bird.position();
+		bird.setPos(to);
+		var packet = new net.minecraft.network.protocol.game.ServerboundMoveVehiclePacket(bird);
+		bird.setPos(before);
+		rider.connection.handleMoveVehicle(packet);
+	}
+
+	/**
+	 * S_ORBIT / S_RIFT hub harness: a fast step up (out of a bog, onto a pool wall) left a
+	 * rider's bird wholly over the lower side, feet level with the top it stepped onto. Its
+	 * client, still "on ground" from the step, slid on along that top at a zero-height
+	 * step; the server's replay (not on ground: it had climbed) was stopped by the block's
+	 * side a micro-epsilon above the feet. "Moved wrongly!", sent back, the same move
+	 * again: 600-1000 corrections and the rider frozen there. The client's move from the
+	 * lip must be one the server's replay reaches, whatever flag either side carries.
+	 */
+	@GameTest(template = EMPTY, batch = "vehicle_packets")
+	public static void riderMoveFromTheLipReplaysOnTheServer(GameTestHelper helper) {
+		// road (top y 2) at x 0..2, bog (mud, top 1.875) from x 3, a floor under both
+		for (int x = 0; x <= 8; x++) for (int z = 0; z <= 4; z++) {
+			helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+			helper.setBlock(new BlockPos(x, 1, z), x <= 2 ? Blocks.STONE : Blocks.MUD);
+			for (int y = 2; y <= 6; y++) helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+		}
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(5, 2, 2), true, ChocoboColor.GOLD);
+		ServerPlayer rider = packetRider(helper, bird);
+		double half = bird.getBbWidth() / 2.0D;
+		Vec3 stride = new Vec3(-1.5D, -0.0784D, 0.0D);   // one tick back toward the road: pace and gravity
+		Vec3 lip = helper.absoluteVec(new Vec3(3.2D + half, 2.0D, 2.5D));
+		bird.setPos(lip);
+		helper.assertFalse(bird.hasFooting(), "the lip: feet level with the road, the whole box over the bog");
+		// the rider's client: the step that brought it here left it "on ground"
+		bird.setOnGround(true);
+		bird.move(net.minecraft.world.entity.MoverType.SELF, stride);
+		Vec3 client = bird.position();
+		helper.assertTrue(client.x > lip.x - 1.0D, "no zero-height slide along the road's top from the lip; x " + (client.x - lip.x));
+		// the server: its replay of that step was a climb (not on ground)
+		bird.setPos(lip);
+		bird.setOnGround(false);
+		vehicleBaseline(rider, bird);
+		vehiclePacketTo(rider, bird, client);
+		helper.assertTrue(bird.position().distanceTo(client) < 1.0E-5D, "the server replays the client's move from the lip; off by "
+				+ bird.position().distanceTo(client));
+		// from the bog itself the bird still steps up onto the road, and the server replays that
+		Vec3 bog = helper.absoluteVec(new Vec3(3.2D + half, 1.875D, 2.5D));
+		bird.setPos(bog);
+		helper.assertTrue(bird.hasFooting(), "standing on the mud");
+		bird.setOnGround(true);
+		bird.move(net.minecraft.world.entity.MoverType.SELF, stride);
+		Vec3 stepped = bird.position();
+		helper.assertTrue(Math.abs(stepped.y - 2.0D - helper.absoluteVec(Vec3.ZERO).y) < 1.0E-6D && stepped.x < bog.x - 1.4D,
+				"a bird on the bog steps up onto the road; at " + stepped.subtract(bog));
+		bird.setPos(bog);
+		bird.setOnGround(false);
+		vehicleBaseline(rider, bird);
+		vehiclePacketTo(rider, bird, stepped);
+		helper.assertTrue(bird.position().distanceTo(stepped) < 1.0E-5D, "the server replays the step");
 		bird.discard();
 		helper.succeed();
 	}
