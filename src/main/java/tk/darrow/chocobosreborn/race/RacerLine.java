@@ -134,4 +134,20 @@ public final class RacerLine {
 		}
 		return clampLane(lane + Math.min(DEFEND_MAX * skill, d));
 	}
+	// ------------------------------------------------------------ walls
+
+	/** Ticks pressed on a wall without getting anywhere before a racer recovers, and how long it recovers. */
+	public static final int STUCK_TICKS = 10, RECOVER_TICKS = 20;
+	/** Horizontal blocks a tick below which a racer pressed on a wall counts as not moving. */
+	public static final double STUCK_MOVE = 0.05D;
+
+	/**
+	 * One tick of the wall check the AI ({@link RacerGoal}) and the harness bot share: pressed
+	 * into something (horizontal collision) on the ground and barely moving. Returns the new
+	 * count; at {@link #STUCK_TICKS} the racer recovers (jumps, backs off, steers for the line).
+	 * Sliding along a rail at speed, a jump and a clear road reset it.
+	 */
+	public static int stuckStep(int stuck, boolean horizontalCollision, boolean onGround, double moved) {
+		return horizontalCollision && onGround && moved < STUCK_MOVE ? stuck + 1 : 0;
+	}
 }

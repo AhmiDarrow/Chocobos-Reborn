@@ -2082,9 +2082,32 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return super.getFlyingSpeed();
 	}
 
+	/** In a race no higher than a hill step ({@link RaceScoring#stepHeight}); the same on the rider's client and the server. */
+	@Override
+	public float maxUpStep() {
+		return RaceScoring.stepHeight(racing(), super.maxUpStep());
+	}
+
 	@Override
 	public boolean onClimbable() {
-		return (color().climb() && horizontalCollision) || super.onClimbable();
+		boolean climbs = color().climb(), racing = racing();
+		// onRidge is only worked out for a climber in a race that is pressed on something
+		return RaceScoring.mayClimb(climbs, horizontalCollision, racing, climbs && racing && horizontalCollision && onRidge())
+				|| super.onClimbable();
+	}
+
+	/** Progress hint for {@link #onRidge}, so a climber pressed on a wall does not scan the whole lap each tick. */
+	private double climbHint = -1.0D;
+
+	/**
+	 * On its course's ridge band. Worked out from synced state (the racing flag, the track,
+	 * the position), so the rider's client and the server agree where a climber may climb.
+	 */
+	private boolean onRidge() {
+		RaceTrack track = RaceTrack.byId(raceTrack());
+		double t = track.progressAt(getX(), getZ(), climbHint);
+		climbHint = t;
+		return track.ridgeBandAt(t, track.laneAt(t, getX(), getZ()));
 	}
 
 	@Override

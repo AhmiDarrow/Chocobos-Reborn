@@ -53,6 +53,14 @@ public final class RaceCourseLayout {
 	private static final double LANE_STEP = 0.25D;
 	private static final String BOOST = "chocobosreborn:boost_pad";
 	private static final String[] RAINBOW = {"red", "orange", "yellow", "lime", "light_blue", "blue", "purple"};
+	/**
+	 * How far from the centre line a racing bird's body reaches: {@link RacerLine#LANE_LIMIT}
+	 * plus half a bird (1.75 wide) and an eighth of a block. Nothing solid may stand at body
+	 * height in a block column any part of which is nearer the line than this.
+	 */
+	static final double CLEAR = RacerLine.LANE_LIMIT + 0.875D + 0.125D;
+	/** Blocks above the surface the lanes are kept clear to: a bird (3.25) and its jump; gantry lights hang higher. */
+	private static final int CLEAR_UP = 6;
 
 	private final RaceTrack track;
 	private final RaceTrack.Theme theme;
@@ -74,6 +82,19 @@ public final class RaceCourseLayout {
 	/** Set while the set piece is stamped: {@link #put} records its cells in {@link #landmarkCells}. */
 	private boolean landmarking;
 	private final Map<Cell, String> landmarkCells = new HashMap<>();
+	/**
+	 * While the plan is stamped: for every block column within {@code CLEAR + 1.5} of the
+	 * centre line, its exact distance to the line (the nearest point of the column's square
+	 * to the sampled polyline) and the lap parameter of that nearest point. Dropped when
+	 * the plan is done.
+	 */
+	private Map<Long, double[]> laneClear;
+	/** Liquid cells a pool laid (band and rim fill), walled after the road is down ({@link #poolBasins}). */
+	private final Map<Cell, String> poolCells = new LinkedHashMap<>();
+	/** Set while the driving surface is laid (band, detour, ridge, paint, plugged road): {@link #put} records it. */
+	private boolean surfacing;
+	/** Cells that are the course's own driving surface as built, for the lane-clearance test. */
+	private final Set<Cell> surfaceCells = new HashSet<>();
 
 	public static synchronized RaceCourseLayout of(RaceTrack track) {
 		return CACHE.computeIfAbsent(track, RaceCourseLayout::new);
@@ -99,6 +120,7 @@ public final class RaceCourseLayout {
 		double lap = track.lapLength();
 		int steps = (int) Math.ceil(lap * 2.0D);   // 0.5 blocks between stamps
 		boolean sky = theme == RaceTrack.Theme.SKYWAY;
+		this.laneClear = laneClearance(track);
 		// the road tiles first (no blocks yet): the stands are sited against every leg of the lap
 		road.addAll(roadTiles(track));
 		this.stands = CourseStands.of(track, road);
@@ -122,6 +144,7 @@ public final class RaceCourseLayout {
 				stampRoad(i, t + 0.5D / steps, lap, sky, features);
 			}
 		}
+		poolBasins();
 		sparingRoad = true;   // nothing below this line belongs on the racing line
 		for (int i = 0; i < steps; i++) {
 			double t = i / (double) steps;
@@ -164,9 +187,11 @@ public final class RaceCourseLayout {
 		warnings(lap);
 		sparingRoad = false;
 		gantry();
+		surfacing = true;   // paint on the road is still the road
 		startLine(lap);
 		startGrid(lap);
 		startArrow(lap);
+		surfacing = false;
 		shortcutMarkers(lap);
 		sparingRoad = true;   // sited clear of every road tile, but never let a stand onto one
 		standing = true;
@@ -183,6 +208,204 @@ public final class RaceCourseLayout {
 			chunks.add(chunkKey(c.x() >> 4, c.z() >> 4));
 		}
 		indexRoad();
+		laneClear = null;
+		poolCells.clear();
+	}
+
+	/**
+	 * {@link #laneClear}: each column's distance to the centre polyline, exact for the
+	 * column's whole square. Rounding a lateral offset to a block is not enough: a point
+	 * 6.5 out lands in a column whose near edge is anywhere from 5.1 to 6.5 out (a diagonal
+	 * leg, a bend), and a rail or pool wall stood there is inside a bird held at the lane
+	 * limit (B_FORD pinned a rider for 50 s on one).
+	 */
+	private static Map<Long, double[]> laneClearance(RaceTrack track) {
+		int n = track.spline().samples();
+		double[] px = new double[n], pz = new double[n];
+		for (int i = 0; i < n; i++) {
+			RacePoint p = track.pointAt(i / (double) n);
+			px[i] = p.x();
+			pz[i] = p.z();
+		}
+		double reach = CLEAR + 1.5D;
+		Map<Long, double[]> out = new HashMap<>();
+		for (int i = 0; i < n; i++) {
+			int k = (i + 1) % n;
+			double ax = px[i], az = pz[i], bx = px[k], bz = pz[k];
+			double len2 = (bx - ax) * (bx - ax) + (bz - az) * (bz - az);
+			for (int x = floor(Math.min(ax, bx) - reach); x <= floor(Math.max(ax, bx) + reach); x++) {
+				for (int z = floor(Math.min(az, bz) - reach); z <= floor(Math.max(az, bz) + reach); z++) {
+					double d = segmentToSquare(ax, az, bx, bz, x, z);
+					if (d >= reach) {
+						continue;
+					}
+					long key = roadKey(x, z);
+					double[] cur = out.get(key);
+					if (cur == null || d < cur[0]) {
+						double u = len2 < 1.0E-12D ? 0.0D
+								: Math.max(0.0D, Math.min(1.0D, ((x + 0.5D - ax) * (bx - ax) + (z + 0.5D - az) * (bz - az)) / len2));
+						out.put(key, new double[]{d, (i + u) / n});
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Distance from segment a-b to the unit square at (x0, z0); 0 where they meet. */
+	static double segmentToSquare(double ax, double az, double bx, double bz, int x0, int z0) {
+		// Liang-Barsky: does the segment cross the square?
+		double dx = bx - ax, dz = bz - az, lo = 0.0D, hi = 1.0D;
+		double[] p = {-dx, dx, -dz, dz};
+		double[] q = {ax - x0, x0 + 1 - ax, az - z0, z0 + 1 - az};
+		boolean meets = true;
+		for (int k = 0; k < 4 && meets; k++) {
+			if (Math.abs(p[k]) < 1.0E-12D) {
+				meets = q[k] >= 0.0D;
+			} else {
+				double r = q[k] / p[k];
+				if (p[k] < 0.0D) {
+					lo = Math.max(lo, r);
+				} else {
+					hi = Math.min(hi, r);
+				}
+				meets = lo <= hi;
+			}
+		}
+		if (meets) {
+			return 0.0D;
+		}
+		double best = Math.min(pointToSquare(ax, az, x0, z0), pointToSquare(bx, bz, x0, z0));
+		for (int c = 0; c < 4; c++) {
+			best = Math.min(best, pointToSegment(x0 + (c & 1), z0 + (c >> 1), ax, az, bx, bz));
+		}
+		return best;
+	}
+
+	private static double pointToSquare(double x, double z, int x0, int z0) {
+		double dx = Math.max(0.0D, Math.max(x0 - x, x - (x0 + 1)));
+		double dz = Math.max(0.0D, Math.max(z0 - z, z - (z0 + 1)));
+		return Math.hypot(dx, dz);
+	}
+
+	private static double pointToSegment(double x, double z, double ax, double az, double bx, double bz) {
+		double dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
+		double u = len2 < 1.0E-12D ? 0.0D : Math.max(0.0D, Math.min(1.0D, ((x - ax) * dx + (z - az) * dz) / len2));
+		return Math.hypot(x - (ax + dx * u), z - (az + dz * u));
+	}
+
+	/** The column's distance to the centre line ({@link #laneClear}); far columns read as infinitely clear. */
+	private double clearance(int x, int z) {
+		double[] c = laneClear == null ? null : laneClear.get(roadKey(x, z));
+		return c == null ? Double.POSITIVE_INFINITY : c[0];
+	}
+
+	private static boolean liquid(RaceTrack.Feature f) {
+		return f != null && (f.type() == RaceTrack.Feature.Type.WATER || f.type() == RaceTrack.Feature.Type.LAVA);
+	}
+
+	/**
+	 * A cell in a racing bird's body: a column nearer the line than {@link #CLEAR}, from just
+	 * above the surface (from the surface itself across water and lava) up past its head.
+	 * Only the driving surface itself is laid there ({@link #surfacing}).
+	 */
+	private boolean inLanes(int x, int y, int z) {
+		double[] c = laneClear == null ? null : laneClear.get(roadKey(x, z));
+		if (c == null || c[0] >= CLEAR) {
+			return false;
+		}
+		int s = surf(c[1]);
+		// across a pool a bird's body is down in the water; the pool floor under it is
+		// laid (as the pool) by poolBasins, and a road column beside it keeps its footing
+		return y >= (liquid(track.terrainAt(c[1])) ? s : s + 1) && y <= s + CLEAR_UP;
+	}
+
+	/**
+	 * The column for an edge block {@code offset} out at t (a rail, a pool wall, a kerb
+	 * across a pool): the column the point lands in, or, where that column reaches into the
+	 * lanes, the next one out along the normal, so the rail still hugs the kerb.
+	 */
+	private int[] clearColumn(double t, double offset, double clear) {
+		double sign = Math.signum(offset);
+		for (double o = Math.abs(offset); o <= Math.abs(offset) + 2.0D; o += 0.25D) {
+			RacePoint q = track.pointAtLane(t, sign * o);
+			int x = floor(q.x()), z = floor(q.z());
+			if (localClearance(x, z, t) >= clear) {
+				return new int[]{x, z};
+			}
+		}
+		RacePoint q = track.pointAtLane(t, sign * (Math.abs(offset) + 2.0D));
+		return new int[]{floor(q.x()), floor(q.z())};
+	}
+
+	/** {@link #clearance} out to the detour's rail, from the polyline either side of t. */
+	private double localClearance(int x, int z, double t) {
+		double near = clearance(x, z);
+		if (near < CLEAR + 1.5D) {
+			return near;
+		}
+		int n = track.spline().samples();
+		int i0 = (int) Math.floor((t - Math.floor(t)) * n);
+		double best = Double.POSITIVE_INFINITY;
+		RacePoint a = track.pointAt(Math.floorMod(i0 - 24, n) / (double) n);
+		for (int k = -23; k <= 24; k++) {
+			RacePoint b = track.pointAt(Math.floorMod(i0 + k, n) / (double) n);
+			best = Math.min(best, segmentToSquare(a.x(), a.z(), b.x(), b.z(), x, z));
+			a = b;
+		}
+		return best;
+	}
+
+	/**
+	 * Water and lava features, once the road is down: every column of the lanes beside the
+	 * band that the band stamp missed is filled with the pool (so no rim block is left in a
+	 * swimming bird's way), and every column beside the pool that is not road gets the wall:
+	 * the pool floor's level and two blocks at the surface. The rim follows the pool cell by
+	 * cell instead of being laid a fixed offset out from a sampled point, so it can neither
+	 * step into the lanes nor leave a diagonal gap the pool drains through.
+	 */
+	private void poolBasins() {
+		for (Map.Entry<Long, double[]> e : laneClear.entrySet()) {
+			double[] c = e.getValue();
+			RaceTrack.Feature ft = track.terrainAt(c[1]);
+			if (c[0] >= CLEAR || !liquid(ft)) {
+				continue;
+			}
+			int x = (int) (e.getKey() >> 32), z = (int) (long) e.getKey();
+			if (road.contains(new Tile(x, z))) {
+				continue;   // band (already the pool) or another leg's road
+			}
+			int s = surf(c[1]);
+			String fluid = ft.type() == RaceTrack.Feature.Type.WATER ? "water" : "lava";
+			put(x, s - 2, z, theme.base);
+			surfacing = true;
+			put(x, s - 1, z, fluid);
+			put(x, s, z, fluid);
+			surfacing = false;
+			poolCells.put(new Cell(x, s, z), fluid);
+		}
+		for (Cell w : new ArrayList<>(poolCells.keySet())) {
+			String here = blocks.get(w);
+			if (here == null || !(here.equals("water") || here.equals("lava"))) {
+				continue;   // plain road laid over the end of the pool
+			}
+			for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+				int x = w.x() + d[0], z = w.z() + d[1];
+				if (road.contains(new Tile(x, z))) {
+					continue;
+				}
+				String at = blocks.get(new Cell(x, w.y(), z));
+				if (at != null && (at.equals("water") || at.equals("lava"))) {
+					continue;
+				}
+				String below = blocks.get(new Cell(x, w.y() - 1, z));
+				if (below == null || below.equals("water") || below.equals("lava") || below.equals("air")) {
+					put(x, w.y() - 1, z, theme.base);
+				}
+				put(x, w.y(), z, theme.wall);
+				put(x, w.y() + 1, z, theme.wall);
+			}
+		}
 	}
 
 	private void indexRoad() {
@@ -235,7 +458,9 @@ public final class RaceCourseLayout {
 				if (y == null) {
 					continue;
 				}
+				surfacing = true;   // a plug is the ground its neighbours stand on, never a wall
 				put(h.x(), y, h.z(), road.contains(h) ? theme.road : theme.ground);
+				surfacing = false;
 				for (int d = 1; d <= (theme == RaceTrack.Theme.SKYWAY ? 2 : 5); d++) {
 					put(h.x(), y - d, h.z(), theme.base);
 				}
@@ -349,6 +574,7 @@ public final class RaceCourseLayout {
 		boolean nearFeature = nearFeature(t);
 		int surf = surf(t);
 		// the band
+		surfacing = true;
 		for (double o = -RaceTrack.ROAD_HALF; o <= RaceTrack.ROAD_HALF; o += LANE_STEP) {
 			RacePoint q = track.pointAtLane(t, o);
 			int x = floor(q.x()), z = floor(q.z());
@@ -369,11 +595,13 @@ public final class RaceCourseLayout {
 						put(x, surf - 2, z, theme.base);
 						put(x, surf - 1, z, "water");
 						put(x, surf, z, "water");
+						poolCells.put(new Cell(x, surf, z), "water");
 					}
 					case LAVA -> {
 						put(x, surf - 2, z, theme.base);
 						put(x, surf - 1, z, "lava");
 						put(x, surf, z, "lava");
+						poolCells.put(new Cell(x, surf, z), "lava");
 					}
 					case MUD -> put(x, surf, z, "mud");
 					case RIDGE -> {
@@ -387,19 +615,9 @@ public final class RaceCourseLayout {
 				}
 			}
 		}
-		boolean liquid = ft != null && (ft.type() == RaceTrack.Feature.Type.WATER || ft.type() == RaceTrack.Feature.Type.LAVA);
-		if (liquid) {
-			// one kerb stamp per step steps diagonally on a diagonal leg and the pool leaks out
-			// through the corner: wall the whole strip between the band and the kerb instead
-			for (int side = -1; side <= 1; side += 2) {
-				for (double o = RaceTrack.ROAD_HALF + LANE_STEP; o <= RaceTrack.ROAD_HALF + 1.0D; o += LANE_STEP) {
-					RacePoint q = track.pointAtLane(t, side * o);
-					int x = floor(q.x()), z = floor(q.z());
-					put(x, surf, z, theme.wall);
-					put(x, surf + 1, z, theme.wall);
-				}
-			}
-		}
+		surfacing = false;
+		// the pool's walls go in once the whole band is down (poolBasins): one stamp per step
+		// steps diagonally on a diagonal leg, and a wall laid a fixed offset out steps into the lanes
 		// detour road outside a feature, with connectors; its own kerb further out
 		if (nearFeature) {
 			double from = ft != null ? RaceTrack.DETOUR_INNER : RaceTrack.ROAD_HALF + 0.5D;
@@ -407,7 +625,9 @@ public final class RaceCourseLayout {
 				RacePoint q = track.pointAtLane(t, o);
 				int x = floor(q.x()), z = floor(q.z());
 				road.add(new Tile(x, z));
+				surfacing = true;
 				put(x, surf, z, theme.road);
+				surfacing = false;
 			}
 			RacePoint edge = track.pointAtLane(t, -RaceTrack.DETOUR_OUTER - 1.0D);
 			put(floor(edge.x()), surf, floor(edge.z()), ft == null ? "yellow_concrete" : theme.wall);
@@ -443,20 +663,32 @@ public final class RaceCourseLayout {
 			RacePoint q = track.pointAtLane(t, o);
 			int x = floor(q.x()), z = floor(q.z());
 			String kerb = corner ? ((i / 6) % 2 == 0 ? theme.kerbA : theme.kerbB) : theme.wall;
-			put(x, surf, z, kerb);
+			put(x, surf, z, kerb);   // flush with the road; across a pool inLanes keeps it out of a swimmer's way
 			if (corner) {
 				RacePoint wide = track.pointAtLane(t, side * (RaceTrack.ROAD_HALF + 2.0D));
 				put(floor(wide.x()), surf, floor(wide.z()), kerb);
 			}
-			if (liquid) {
-				put(x, surf + 1, z, theme.wall);
-			} else if (!theme.rail.equals("air") && t >= 0.03D && (side < 0 || corner)) {
-				put(x, surf + 1, z, theme.rail);
+			boolean rail = liquid || (!theme.rail.equals("air") && t >= 0.03D && (side < 0 || corner));
+			if (!rail) {
+				continue;
 			}
+			// the rail stands on the kerb column unless that column reaches into the lanes;
+			// then on the next one out, with a kerb block under it
+			int[] r = clearColumn(t, o, CLEAR);
+			if (r[0] != x || r[1] != z) {
+				put(r[0], surf, r[1], kerb);
+			}
+			put(r[0], surf + 1, r[1], liquid ? theme.wall : theme.rail);
 		}
 		if (nearFeature && !theme.rail.equals("air")) {
+			// the detour's rail: clear of a bird held a block inside the detour's outer edge
 			RacePoint edge = track.pointAtLane(t, -RaceTrack.DETOUR_OUTER - 1.0D);
-			put(floor(edge.x()), surf + 1, floor(edge.z()), theme.rail);
+			int ex = floor(edge.x()), ez = floor(edge.z());
+			int[] r = clearColumn(t, -RaceTrack.DETOUR_OUTER - 1.0D, RaceTrack.DETOUR_OUTER);
+			if (r[0] != ex || r[1] != ez) {
+				put(r[0], surf, r[1], blocks.getOrDefault(new Cell(ex, surf, ez), theme.wall));
+			}
+			put(r[0], surf + 1, r[1], theme.rail);
 		}
 	}
 
@@ -667,10 +899,12 @@ public final class RaceCourseLayout {
 					continue;
 				}
 				int y = surf(t);
+				surfacing = true;
 				for (double o = -1.0D; o <= 1.0D; o += 0.5D) {
 					RacePoint q = track.pointAtLane(t, o);
 					put(floor(q.x()), y, floor(q.z()), colour + "_concrete");
 				}
+				surfacing = false;
 			}
 			// the gantry, just before the fork: a post on the infield verge, a beam over the road
 			double t = wrap(fork - 4.0D / lap);
@@ -2534,6 +2768,15 @@ public final class RaceCourseLayout {
 
 	/** A walled 3x3 pool sunk into the ground (rim on the ground level). */
 	private void pool(int x, int y, int z, String liquid, String rim) {
+		// on the inside of a tight bend the margin is another stretch of the lanes: a pool whose
+		// rim would be left out there (inLanes, a road tile) would run onto the road, so none
+		for (int dx = -2; dx <= 2; dx++) {
+			for (int dz = -2; dz <= 2; dz++) {
+				if (road.contains(new Tile(x + dx, z + dz)) || clearance(x + dx, z + dz) < CLEAR) {
+					return;
+				}
+			}
+		}
 		for (int dx = -2; dx <= 2; dx++) {
 			for (int dz = -2; dz <= 2; dz++) {
 				boolean edge = Math.abs(dx) == 2 || Math.abs(dz) == 2;
@@ -2570,10 +2813,24 @@ public final class RaceCourseLayout {
 		if (standing) {
 			standTiles.add(new Tile(x, z));
 		}
-		if (landmarking) {
-			landmarkCells.put(new Cell(x, y, z), block);
+		if (!surfacing && !block.equals("air") && inLanes(x, y, z)) {
+			return;   // a rim, a rail, a post or scenery reaching into a racing bird's body
 		}
-		blocks.put(new Cell(x, y, z), block);
+		Cell cell = new Cell(x, y, z);
+		if (landmarking) {
+			landmarkCells.put(cell, block);
+		}
+		if (surfacing) {
+			surfaceCells.add(cell);
+		} else {
+			surfaceCells.remove(cell);
+		}
+		blocks.put(cell, block);
+	}
+
+	/** Cells of the driving surface as built (band, detour, ridge, road paint), for tests. */
+	Set<Cell> surfaceCells() {
+		return Collections.unmodifiableSet(surfaceCells);
 	}
 
 	/** Every block the course's set piece laid (plinth included). */

@@ -10,6 +10,8 @@ ends = [e for e in events if e.get("event") == "end"]
 rows = [line.split(",") for line in (out / "server.csv").read_text().splitlines()]
 client = [line.split(",") for line in (out / "client.csv").read_text().splitlines()]
 end_file = out / "client-end-LatencyRider.jsonl"
+recover_file = out / "recover-LatencyRider.csv"
+recoveries = [line.split(",") for line in recover_file.read_text().splitlines()] if recover_file.exists() else []
 client_ends = [json.loads(line) for line in end_file.read_text().splitlines()] if end_file.exists() else []
 summary = []
 for i, event in enumerate(ends, 1):
@@ -31,6 +33,7 @@ for i, event in enumerate(ends, 1):
         "race_probe_rtt_ms_min_max": [min(int(r[10]) for r in running), max(int(r[10]) for r in running)] if running and len(running[0]) > 10 else None,
         "stamina_min": min(int(r[6]) for r in running) if running else None,
         "dash_locked_samples": sum(r[7] == "true" for r in running),
+        "wall_recoveries": sum(1 for r in recoveries if r and int(r[0]) == i),
     })
 (out / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
 print(json.dumps(summary, indent=2))

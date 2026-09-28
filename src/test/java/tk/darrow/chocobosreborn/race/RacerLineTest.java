@@ -33,6 +33,18 @@ class RacerLineTest {
 	}
 
 	@Test
+	void aRacerPinnedOnAWallRecoversAndOneSlidingAlongItDoesNot() {
+		int stuck = 0;
+		for (int i = 0; i < RacerLine.STUCK_TICKS; i++) {
+			stuck = RacerLine.stuckStep(stuck, true, true, 0.0D);
+		}
+		assertEquals(RacerLine.STUCK_TICKS, stuck, "ten ticks pressed on a wall on the ground, going nowhere");
+		assertEquals(0, RacerLine.stuckStep(9, true, true, 0.4D), "grazing a rail at speed");
+		assertEquals(0, RacerLine.stuckStep(9, true, false, 0.0D), "mid-jump against it");
+		assertEquals(0, RacerLine.stuckStep(9, false, true, 0.0D), "held on the grid, nothing in the way");
+	}
+
+	@Test
 	void aFinishedBirdParksOffTheRacingLine() {
 		assertTrue(Math.abs(RacerLine.PARK_LANE - RacerLine.INSIDE_LINE) >= 3.0D);
 		assertTrue(Math.abs(RacerLine.PARK_LANE) <= RacerLine.LANE_LIMIT);

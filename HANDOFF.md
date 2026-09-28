@@ -2094,3 +2094,92 @@ alone here). Full `test` on this branch: 244 tests, 1 skipped, 1 failure,
 on this branch; B and S have not either); every class A line of it passes. Needs an in-game look: Grotto's two tail hairpins and its two boosts
 0.04 apart after the upper tip (the only boost set that seats all seven stands), Ember's tines at three-lap
 pace with bumping, the long ridges (Ember's 0.08 of a lap on the run home), and Crystal's climbing bowl.
+
+## Rail clearance (2026-09-28, unreleased, branch `rail-clearance`; from the 3-client race harness)
+
+**The defect.** On B_FORD (4 x 395, ford 0.40-0.52) a harness rider on a Blue bird sat pinned for 50 s at
+progress 0.4633, 4.38 outside the line, `horizontalCollision` and `onGround` both true: its west face was
+against a cobblestone block at x=-1228, z=1619 that stood a block inside the kerb line, at the road level
+and one above. The lane limit is ROAD_HALF - 1 = 4.5 and a bird is 1.75 wide, so a bird at the limit reaches
+5.375 from the line; anything solid nearer than that at body height is a wall in the racing line. The AI got
+out by jumping (`RacerGoal`), the harness bot and a real rider did not.
+
+**Root cause.** Edge blocks were placed by `floor()` of a point a fixed lateral offset out (the pool strip at
+5.75-6.5 and the kerb rail at 6.5 from each sampled t). The block that point lands in can reach anywhere from
+5.1 to 6.5 from the line (a diagonal leg or a bend: the short-GP rebuild put every colour feature on a long
+bend). The rails and scenery were already kept off the road tiles (`sparingRoad`), but the pool walls were
+laid in the feature pass with no such check, at the surface and one above, so across every water and lava
+feature the rim stepped into the band; the plain road laid afterwards covered the surface level and left the
+upper block standing. Past that: a pool's wall end spilling a block into the connector, and on S_BASTION a
+margin lava pool on the inside of a tight bend whose rim reached the lanes of the next stretch.
+
+**The test.** `CourseClearanceTest` walks every lap every half block and every eighth of a lane across the
+reach (4.5 + 0.875 + 0.1), plus the detour road (its own lane limit, 12.5 +- 3.475) and the connector corridor
+between them (the lanes `detourLaneAt` blends through), and fails on any solid cell from the surface (the pool
+floor across water and lava) up through the bird's 3.25. The course's own surface is excused
+(`RaceCourseLayout.surfaceCells()`, recorded as the band, detour, ridge, paint and plugs go down: a hill's
+next step is road, not a wall), as is the road a pool ends against. Before the fix it found **5552 cells on
+29 of 48 courses**: S_ABYSS 525, S_MAELSTROM 488, S_CITADEL 441, S_STARFALL 438, A_INFERNO 410, S_BASTION 343,
+S_ZENITH 320, A_FORGE 254, A_TEMPLE 198, B_GLACIER 193, A_DEEPS 192, B_RAPIDS 180, B_OXBOW 174, S_KEEP 173,
+A_TOADSTOOL 169, S_ORBIT 146, B_FORD 127, B_BAOBAB 126, B_ACACIA 108, S_VOID 91, S_RIFT 76, A_EMBER 72,
+A_CRYSTAL 71, A_MACHETE 70, A_GROTTO 62, A_CANOPY 42, A_MOONSHELF 38, S_SKYWAY 24, B_FROST 1 (5404 of them in
+water or lava bands, 145 on plain road, 3 in connectors). After: **0**. `theFordNoLongerPinsARider` checks the
+harness rider's exact box.
+
+**The fix** (`RaceCourseLayout`), general, not per course:
+- `laneClearance`: every column within 7 blocks of the centre polyline gets its exact distance to the line
+  (segment-to-square) and the lap parameter of that nearest point, for the time the plan is stamped.
+- `put` refuses anything but the driving surface in a column nearer than `CLEAR` = LANE_LIMIT + 0.875 + 0.125
+  (5.5), from one above the surface (from the surface across a pool) to six above. That covers rails, rims,
+  kerb walls, gantry and warning posts, shortcut sign posts, stands, landmarks and scenery at once.
+- Pools: `poolBasins` runs after the road is down. Lane columns beside the band that the band stamp missed
+  become pool (water or lava, floor below), and every non-road column next to pool water gets the rim (the
+  floor level, the surface and one above). The rim follows the pool cell by cell, so it neither steps into the
+  lanes nor leaves the diagonal gap the old strip existed to plug.
+- Rails keep hugging the kerb: `clearColumn` stands the rail on the kerb column, or where that reaches into
+  the lanes on the next one out along the normal with a kerb block under it. The detour rail does the same
+  against the detour's outer edge (16).
+- A margin pool (`pool`) that would reach the lanes or a road tile is left out.
+`COURSE_VERSION` 13 (`RaceTrackTest` updated): every island is re-laid; the version-12 slot sweep covers it.
+No existing test pinned block counts; `CourseLiquidTest` and `CourseIslandTest` pass on the new rims.
+
+**Harness recovery.** `RaceHarnessClient.input`: pressed on a wall (`horizontalCollision && onGround`, under
+0.05 blocks a tick) for 10 ticks, the bot jumps once and aims for lane 0 for 20 ticks, and appends
+`run,tick,track,x,y,z,progress,lane,yaw` to `recover-<name>.csv`. Existing files are unchanged;
+`analyze_paired_races.py` adds `<role>_wall_recoveries` (and the progress of the first twelve),
+`analyze_latency.py` adds `wall_recoveries`. The rule is `RacerLine.stuckStep`, shared with the AI.
+
+**Climbing desynced the server** (A_CRYSTAL, Black bird, ~1.1 b/t, climbed to y=66.5 near 0.12-0.15, then
+600 vehicle corrections and "moved wrongly! 1.22" every tick). 66.5 is the road plus a 1.5 rail: a climbing
+colour went up the rail beside the road, either by `onClimbable` (any wall, while pressed on it) or by its 2.0
+step (a fence or wall rail is 1.5). The server's replay of the rider's vehicle moves does not climb, so it put
+the bird back every tick and the client climbed again. Now, in a race only: `onClimbable` needs the ridge band
+(`RaceTrack.ridgeBandAt`: a ridge feature, within ROAD_HALF, from 2 blocks before its face to 2 past its end),
+and `maxUpStep` is capped at 1.0 (`RaceScoring.stepHeight`; hill steps are one block). Both read synced state
+(racing flag, track, position), so client and server agree; outside races nothing changes. Tests in
+`RaceClimbTest`. The racer-contact guard already allows no sideways shove off the band, and the pushes are
+velocity, not position, so the server's replay follows them. Not done: a server-side recovery. Vanilla
+already resets the vehicle to its last good position and re-syncs the client; the loop was the client doing
+the same climb again. If it ever recurs, count consecutive corrections per rider in `RaceSession` and after
+about 20 move the bird to its lane point (`pointAtLane(t, clampLane(lane))`) through the fall-rescue path.
+That is a teleport the server makes itself, so vanilla's movement check is not loosened.
+
+**AI stall at a ridge** ("Vivi", A_CRYSTAL, 40 s at lap 1 + 0.69, at the ridge start 0.6875). On the short
+laps the connector is a lap fraction (`DETOUR_CONNECT` 0.012): 4.1-7.3 blocks on the 3-5 lap courses (B_CANYON
+4.1, A_CRYSTAL 4.5, B_FORD 4.7) against 15-19 on the long ones, for a 12.5-17-block swing. A scratch
+kinematic model of `RacerGoal`'s steering (ground inertia, 0.6-1.1 b/t, band lanes -2..3) cleared the ridge in
+nearly every case, so the connector alone does not explain a 40 s stall. The likely cause is a bump or a pass
+leaving a non-climber on the ridge face, which it cannot jump (4 blocks) and pressed on into, since its
+target lies past the face. It had no recovery. Now a stuck AI bird (`RacerLine.stuckStep`, 10 ticks) backs off
+for 20 ticks toward a point 3 blocks back on the lane it wants there. `aBirdPinnedOnARidgeFaceBacksOffOntoClearRoad`
+checks that point on every ridge: on the road, before the face, clear of solid blocks. Two other ideas
+(holding the outside lane before the fork, clamping the lookahead at the feature's ends) made the model worse
+and were dropped. Still open: making the connector a length in blocks (for example
+`max(0.012, 16 / lap)`). That moves every short course's detour cost, so the features would need re-solving
+against `CourseBalanceTest`.
+
+**Results.** Full `test`: 268 tests, 0 failures, 1 skipped (AtlasTint). `build` passes. `runVerification`
+was not run. **Needs an in-game look:** the pool rims on the ford/lava courses (a rim now follows the pool
+cell by cell, so it is a little more ragged on diagonals). Rails that stepped out a column on diagonal legs
+(a kerb block under each). Climbers on A_CRYSTAL's ridge still climbing it and nothing else. A Black bird no
+longer mounting rails in a race. The AI back-off at a ridge face on a short lap.

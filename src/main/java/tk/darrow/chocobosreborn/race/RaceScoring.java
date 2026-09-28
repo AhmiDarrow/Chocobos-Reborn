@@ -773,6 +773,27 @@ public final class RaceScoring {
 		return canFly && !racingOrHold;
 	}
 
+	/**
+	 * Whether a climbing colour pressed into a wall climbs it. In a race only a ridge
+	 * feature is climbable: a climber that went up a rail, a pool wall, a stand or a post
+	 * beside the road left the course, and the server's replay of the rider's vehicle moves
+	 * (which does not climb) reset it every tick ("moved wrongly!") and froze it there.
+	 */
+	public static boolean mayClimb(boolean colourClimbs, boolean againstWall, boolean racing, boolean onRidge) {
+		return colourClimbs && againstWall && (!racing || onRidge);
+	}
+
+	/** Highest step in a race: the road's hill steps are one block; a rail stands 1.5, a pool wall one above the road. */
+	public static final float RACE_STEP = 1.0F;
+
+	/**
+	 * Step height a bird has: its colour's (2 for the climbing colours), capped at
+	 * {@link #RACE_STEP} in a race so no bird walks up onto the rail and off the course.
+	 */
+	public static float stepHeight(boolean racing, float colourStep) {
+		return racing ? Math.min(colourStep, RACE_STEP) : colourStep;
+	}
+
 	public static boolean stallFitsTrack(double offset, double halfWidth) {
 		return Math.abs(offset) <= halfWidth;
 	}

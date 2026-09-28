@@ -527,9 +527,11 @@ class RaceTrackTest {
 		// a relay clears what older plans left (stray water washed the boost pads out); 9: class-based
 		// stands inside and outside the loop, the island ground reaching under each; 10: shortcut
 		// markers; 11: the 48-course swap (grand prix laps lengthened on six courses, boost
-		// strips and set pieces follow the new format).
+		// strips and set pieces follow the new format); 12: an island an older plan laid is swept over its
+		// whole slot; 13: rails, pool rims and scenery kept out of the racing lanes
+		// (CourseClearanceTest).
 		// Older islands have to be re-laid either way.
-		assertEquals(12, SquareBuilder.COURSE_VERSION);
+		assertEquals(13, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

@@ -707,6 +707,32 @@ public enum RaceTrack {
 		return directLane;
 	}
 
+	/**
+	 * On a ridge feature's band: within the road half-width of the line, from a couple of
+	 * blocks before the ridge face to a couple past its far end (a climber meets the face
+	 * with its body, not its centre). The only place a climber climbs during a race
+	 * ({@link RaceScoring#mayClimb}).
+	 */
+	public boolean ridgeBandAt(double t, double lane) {
+		if (Math.abs(lane) > ROAD_HALF) {
+			return false;
+		}
+		double w = t - Math.floor(t), pad = 2.0D / lapLength();
+		for (Feature f : features) {
+			if (f.type() == Feature.Type.RIDGE && w >= f.start() - pad && w <= f.end() + pad) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Signed lane of (x, z) at progress t: positive = inside the loop, as {@link #pointAtLane}. */
+	public double laneAt(double t, double x, double z) {
+		RacePoint c = pointAt(t);
+		double[] tg = tangent(t);
+		return (x - c.x()) * -tg[1] + (z - c.z()) * tg[0];
+	}
+
 	/** A ridge across the direct line here (climbers' shortcut). */
 	public boolean isSpaceSection(double t) {
 		Feature ft = featureAt(t);

@@ -37,6 +37,35 @@ class DetourSteeringTest {
         }
     }
 
+    /**
+     * "Vivi" stood 40 s against A_CRYSTAL's ridge face at 0.69 (a non-climber, pressing on
+     * toward a detour lane it could not reach through the ridge; jumping does not clear four
+     * blocks). A stuck AI bird now backs off along the lap to the lane it wants there: that
+     * point is on the road, before the face, and clear of the ridge.
+     */
+    @Test void aBirdPinnedOnARidgeFaceBacksOffOntoClearRoad() {
+        for (var track : RaceTrack.values()) for (var ridge : track.terrainFeatures()) {
+            if (ridge.type() != RaceTrack.Feature.Type.RIDGE) continue;
+            var layout = RaceCourseLayout.of(track);
+            double lap = track.lapLength(), pinned = ridge.start() - 0.9 / lap;
+            for (double direct = -RacerLine.LANE_LIMIT; direct <= RacerLine.LANE_LIMIT; direct += 1.5) {
+                double back = pinned - 3.0 / lap;
+                double lane = track.detourLaneAt(back, direct, ChocoboColor.YELLOW, true);
+                var target = track.pointAtLane(back, lane);
+                assertTrue(layout.onCourse(target.x(), target.z()), track.name() + " lane " + direct);
+                assertTrue(back < ridge.start(), track.name());
+                int x = (int) Math.floor(target.x()), z = (int) Math.floor(target.z()), s = (int) track.groundY(back) - 1;
+                for (int y = s + 1; y <= s + 3; y++) {
+                    var cell = new RaceCourseLayout.Cell(x, y, z);
+                    String block = layout.blocks().get(cell);
+                    // the road one step up a hill is the road, not the ridge
+                    assertFalse(CourseClearanceTest.solid(block) && !layout.surfaceCells().contains(cell),
+                            track.name() + " back-off target in " + block);
+                }
+            }
+        }
+    }
+
     @Test void abilitiesAndBogKnowledgeStillChooseTheDirectRoute() {
         for (var track : RaceTrack.values()) for (var feature : track.terrainFeatures()) {
             double middle = (feature.start() + feature.end()) / 2;

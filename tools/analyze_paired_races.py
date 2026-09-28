@@ -18,6 +18,11 @@ for role in ("LatencyHost", "LatencyGuest", "LatencyGuest2"):
     clients[role] = list(csv.reader(path.open())) if path.exists() else []
     end_path = out / ("client-end-" + role + ".jsonl")
     client_ends[role] = [json.loads(line) for line in end_path.read_text().splitlines()] if end_path.exists() else []
+# the bot's wall recoveries (RaceHarnessClient): run, tick, track, x, y, z, progress, lane, yaw
+recoveries = {}
+for role in ("LatencyHost", "LatencyGuest", "LatencyGuest2"):
+    path = out / ("recover-" + role + ".csv")
+    recoveries[role] = list(csv.reader(path.open())) if path.exists() else []
 field_path = out / "field.jsonl"
 field_samples = [json.loads(line) for line in field_path.read_text().splitlines()] if field_path.exists() else []
 summary = []
@@ -67,6 +72,10 @@ for event in ends:
         paired_samples[label] = {int(r[1]): r for r in samples}
         row[label + "_collision_samples"] = sum(len(r) > 13 and r[13] == "true" for r in samples)
         row[label + "_peak_sampled_speed"] = round(max((float(r[11]) for r in samples if len(r) > 11), default=0), 4)
+        stuck = [r for r in recoveries[role] if len(r) > 2 and r[2] == event["track"]]
+        row[label + "_wall_recoveries"] = len(stuck)
+        if stuck:
+            row[label + "_wall_recovery_progress"] = [round(float(r[6]), 4) for r in stuck][:12]
     for label in ("guest", "guest2"):
         if label not in paired_samples:
             continue

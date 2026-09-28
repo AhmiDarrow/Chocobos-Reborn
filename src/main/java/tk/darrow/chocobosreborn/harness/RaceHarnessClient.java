@@ -32,6 +32,11 @@ public final class RaceHarnessClient {
     private static int correctionBase;
     private static RaceTrack activeTrack;
     private static long lastSampleNanos;
+    /** Ticks pressed against a wall without getting anywhere; at {@link RacerLine#STUCK_TICKS} the bot recovers. */
+    private static int stuckTicks;
+    /** Ticks left of a recovery: steering back toward the centre line after the jump. */
+    private static int recoverTicks;
+    private static double lastX = Double.NaN, lastZ = Double.NaN;
     private static int localBoostTicks(ChocoboEntity bird) {
         try {
             var field = ChocoboEntity.class.getDeclaredField("localBoostTicks");
@@ -95,6 +100,8 @@ public final class RaceHarnessClient {
             ticks = 0;
             lastSampleNanos = 0;
             hint = Double.NaN;
+            stuckTicks = recoverTicks = 0;
+            lastX = lastZ = Double.NaN;
         } else {
             if (held) correctionBase = corrections.get();
             ticks++;
@@ -123,6 +130,29 @@ public final class RaceHarnessClient {
             }
         }
         if (passTicks > 0) aim = RacerLine.clampLane(botLane + passSide * RacerLine.PASS_OFFSET);
+        // pinned on a rail or a rim: jump, and steer back toward the centre line for a second
+        boolean jump = false;
+        double moved = Double.isNaN(lastX) ? 1.0D : Math.hypot(bird.getX() - lastX, bird.getZ() - lastZ);
+        lastX = bird.getX();
+        lastZ = bird.getZ();
+        stuckTicks = bird.raceHeld() ? 0 : RacerLine.stuckStep(stuckTicks, bird.horizontalCollision, bird.onGround(), moved);
+        if (stuckTicks >= RacerLine.STUCK_TICKS && recoverTicks == 0) {
+            recoverTicks = RacerLine.RECOVER_TICKS;
+            stuckTicks = 0;
+            jump = true;
+            try {
+                Path out = Path.of(System.getProperty("chocobosreborn.harness.output"));
+                Files.createDirectories(out);
+                Files.writeString(out.resolve("recover-" + mc.getUser().getName() + ".csv"), String.format(Locale.ROOT,
+                        "%d,%d,%s,%.4f,%.4f,%.4f,%.6f,%.3f,%.2f%n", run, ticks, track.name(), bird.getX(), bird.getY(), bird.getZ(),
+                        progress, laneOf(track, progress, bird.getX(), bird.getZ()), bird.getYRot()),
+                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } catch (java.io.IOException e) { throw new RuntimeException(e); }
+        }
+        if (recoverTicks > 0) {
+            recoverTicks--;
+            aim = 0.0D;
+        }
         RacePoint target = track.pointAtLane(progress + Math.max(5.0D, bird.getDeltaMovement().horizontalDistance() * 6.0D) / track.lapLength(), aim);
         event.getEntity().setYRot((float) Math.toDegrees(Math.atan2(-(target.x() - bird.getX()), target.z() - bird.getZ())));
         event.getEntity().setXRot(0);
@@ -131,6 +161,7 @@ public final class RaceHarnessClient {
         input.leftImpulse = 0;
         input.up = true;
         input.down = input.left = input.right = input.jumping = input.shiftKeyDown = false;
+        input.jumping = jump;
         mc.options.keySprint.setDown(ticks % 400 < 240);
         if (ticks > 0 && track.name().equals(System.getProperty("chocobosreborn.harness.traceTrack", ""))) {
             try {

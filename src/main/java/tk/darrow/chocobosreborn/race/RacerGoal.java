@@ -69,6 +69,10 @@ public class RacerGoal extends Goal {
 	/** Last progress on this lap, so the next tick searches that section. */
 	private double along = -1.0D;
 	private double lastX = Double.NaN, lastZ;
+	/** Ticks pressed on a wall without moving ({@link RacerLine#stuckStep}), and ticks left of backing off it. */
+	private int stuckTicks, backOff;
+	/** A stuck bird aims this far back along the lap, on the lane it wants there. */
+	private static final double BACK_OFF_BLOCKS = 3.0D;
 	private List<ChocoboEntity> nearby = List.of();
 
 	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane, RacerProfile profile) {
@@ -204,8 +208,21 @@ public class RacerGoal extends Goal {
 		}
 		// The old fixed early swerve aimed through the rail before the detour
 		// entrance existed. Follow the same connector ramp the builder lays down.
-		lane = track.detourLaneAt(t + ahead, lane, bird.color(), bogSavvy);
-		RacePoint target = track.pointAtLane((t + ahead) % 1.0D, lane);
+		double aimT = t + ahead;
+		lane = track.detourLaneAt(aimT, lane, bird.color(), bogSavvy);
+		// pinned on a wall (a ridge face a non-climber cannot jump, a rail it was bumped
+		// into): back off along the lane it wants for a second instead of pressing on
+		stuckTicks = RacerLine.stuckStep(stuckTicks, bird.horizontalCollision, bird.onGround(), moved);
+		if (stuckTicks >= RacerLine.STUCK_TICKS && backOff == 0) {
+			backOff = RacerLine.RECOVER_TICKS;
+			stuckTicks = 0;
+		}
+		if (backOff > 0) {
+			backOff--;
+			aimT = t - BACK_OFF_BLOCKS / track.lapLength();
+			lane = track.detourLaneAt(aimT, directLane, bird.color(), bogSavvy);
+		}
+		RacePoint target = track.pointAtLane(aimT - Math.floor(aimT), lane);
 		// terrain is physical (water slows swimmers, ridges block non-climbers); no attribute fudge.
 		// Same stack a rider gets: grade, then training, once each. The profile
 		// cruise sits on top of that, so a class bird is not a flat attribute.
