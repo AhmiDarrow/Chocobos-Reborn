@@ -402,7 +402,7 @@ class RaceTrackTest {
 		// a relay clears what older plans left (stray water washed the boost pads out); 9: class-based
 		// stands inside and outside the loop, the island ground reaching under each.
 		// Older islands have to be re-laid either way.
-		assertEquals(9, SquareBuilder.COURSE_VERSION);
+		assertEquals(10, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

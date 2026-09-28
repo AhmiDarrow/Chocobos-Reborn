@@ -421,6 +421,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.entityData.set(DATA_GENE_COOP, Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, cooperation)));
 	}
 
+	/**
+	 * Save format 2 (1.0.19). A bird saved by an older version is brought onto the
+	 * current rules once: its first-place marks toward the old three-win promotion
+	 * become points of nine, and a bird from before bloodlines rolls born stats from
+	 * its birth grade, as a wild bird does. Training, wins, colour and grade stay.
+	 */
+	static final int SAVE_FORMAT = 2;
+
+	private void convertOldSave() {
+		this.entityData.set(DATA_CLASS_WINS, RaceScoring.migratedClassPoints(raceClass().getId(), classWins()));
+		if (!raceNpc() && !townBird() && BreedGenes.blankLine(geneSpeed(), geneStamina(), geneIntelligence(), geneCooperation())) {
+			rollWildBlood();
+		}
+	}
+
 	/** A wild bird's bloodline, rolled from its grade so a wonderful stray starts ahead of a poor one. */
 	private void rollWildBlood() {
 		int floor = BreedGenes.gradeFloor(bornGrade().getRank());
@@ -952,6 +967,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putInt("RaceWins", raceWins());
 		tag.putInt("RaceClass", raceClass().getId());
 		tag.putInt("ClassWins", classWins());
+		tag.putInt("SaveFormat", SAVE_FORMAT);
 		tag.putBoolean("Male", male());
 		tag.putBoolean("Saddled", saddled());
 		net.minecraft.nbt.ListTag items = new net.minecraft.nbt.ListTag();
@@ -1052,6 +1068,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			lastGreensFeed = tag.getLong("LastGreensFeed");
 		}
 		featherTicks = tag.contains("FeatherTicks") ? tag.getInt("FeatherTicks") : -1;
+		if (tag.getInt("SaveFormat") < SAVE_FORMAT) {
+			convertOldSave();
+		}
 		this.entityData.set(DATA_STAGE, computeStage());
 		// Attributes follow the plumage; health is whatever was saved.
 		applyColorStats(false);

@@ -31,6 +31,22 @@ public final class RaceScoring {
 		return new Promotion(current, wins, false);
 	}
 
+	/**
+	 * A bird saved before the points ladder carried first-place marks toward the old
+	 * three-win promotion. Convert them once, keeping the same share of the way up:
+	 * 1 or 2 marks become 3 or 6 points of 9, and a Class S bird shows the full 9.
+	 * Anything else is already points (a bird cannot hold 3 marks below S).
+	 */
+	public static int migratedClassPoints(int classId, int stored) {
+		if (classId >= RaceClass.S.getId()) {
+			return RaceClass.POINTS_TO_PROMOTE;
+		}
+		if (stored >= 1 && stored <= 2) {
+			return stored * RaceClass.GRAND_PRIX_POINTS;
+		}
+		return Math.max(0, stored);
+	}
+
 	/** Points still needed in this class. Class S is the top of the ladder. */
 	public static int winsUntilPromote(RaceClass current, int classWins) {
 		if (current == RaceClass.S) {
@@ -537,6 +553,33 @@ public final class RaceScoring {
 	/** A finish crossing at {@code time} (ticks) is safe to place once no later report can beat it. */
 	public static boolean finishSettled(double time, int nowTick) {
 		return time < nowTick - MAX_LAG_CREDIT_TICKS;
+	}
+
+	/** How far before a shortcut's fork a rider hears about it, in blocks. */
+	public static final double SHORTCUT_WARN_BLOCKS = 45.0D;
+
+	/** Blocks from progress {@code at} forward round the lap to {@code target}; negative just past it (within half a lap). */
+	public static double blocksAhead(double at, double target, double lapLength) {
+		double d = target - at;
+		d -= Math.floor(d);
+		if (d > 0.5D) {
+			d -= 1.0D;
+		}
+		return d * lapLength;
+	}
+
+	/** A rescued bird waits this long on the road before it may go again. */
+	public static final int RESCUE_HOLD_TICKS = 20;
+	/** Off the road and this far from the last point on it: put back. */
+	public static final double STRAY_BLOCKS = 24.0D;
+
+	public static boolean strayedTooFar(double dx, double dz) {
+		return dx * dx + dz * dz > STRAY_BLOCKS * STRAY_BLOCKS;
+	}
+
+	/** Whole seconds left on the off-road countdown, for the warning (never 0 while it shows). */
+	public static int offRoadSecondsLeft(int offTicks) {
+		return Math.max(1, (RaceLapProgress.OFF_LIMIT_TICKS - offTicks + 19) / 20);
 	}
 
 	public static boolean stillOnCourse(boolean forfeited, int finishIndex) {

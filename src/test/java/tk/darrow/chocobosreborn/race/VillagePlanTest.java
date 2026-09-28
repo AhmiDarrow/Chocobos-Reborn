@@ -137,7 +137,7 @@ class VillagePlanTest {
 					continue;
 				}
 				// signs written as a prefix + ".0".."3"
-				boolean present = lang.contains("\"" + k + "\"") || lang.contains("\"" + k + ".0\"");
+				boolean present = lang.contains("\"" + k + "\"") || lang.contains("\"" + k + ".");   // a key or a family built in code
 				assertTrue(present, src + " uses missing key " + k);
 			}
 		}

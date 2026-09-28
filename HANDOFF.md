@@ -1,6 +1,6 @@
-# Current release: 1.0.18 — Race day
+# Current release: 1.0.19 - Back on track
 
-Other birds' legs move again, class C is a race, Teiyo and Jolo pace off the rider's bird, stands and a client-drawn crowd by class, and Whiskerwind v13 (1.5x, townsfolk, bell, winners' board, a gold saucer at the fountain). See [release notes](docs/RELEASE_1.0.18.md) and the two 2026-09-27 sections near the end. Gates on this commit: 186 unit tests, 27 GameTests, jar. Not yet seen in a client. Server and every rider need this jar. Publication records are in docs/curseforge.md.
+A wide line keeps the lap. A real shortcut sets the rider back on the road and holds them for a second. Every fork is marked, and the HUD says whether this bird can take it. Older birds convert once: old promotion marks become points of nine, and a bird with no born stats rolls a bloodline from its grade. See [release notes](docs/RELEASE_1.0.19.md). Server and every rider need this jar. Publication records are in docs/curseforge.md. The 1.0.18 notes remain in docs/RELEASE_1.0.18.md.
 
 # Chocobos Reborn — session handoff (internal)
 
@@ -1183,6 +1183,53 @@ few seconds; players are held above the plaza and put back).
 * **Needs an in-game look:** crowd facing and hop, cloak / glow alignment on the
   captured mesh, light under the S roofs, wall-banner support on diagonal stands,
   frame time on an S course with the whole crowd in view.
+
+## Old saves convert once (2026-09-27, Ahmi: "have it convert old birds into the new system ... old birds prior to the new breeding/stat system as well")
+
+`ChocoboEntity` writes `SaveFormat` 2. A bird read with a lower (or no) format runs
+`convertOldSave` once, then saves as 2: class progress goes through
+`RaceScoring.migratedClassPoints` (1 or 2 marks of the old three -> 3 or 6 points of
+nine; Class S -> 9; anything else is already points), and a bird that is not a race
+NPC or town bird and has no born stats at all (`BreedGenes.blankLine`: all four genes
+0, i.e. from before 1.0.15 bloodlines) gets `rollWildBlood()` from its born grade.
+Training, wins, colour and grade are untouched. Known overlap: a bird that won 1-2
+sprints on 1.0.17 / 1.0.18 also reads as old marks and gets x3. The almanac ledger
+follows on the bird's next load (`ledgerUpdate` in `onAddedToLevel`). Tests:
+`OldSaveConversionTest` (rules) and GameTest `oldSaveConvertsOnce` (NBT round trip:
+converts, then does not convert again).
+
+## Off the road: a set-back, not a lost lap; shortcuts marked (2026-09-27, Ahmi: "going out of bounds, making them repeat the lap and putting them in last place is way too rough ... look at mario kart"; "shortcuts need to have something that shows they are there")
+
+**Before:** `RaceLapProgress.update` zeroed the lap and waited for the next start
+crossing the moment a bird was more than a block off any road tile: one wide corner
+cost a full lap, i.e. last place.
+
+**Now** (`RaceLapProgress.step` -> `NONE / LAP / RESCUE`): off the road nothing
+accrues and the last on-road progress is the anchor. Back on no further round than
+anchor + `SKIP_BLOCKS` (10) / lap length: the stretch counts, nothing happens (a wide
+line is free). Further round (a shortcut), `OFF_LIMIT_TICKS` (80 = 4 s) off the road,
+more than `RaceScoring.STRAY_BLOCKS` (24) from the last road position, a jump over an
+eighth of a lap between ticks, or a fall (`squareFallRescue`): `RaceSession.rescue`
+sets the bird on the road at the anchor (the detour lane if it does not suit the
+feature there), facing up the course, held `RESCUE_HOLD_TICKS` (20) via `raceHeld`,
+action bar "Set back on the road. Your lap still counts" + chime. While off, the
+action bar counts down the seconds left. Applies to the AI too. The lap is never
+forfeited. `update(progress, onCourse)` survives as a thin wrapper (GameTests use it).
+
+**Shortcut markers** (`RaceCourseLayout.shortcutMarkers`, COURSE_VERSION 10): for
+every terrain feature, a dashed 3-wide stripe in the feature colour (water light
+blue, ridge lime, lava orange, bog brown) down the road centre from 22 blocks before
+the fork (`start - DETOUR_CONNECT`) to the feature, skipping boost strips; a gantry 4
+blocks before the fork: post on the infield verge (skipped if a fold puts it on
+road), glazed-terracotta beam over the road at +8, wall banners facing the riders in
+the colours of the breeds that take it straight (`shortcutBanners`: yellow for Gold,
+blue, white, black, purple, green, red for Flame; brown for a bog), and a sign
+(`ShortcutSign`, text written in `SquareBuilder.buildTrack`, lang
+`chocobosreborn.sign.shortcut.<type>.N`). `RaceSession.warnShortcut`: 45 blocks
+before each fork, once per lap per feature, the rider's action bar says "Shortcut
+ahead! ... stay on the coloured stripe" (with a chime) when the bird suits it, or
+"... take the road round the outside". Tests: `RaceLapProgressTest` (rewritten),
+`ShortcutMarkerTest`.
 
 ## Open
 

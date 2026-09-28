@@ -55,6 +55,14 @@ public final class BreedGenes {
 		return Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, floor) + Math.floorMod(roll, 9));
 	}
 
+	/**
+	 * A bird from before bloodlines (1.0.15) has no born stats at all. It gets a wild
+	 * roll from its birth grade when it is converted, as a new wild bird would.
+	 */
+	public static boolean blankLine(int speed, int stamina, int intelligence, int cooperation) {
+		return speed <= 0 && stamina <= 0 && intelligence <= 0 && cooperation <= 0;
+	}
+
 	/** Speed and stamina take the nut's tier. Intelligence and cooperation take half, rounded down. */
 	public static int nutGift(int tier, boolean primary) {
 		int t = Math.max(0, tier);

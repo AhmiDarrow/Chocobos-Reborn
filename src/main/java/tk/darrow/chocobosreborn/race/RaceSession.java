@@ -67,6 +67,12 @@ public class RaceSession {
 		boolean forfeited;
 		boolean settled;
 		@Nullable RacerGoal goal;
+		/** Last position on the road: a bird off it this far from here is put back. */
+		double roadX = Double.NaN, roadZ = Double.NaN;
+		/** Tick a rescue hold ends (0 = none). */
+		int heldUntil;
+		/** The terrain feature this rider was last told about (lap * 100 + index), so each approach warns once. */
+		int warnedFeature = -1;
 
 		Racer(ChocoboEntity ref, @Nullable UUID player, String name, double lane, double startProgress) {
 			this.ref = ref;
@@ -702,19 +708,47 @@ public class RaceSession {
 			double fineBefore = Double.isNaN(r.lastFine) ? fine : r.lastFine;
 			r.lastFine = fine;
 			boolean onCourse = layout.onCourse(e.getX(), e.getZ());
-			if (RaceScoring.squareFallRescue(e.getY())) {
-				RacePoint back = track.pointAtLane(progress, r.lane);
-				moveRidden(e, back.x(), back.y(), back.z());
-			}
+			boolean fell = RaceScoring.squareFallRescue(e.getY());
 			if (r.finishIndex >= 0 || r.pending()) {
+				if (fell) {
+					RacePoint back = track.pointAtLane(progress, r.lane);
+					moveRidden(e, back.x(), back.y(), back.z());
+				}
 				continue;
+			}
+			if (r.heldUntil > 0 && tick >= r.heldUntil) {
+				r.heldUntil = 0;
+				e.setRaceHeld(false);
+			}
+			RaceLapProgress.Step step = fell ? RaceLapProgress.Step.RESCUE
+					: r.progress.step(progress, onCourse, RaceLapProgress.allowance(track.lapLength()));
+			if (onCourse && !r.progress.offCourse()) {
+				r.roadX = e.getX();
+				r.roadZ = e.getZ();
+			} else if (step == RaceLapProgress.Step.NONE && !Double.isNaN(r.roadX)
+					&& RaceScoring.strayedTooFar(e.getX() - r.roadX, e.getZ() - r.roadZ)) {
+				step = RaceLapProgress.Step.RESCUE;
+			}
+			if (step == RaceLapProgress.Step.RESCUE) {
+				rescue(r, e);
+				continue;
+			}
+			if (r.human() && tick % 5 == 0) {
+				warnShortcut(r, e, progress);
+			}
+			if (r.progress.offCourse() && r.human() && r.progress.offTicks() % 20 == 1) {
+				ServerPlayer warned = r.serverPlayer();
+				if (warned != null) {
+					warned.displayClientMessage(Component.translatable("chocobosreborn.race.off_road",
+							RaceScoring.offRoadSecondsLeft(r.progress.offTicks())), true);
+				}
 			}
 			if (!r.human() && r.goal != null) {
 				r.goal.lapsDone = r.laps;
 				double mine = lead == null ? 0.0D : lead.laps + lead.progress.lastProgress();
 				r.goal.playerGap = mine - (r.laps + r.progress.lastProgress());
 			}
-			if (r.progress.update(progress, onCourse)) {
+			if (step == RaceLapProgress.Step.LAP) {
 				r.laps++;
 				ServerPlayer player = r.serverPlayer();
 				if (RaceScoring.finished(r.laps, track.getLaps())) {
@@ -1243,6 +1277,58 @@ public class RaceSession {
 			return;
 		}
 		bird.teleportTo(x, y, z);
+	}
+
+	/** Tell a rider about the terrain feature coming up: take it straight if the bird suits it, else the road round. */
+	private void warnShortcut(Racer r, ChocoboEntity e, double progress) {
+		java.util.List<RaceTrack.Feature> features = track.terrainFeatures();
+		for (int i = 0; i < features.size(); i++) {
+			RaceTrack.Feature f = features.get(i);
+			double ahead = RaceScoring.blocksAhead(progress, f.start() - RaceTrack.DETOUR_CONNECT, track.lapLength());
+			int key = r.laps * 100 + i;
+			if (ahead < 0.0D || ahead > RaceScoring.SHORTCUT_WARN_BLOCKS || r.warnedFeature == key) {
+				continue;
+			}
+			r.warnedFeature = key;
+			ServerPlayer player = r.serverPlayer();
+			if (player == null) {
+				return;
+			}
+			Component name = Component.translatable("chocobosreborn.race.feature." + f.type().name().toLowerCase(java.util.Locale.ROOT));
+			String line = f.type() == RaceTrack.Feature.Type.MUD ? "chocobosreborn.race.shortcut.bog"
+					: f.suits(e.color()) ? "chocobosreborn.race.shortcut.yes" : "chocobosreborn.race.shortcut.no";
+			player.displayClientMessage(Component.translatable(line, name), true);
+			if (f.suits(e.color())) {
+				player.playNotifySound(net.minecraft.sounds.SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.PLAYERS, 0.8F, 1.5F);
+			}
+			return;
+		}
+	}
+
+	/**
+	 * Off the road too long, too far, over the edge, or back on further round than a
+	 * wide line allows: set the bird down on the road where it left it, facing up the
+	 * course, and hold it a second. The lap is kept (Mario Kart's pick-up, gentler).
+	 */
+	private void rescue(Racer r, ChocoboEntity e) {
+		double t = r.progress.lastProgress();
+		double lane = track.detourLaneAt(t, 0.0D, e.color(), true);
+		RacePoint at = track.pointAtLane(t, lane);
+		moveRidden(e, at.x(), at.y(), at.z());
+		double[] tg = track.tangent(t);
+		face(e, (float) Math.toDegrees(Math.atan2(-tg[0], tg[1])));
+		e.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
+		e.setRaceHeld(true);
+		r.heldUntil = tick + RaceScoring.RESCUE_HOLD_TICKS;
+		r.progress.rescued();
+		r.roadX = at.x();
+		r.roadZ = at.z();
+		r.lastFine = Double.NaN;
+		ServerPlayer player = r.serverPlayer();
+		if (player != null) {
+			player.displayClientMessage(Component.translatable("chocobosreborn.race.rescued"), true);
+			player.playNotifySound(net.minecraft.sounds.SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.2F);
+		}
 	}
 
 	public boolean hasRacer(UUID bird) {

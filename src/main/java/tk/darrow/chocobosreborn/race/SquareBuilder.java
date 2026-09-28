@@ -48,7 +48,7 @@ public final class SquareBuilder {
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 9;
+	public static final int COURSE_VERSION = 10;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/**
@@ -121,6 +121,13 @@ public final class SquareBuilder {
 		for (Map.Entry<RaceCourseLayout.Cell, String> e : plan.entrySet()) {
 			RaceCourseLayout.Cell c = e.getKey();
 			level.setBlock(new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()), 2);
+		}
+		// the shortcut gantries name the feature and the breeds that take it straight
+		for (RaceCourseLayout.ShortcutSign sc : layout.shortcutSigns()) {
+			String k = "chocobosreborn.sign.shortcut." + sc.type().name().toLowerCase(java.util.Locale.ROOT);
+			if (level.getBlockEntity(new BlockPos(sc.x(), sc.y(), sc.z())) instanceof net.minecraft.world.level.block.entity.SignBlockEntity s) {
+				writeSign(s, k + ".0", k + ".1", k + ".2", k + ".3");
+			}
 		}
 		RaceCourseLayout.BoardPost board = layout.courseBoard();
 		if (board != null) {

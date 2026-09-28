@@ -101,6 +101,10 @@ Chick born grade = parents' born-grade average (+1 with Zeio). Chick talent = nu
 training points + a sixth of the parents' training (intelligence / cooperation at
 half). Chick sex random; grows through three stages.
 
+**Old saves.** A bird saved before save format 2 converts once on load: old
+first-place marks become points of nine (1 -> 3, 2 -> 6, Class S -> 9) and a bird with
+no born stats rolls a wild bloodline from its birth grade (`ChocoboEntity.convertOldSave`).
+
 ## Riding
 
 `getControllingPassenger` = the rider when saddled. The rider fights from the saddle:

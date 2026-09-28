@@ -148,6 +148,7 @@ public final class RaceCourseLayout {
 		startLine(lap);
 		startGrid(lap);
 		startArrow(lap);
+		shortcutMarkers(lap);
 		sparingRoad = true;   // sited clear of every road tile, but never let a stand onto one
 		standing = true;
 		for (CourseStands.Plan plan : stands.plans()) {
@@ -624,6 +625,121 @@ public final class RaceCourseLayout {
 				put(x, surf + 3, z, colour + "_banner[rotation=8]");
 			}
 		}
+	}
+
+	/**
+	 * Every terrain shortcut is marked where the road forks (Ahmi: "I have no idea
+	 * where any are"): a gantry from the infield side arches over the straight line
+	 * in the feature's colour, hung with a banner for each breed that can take it (a
+	 * bog, which suits nobody, is hung brown), a sign says so, and a dashed stripe of
+	 * the same colour runs down the middle of the road into the fork. The detour peels
+	 * off to the outside as before.
+	 */
+	private void shortcutMarkers(double lap) {
+		for (RaceTrack.Feature f : track.terrainFeatures()) {
+			String colour = shortcutColour(f.type());
+			double fork = f.start() - RaceTrack.DETOUR_CONNECT;
+			// the stripe: dashed, three wide, from 22 blocks before the fork to the feature
+			for (double d = 22.0D; d >= -RaceTrack.DETOUR_CONNECT * lap + 1.0D; d -= 0.5D) {
+				double t = wrap(fork - d / lap);
+				if (boostAt(t) || ((int) Math.floor(d / 2.0D) & 1) == 1) {
+					continue;
+				}
+				int y = surf(t);
+				for (double o = -1.0D; o <= 1.0D; o += 0.5D) {
+					RacePoint q = track.pointAtLane(t, o);
+					put(floor(q.x()), y, floor(q.z()), colour + "_concrete");
+				}
+			}
+			// the gantry, just before the fork: a post on the infield verge, a beam over the road
+			double t = wrap(fork - 4.0D / lap);
+			int y = surf(t);
+			RacePoint foot = track.pointAtLane(t, RaceTrack.ROAD_HALF + 2.5D);
+			int fx = floor(foot.x()), fz = floor(foot.z());
+			if (road.contains(new Tile(fx, fz))) {
+				continue;   // a fold of the course: no post in anyone's racing line
+			}
+			for (int h = 1; h <= 7; h++) {
+				put(fx, y + h, fz, h == 4 ? theme.lamp : theme.post);
+			}
+			double[] tg = track.tangent(t);
+			String toward = facingOf(-tg[0], -tg[1]);   // the banners and sign face the riders coming up
+			List<String> banners = shortcutBanners(f);
+			int b = 0;
+			for (double o = RaceTrack.ROAD_HALF + 2.5D; o >= -RaceTrack.ROAD_HALF - 0.5D; o -= 0.5D) {
+				RacePoint q = track.pointAtLane(t, o);
+				int bx = floor(q.x()), bz = floor(q.z());
+				put(bx, y + 8, bz, colour + "_glazed_terracotta");
+				put(bx, y + 9, bz, colour + "_concrete");
+				if (o <= RaceTrack.ROAD_HALF && o > -RaceTrack.ROAD_HALF && Math.floorMod((int) Math.round(o * 2.0D), 4) == 0) {
+					RacePoint front = track.pointAtLane(wrap(t - 1.0D / lap), o);
+					put(floor(front.x()), y + 8, floor(front.z()),
+							banners.get(b++ % banners.size()) + "_wall_banner[facing=" + toward + "]");
+				}
+			}
+			RacePoint plate = track.pointAtLane(wrap(t - 1.0D / lap), RaceTrack.ROAD_HALF + 2.5D);
+			put(floor(plate.x()), y + 3, floor(plate.z()), "oak_wall_sign[facing=" + toward + "]");
+			shortcutSigns.add(new ShortcutSign(floor(plate.x()), y + 3, floor(plate.z()), f.type()));
+		}
+	}
+
+	/** A sign on a shortcut gantry: where it is and which feature it names (text is written by the builder). */
+	public record ShortcutSign(int x, int y, int z, RaceTrack.Feature.Type type) {
+	}
+
+	private final List<ShortcutSign> shortcutSigns = new ArrayList<>();
+
+	public List<ShortcutSign> shortcutSigns() {
+		return Collections.unmodifiableList(shortcutSigns);
+	}
+
+	static String shortcutColour(RaceTrack.Feature.Type type) {
+		return switch (type) {
+			case WATER -> "light_blue";
+			case RIDGE -> "lime";
+			case LAVA -> "orange";
+			case MUD -> "brown";
+			default -> "yellow";
+		};
+	}
+
+	/** One banner colour per breed that can take this feature straight; brown for a bog. */
+	static List<String> shortcutBanners(RaceTrack.Feature f) {
+		List<String> out = new ArrayList<>();
+		for (tk.darrow.chocobosreborn.breed.ChocoboColor c : tk.darrow.chocobosreborn.breed.ChocoboColor.values()) {
+			if (f.suits(c)) {
+				out.add(switch (c) {
+					case YELLOW, GOLD -> "yellow";
+					case GREEN -> "green";
+					case BLUE -> "blue";
+					case WHITE -> "white";
+					case BLACK -> "black";
+					case PURPLE -> "purple";
+					case FLAME -> "red";
+				});
+			}
+		}
+		if (out.isEmpty()) {
+			out.add("brown");
+		}
+		return out;
+	}
+
+	private boolean boostAt(double t) {
+		for (RaceTrack.Feature f : track.features()) {
+			if (f.type() == RaceTrack.Feature.Type.BOOST && t >= f.start() - 1.0D / track.lapLength() && t <= f.end() + 1.0D / track.lapLength()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static double wrap(double t) {
+		return t - Math.floor(t);
+	}
+
+	private static String facingOf(double dx, double dz) {
+		return Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? "east" : "west") : (dz > 0 ? "south" : "north");
 	}
 
 	private RaceTrack.Feature approachingBoost(double t, double lap) {
