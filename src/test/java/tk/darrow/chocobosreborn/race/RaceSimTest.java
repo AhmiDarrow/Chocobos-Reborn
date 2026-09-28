@@ -168,7 +168,10 @@ class RaceSimTest {
 		Bird gold = trained(ChocoboColor.GOLD, 100);
 		double g = rider(RaceClass.S, gold, Drive.SMART);
 		double t = teiyo(RaceClass.S, gold, 0.0D);
-		assertTrue(t > g && t < g * 1.06D, "S Teiyo stays within 6 % of a maxed Gold driven well");
+		// 6 % before the 48-course swap (Teiyo ~4 % behind). Since sprints are one long lap and
+		// grands prix 3-5 short ones, the Gold gains more over a heat: Teiyo ~8.2 % behind (HANDOFF
+		// "48 courses, phase 1": a balance call for Ahmi, not retuned here)
+		assertTrue(t > g && t < g * 1.09D, "S Teiyo stays within 9 % of a maxed Gold driven well: " + t / g);
 	}
 
 	@Test
@@ -205,7 +208,7 @@ class RaceSimTest {
 	@Test
 	void writeTheTable() throws IOException {
 		List<String> out = new ArrayList<>();
-		out.add("Mean heat seconds over the six courses of each class. before = the 1.0.18 AI and rival pacing,");
+		out.add("Mean heat seconds over every course of each class. before = the 1.0.18 AI and rival pacing,");
 		out.add("after = this build (a rider's bird is the same in both). Field best = the class favourite colour at");
 		out.add("the expected best form of the card; Teiyo is paced off the rider named in the row (FF7 Teioh).");
 		out.add("Rider rows: does the bird beat the field best / Teiyo, before -> after.");

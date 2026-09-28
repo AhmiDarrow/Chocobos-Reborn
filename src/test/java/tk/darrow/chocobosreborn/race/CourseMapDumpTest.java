@@ -12,7 +12,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Writes a top-down map of every course to build/track_maps/<id>.png (road,
  * features, detours, stand, decoration) so a layout change can be eyeballed
- * without launching the game. Also a smoke test that every plan renders.
+ * without launching the game, and build/track_maps/themes/ the four 48-course themes laid
+ * over a course of their class. Also a smoke test that every plan renders.
  */
 class CourseMapDumpTest {
 	@Test
@@ -20,7 +21,22 @@ class CourseMapDumpTest {
 		File dir = new File("build/track_maps");
 		assertTrue(dir.isDirectory() || dir.mkdirs());
 		for (RaceTrack track : RaceTrack.values()) {
-			RaceCourseLayout layout = RaceCourseLayout.of(track);
+			write(track, RaceCourseLayout.of(track), track.theme(), new File(dir, track.id() + ".png"));
+		}
+		// the 48-course themes before any course wears them (CourseThemeTest dresses the same courses)
+		RaceTrack[] previews = {RaceTrack.C_DOWNS, RaceTrack.B_RAPIDS, RaceTrack.A_INFERNO, RaceTrack.S_CITADEL};
+		RaceTrack.Theme[] themes = {RaceTrack.Theme.FARMLAND, RaceTrack.Theme.SAVANNA, RaceTrack.Theme.MUSHROOM, RaceTrack.Theme.DEEP_DARK};
+		File themeDir = new File("build/track_maps/themes");
+		assertTrue(themeDir.isDirectory() || themeDir.mkdirs());
+		for (int i = 0; i < themes.length; i++) {
+			RaceTrack track = previews[i];
+			write(track, RaceCourseLayout.dressedAs(track, themes[i]), themes[i],
+					new File(themeDir, themes[i].name().toLowerCase(java.util.Locale.ROOT) + "_on_" + track.id() + ".png"));
+		}
+	}
+
+	private static void write(RaceTrack track, RaceCourseLayout layout, RaceTrack.Theme theme, File file) throws Exception {
+		{
 			int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
 			for (RaceCourseLayout.Cell c : layout.blocks().keySet()) {
 				minX = Math.min(minX, c.x());
@@ -41,7 +57,7 @@ class CourseMapDumpTest {
 					continue;
 				}
 				top[px][pz] = c.y();
-				img.setRGB(px, pz, colour(e.getValue(), track));
+				img.setRGB(px, pz, colour(e.getValue(), theme));
 			}
 			for (RaceCourseLayout.Tile t : layout.road()) {
 				int px = t.x() - minX + 1, pz = t.z() - minZ + 1;
@@ -55,11 +71,11 @@ class CourseMapDumpTest {
 			}
 			var s = track.stallPos(0, 6);
 			img.setRGB((int) Math.floor(s.x()) - minX + 1, (int) Math.floor(s.z()) - minZ + 1, 0x00FFFF);
-			ImageIO.write(img, "png", new File(dir, track.id() + ".png"));
+			ImageIO.write(img, "png", file);
 		}
 	}
 
-	private static int colour(String block, RaceTrack track) {
+	private static int colour(String block, RaceTrack.Theme theme) {
 		String b = block.contains("[") ? block.substring(0, block.indexOf('[')) : block;
 		if (b.startsWith("chocobosreborn:boost_pad")) {
 			return 0xFFE040;
@@ -82,25 +98,25 @@ class CourseMapDumpTest {
 		if (b.equals("white_concrete") || b.equals("black_concrete")) {
 			return 0xE0E0E0;
 		}
-		if (b.equals(track.theme().road) || b.endsWith("_concrete")) {
+		if (b.equals(theme.road) || b.endsWith("_concrete")) {
 			return 0x8A8A8A;
 		}
-		if (b.equals(track.theme().kerbA)) {
+		if (b.equals(theme.kerbA)) {
 			return 0xD03030;
 		}
-		if (b.equals(track.theme().kerbB)) {
+		if (b.equals(theme.kerbB)) {
 			return 0xF0F0F0;
 		}
-		if (b.equals(track.theme().wall)) {
+		if (b.equals(theme.wall)) {
 			return 0xB0A080;
 		}
-		if (b.equals(track.theme().ground)) {
+		if (b.equals(theme.ground)) {
 			return 0x3E8E3E;
 		}
-		if (b.equals(track.theme().base)) {
+		if (b.equals(theme.base)) {
 			return 0x7A6A5A;
 		}
-		if (b.equals(track.theme().lamp)) {
+		if (b.equals(theme.lamp)) {
 			return 0xFFFFA0;
 		}
 		if (b.contains("stairs")) {

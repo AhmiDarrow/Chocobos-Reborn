@@ -252,8 +252,11 @@ class RaceScoringTest {
 		assertTrue(RaceScoring.sameCourseIndex(0, 0));
 		assertTrue(RaceScoring.sameCourseIndex(1, 1));
 		assertFalse(RaceScoring.sameCourseIndex(0, 1));
-		assertEquals(0, RaceScoring.funGateCourse(false));
-		assertEquals(3, RaceScoring.funGateCourse(true));
+		// since the swap courses 0-2 are grands prix and 3-5 sprints: the short gate runs a sprint
+		assertEquals(3, RaceScoring.funGateCourse(false));
+		assertEquals(0, RaceScoring.funGateCourse(true));
+		assertTrue(RaceTrack.forClass(RaceClass.C, RaceScoring.funGateCourse(false)).isSprint());
+		assertTrue(RaceTrack.forClass(RaceClass.C, RaceScoring.funGateCourse(true)).isGrandPrix());
 	}
 
 	@Test
@@ -482,7 +485,10 @@ class RaceScoringTest {
 		assertEquals("speed_of_the_dragon", RaceScoring.raceLoopKey("s_skyway"));
 		assertEquals("gallop_of_heroes", RaceScoring.raceLoopKey("s_void"));
 		assertEquals("speed_of_the_dragon", RaceScoring.raceLoopKey("s_keep"));
-		assertEquals("chocobo_dash", RaceScoring.raceLoopKey(null));
+		assertEquals("chocobo_dash", RaceScoring.raceLoopKey((String) null));
+		for (RaceTrack t : RaceTrack.values()) {
+			assertEquals(RaceScoring.raceLoopKey(t.theme()), RaceScoring.raceLoopKey(t.id()), t + " plays its theme's loop");
+		}
 		assertTrue(RaceScoring.raceLoopShouldPlay(true, true, false));
 		assertFalse(RaceScoring.raceLoopShouldPlay(true, true, true));
 		assertFalse(RaceScoring.raceLoopShouldPlay(false, true, false));

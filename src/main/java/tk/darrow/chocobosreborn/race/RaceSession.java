@@ -515,6 +515,17 @@ public class RaceSession {
 		return finishCount;
 	}
 
+	/** Racers with at least {@code laps} laps done (a finisher has them all), for diagnostics and tests. */
+	public int lapsDone(int laps) {
+		int n = 0;
+		for (Racer r : racers) {
+			if (r.laps >= laps || r.finishIndex >= 0) {
+				n++;
+			}
+		}
+		return n;
+	}
+
 	/** Laps and lap progress of every racer, for diagnostics. */
 	public String progressReport() {
 		StringBuilder sb = new StringBuilder();

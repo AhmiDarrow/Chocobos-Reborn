@@ -20,7 +20,8 @@ import tk.darrow.chocobosreborn.race.Square;
 /**
  * Chocobo Square gates. ENTRY (placed anywhere): ride a saddled bird into
  * the Square. SHORT / LONG (in the Square): a fun heat on the class's sprint
- * (course 0) or first grand prix (course 3). RETURN: home.
+ * (course 3, one long lap) or first grand prix (course 0, five laps; see
+ * {@link tk.darrow.chocobosreborn.race.RaceScoring#funGateCourse}). RETURN: home.
  */
 public class SquareGateBlock extends Block {
 	public enum Kind implements StringRepresentable {

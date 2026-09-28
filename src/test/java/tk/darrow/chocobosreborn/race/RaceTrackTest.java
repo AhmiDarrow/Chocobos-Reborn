@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
@@ -126,47 +127,123 @@ class RaceTrackTest {
 		}
 	}
 
+	/**
+	 * The course table, generically: every class has the same number of courses (six
+	 * today, twelve once phase 2 lands), half sprints and half grands prix, course index
+	 * = place in the class's rows, and every course its own silhouette.
+	 */
 	@Test
-	void sixCoursesPerClassThreeSprintsThreeGrandsPrix() {
+	void everyClassHasAsManySprintsAsGrandsPrix() {
+		int perClass = RaceTrack.courseCount(RaceClass.C);
+		assertTrue(perClass == 6 || perClass == RaceTrack.MAX_COURSES_PER_CLASS, "6 (phase 1) or 12 (phase 2) courses a class: " + perClass);
 		for (RaceClass rc : RaceClass.values()) {
 			var tracks = RaceTrack.ofClass(rc);
-			assertEquals(6, tracks.size(), rc.name());
-			for (int i = 0; i < 6; i++) {
-				assertEquals(i, tracks.get(i).getCourse());
-				assertEquals(i < 3, tracks.get(i).isShort());
-				assertEquals(i < 3 ? 1 : 3, tracks.get(i).getLaps());
-				assertEquals(tracks.get(i), RaceTrack.forClass(rc, i));
+			assertEquals(perClass, tracks.size(), rc.name() + " has as many courses as every other class");
+			assertEquals(perClass / 2, RaceTrack.sprintsOf(rc).size(), rc.name() + " sprints");
+			assertEquals(perClass / 2, RaceTrack.grandsPrixOf(rc).size(), rc.name() + " grands prix");
+			for (int i = 0; i < tracks.size(); i++) {
+				RaceTrack t = tracks.get(i);
+				assertEquals(i, t.getCourse(), t.name() + " course index is its place in the class's rows");
+				assertEquals(t, RaceTrack.forClass(rc, i));
+				assertEquals(t.getLaps() == 1, t.isSprint(), t.name());
+				assertEquals(t.getLaps() > 1, t.isGrandPrix(), t.name());
+				assertTrue(t.getLaps() == 1 || (t.getLaps() >= 3 && t.getLaps() <= 5), t.name() + " runs 1 or 3-5 laps: " + t.getLaps());
 			}
-			// the three themes of a class each get a sprint and a grand prix, on six different silhouettes
+			assertEquals(tracks.get(tracks.size() - 1), RaceTrack.forClass(rc, 99), "forClass clamps");
+			assertEquals(tracks.get(0), RaceTrack.forClass(rc, -1), "forClass clamps");
+		}
+		assertEquals(RaceClass.values().length * perClass, RaceTrack.values().length);
+		assertEquals(RaceTrack.values().length, java.util.Arrays.stream(RaceTrack.values()).map(RaceTrack::shape).distinct().count(),
+				"every course has its own silhouette");
+	}
+
+	/** The swap (48-course plan, phase 1): the original rows keep their ordinals, 0-2 are now grands prix, 3-5 sprints. */
+	@Test
+	void theOriginalCoursesSwappedFormat() {
+		for (RaceClass rc : RaceClass.values()) {
+			var tracks = RaceTrack.ofClass(rc);
+			for (int i = 0; i < 6; i++) {
+				RaceTrack t = tracks.get(i);
+				assertEquals(i < 3 ? 5 - i : 1, t.getLaps(), t.name() + " laps");
+				assertEquals(rc.getId() * 6 + i, t.ordinal(), t.name() + " keeps its ordinal (saved heats, the picker's answer)");
+			}
+			// the three themes of a class each get a grand prix and a sprint, on six different silhouettes
 			for (int i = 0; i < 3; i++) {
 				assertEquals(tracks.get(i).theme(), tracks.get(i + 3).theme(), rc.name() + " theme pairs");
 			}
-			assertEquals(6, tracks.stream().map(RaceTrack::shape).distinct().count(), rc.name() + " shapes all differ");
 		}
-		assertEquals(24, RaceTrack.values().length);
-		// every course has its own silhouette
-		assertEquals(24, java.util.Arrays.stream(RaceTrack.values()).map(RaceTrack::shape).distinct().count(), "24 different shapes");
 	}
 
 	@Test
-	void sprintsLastAMinuteAndGrandPrixLapsTwoMinutesLongerUpTheLadder() {
-		double[] shortMin = {0, 0, 0, 0};
-		double[] lapMin = {0, 0, 0, 0};
-		for (RaceTrack t : RaceTrack.values()) {
-			double seconds = t.lapLength() / PACE;
-			int c = t.getRaceClass().getId();
-			if (t.isShort()) {
-				assertTrue(seconds >= 60.0D, t.name() + " sprint " + seconds + " s");
-				shortMin[c] = shortMin[c] == 0 ? seconds : Math.min(shortMin[c], seconds);
-			} else {
-				assertTrue(seconds >= 120.0D, t.name() + " lap " + seconds + " s");
-				lapMin[c] = lapMin[c] == 0 ? seconds : Math.min(lapMin[c], seconds);
+	@Disabled("enable after phase 2: the 24 new courses (three sprints and three grands prix a class)")
+	void twelveCoursesPerClass() {
+		for (RaceClass rc : RaceClass.values()) {
+			assertEquals(12, RaceTrack.courseCount(rc), rc.name());
+			assertEquals(6, RaceTrack.sprintsOf(rc).size(), rc.name() + " sprints");
+			assertEquals(6, RaceTrack.grandsPrixOf(rc).size(), rc.name() + " grands prix");
+			// each class gains one new theme: four themes a class
+			assertEquals(4, RaceTrack.ofClass(rc).stream().map(RaceTrack::theme).distinct().count(), rc.name() + " themes");
+			// the new rows: 6-8 sprints, 9-11 grands prix
+			var tracks = RaceTrack.ofClass(rc);
+			for (int i = 6; i < 12; i++) {
+				assertEquals(i < 9, tracks.get(i).isSprint(), tracks.get(i).name());
 			}
 		}
-		for (int c = 1; c < 4; c++) {
-			assertTrue(shortMin[c] > shortMin[c - 1], "sprints get longer up the ladder");
-			assertTrue(lapMin[c] > lapMin[c - 1], "grand prix laps get longer up the ladder");
+		assertEquals(48, RaceTrack.values().length);
+		assertEquals(16, RaceTrack.Theme.values().length);
+		assertEquals(16, java.util.Arrays.stream(RaceTrack.values()).map(RaceTrack::theme).distinct().count(), "every theme raced");
+	}
+
+	/** Shortest sprint lap a class may have: its original sprints are 1150-1190 / 1280-1320 / 1420-1460 / 1560-1600. */
+	static double sprintLapFloor(RaceClass rc) {
+		return switch (rc) {
+			case C -> 1100.0D;
+			case B -> 1220.0D;
+			case A -> 1360.0D;
+			case S -> 1500.0D;
+		};
+	}
+
+	/**
+	 * Sprints are one long lap (at least the class's old long-course ballpark, two minutes
+	 * at the reference pace); grands prix are 3-5 laps of a shorter circuit, never under
+	 * 600 blocks (C_MEADOW, the old shortest sprint), the more laps the shorter the lap,
+	 * and the whole heat between 1.6x and 3.4x the class's shortest sprint.
+	 */
+	@Test
+	void sprintsAreOneLongLapGrandsPrixShortLapsMoreLapsShorter() {
+		for (RaceClass rc : RaceClass.values()) {
+			double shortestSprint = Double.MAX_VALUE;
+			for (RaceTrack t : RaceTrack.sprintsOf(rc)) {
+				assertEquals(1, t.getLaps());
+				assertTrue(t.lapLength() >= sprintLapFloor(rc), t.name() + " sprint lap " + t.lapLength());
+				assertTrue(t.lapLength() / PACE >= 120.0D, t.name() + " sprint lasts two minutes");
+				shortestSprint = Math.min(shortestSprint, t.lapLength());
+			}
+			for (RaceTrack g : RaceTrack.grandsPrixOf(rc)) {
+				assertTrue(g.getLaps() >= 3 && g.getLaps() <= 5, g.name() + " laps " + g.getLaps());
+				assertTrue(g.lapLength() >= 595.0D, g.name() + " lap " + g.lapLength() + " is shorter than the old shortest sprint");
+				assertTrue(g.lapLength() < shortestSprint, g.name() + " lap is not shorter than the class's sprints");
+				double heat = g.raceLength() / shortestSprint;
+				assertTrue(heat >= 1.6D && heat <= 3.4D, g.name() + " heat is " + heat + "x the class's shortest sprint");
+				for (RaceTrack h : RaceTrack.grandsPrixOf(rc)) {
+					if (g.getLaps() > h.getLaps()) {
+						assertTrue(g.lapLength() <= h.lapLength() + 5.0D, g.name() + " (" + g.getLaps() + " laps, " + Math.round(g.lapLength())
+								+ ") has a longer lap than " + h.name() + " (" + h.getLaps() + " laps, " + Math.round(h.lapLength()) + ")");
+					}
+				}
+			}
 		}
+		// longer up the ladder
+		RaceClass[] ladder = RaceClass.values();
+		for (int c = 1; c < ladder.length; c++) {
+			assertTrue(minLap(RaceTrack.sprintsOf(ladder[c])) > minLap(RaceTrack.sprintsOf(ladder[c - 1])), "sprints get longer up the ladder");
+			assertTrue(minLap(RaceTrack.grandsPrixOf(ladder[c])) > minLap(RaceTrack.grandsPrixOf(ladder[c - 1])), "grand prix laps get longer up the ladder");
+		}
+	}
+
+	private static double minLap(List<RaceTrack> tracks) {
+		return tracks.stream().mapToDouble(RaceTrack::lapLength).min().orElse(0.0D);
 	}
 
 	@Test
@@ -278,6 +355,39 @@ class RaceTrackTest {
 				cz = Math.max(cz, Math.abs(p.z() - all[i].centerZ()));
 			}
 			assertTrue(cx <= all[i].getRadiusX() && cz <= all[i].getRadiusZ(), all[i] + " leaves its island");
+		}
+	}
+
+	/**
+	 * The island grid has a place for every course a class can hold, including the ones
+	 * phase 2 will add: {@link RaceTrack#MAX_COURSES_PER_CLASS} slots per class row, every
+	 * two slots far enough apart for two islands of {@link RaceTrack#MAX_ISLAND_RADIUS},
+	 * all clear of the village, and the original six columns where they were built.
+	 */
+	@Test
+	void theIslandGridHoldsTwelveCoursesPerClass() {
+		double r = RaceTrack.MAX_ISLAND_RADIUS;
+		List<double[]> slots = new java.util.ArrayList<>();
+		for (RaceClass rc : RaceClass.values()) {
+			for (int i = 0; i < RaceTrack.MAX_COURSES_PER_CLASS; i++) {
+				double x = RaceTrack.slotX(i), z = RaceTrack.slotZ(rc);
+				for (double[] s : slots) {
+					// square islands in the worst case: the gap on either axis must hold both
+					boolean apart = Math.abs(x - s[0]) > 2 * r + 40 || Math.abs(z - s[1]) > 2 * r + 40;
+					assertTrue(apart, rc + " slot " + i + " at " + x + "," + z + " crowds " + s[0] + "," + s[1]);
+				}
+				assertTrue(z - r > SquareBuilder.PADDOCK_Z1 + 200, rc + " slot " + i + " too near the village");
+				slots.add(new double[]{x, z});
+			}
+			for (int i = 0; i < 6; i++) {
+				assertEquals(0.5D + (i - 2.5D) * 820.0D, RaceTrack.slotX(i), 1.0E-9, "original column " + i + " stays put");
+			}
+		}
+		for (RaceTrack t : RaceTrack.values()) {
+			assertTrue(t.getRadiusX() <= r && t.getRadiusZ() <= r, t.name() + " island " + Math.round(t.getRadiusX()) + " x "
+					+ Math.round(t.getRadiusZ()) + " is bigger than the grid is spaced for (" + r + ")");
+			assertEquals(RaceTrack.slotX(t.getCourse()), t.centerX(), 1.0E-9);
+			assertEquals(RaceTrack.slotZ(t.getRaceClass()), t.centerZ(), 1.0E-9);
 		}
 	}
 
@@ -395,14 +505,16 @@ class RaceTrackTest {
 	}
 
 	@Test
-	void courseVersionNineRelaysTheIslands() {
+	void courseVersionElevenRelaysTheIslands() {
 		// 6: the stamp gaps that dropped a racer through the island into the void are
 		// plugged; 7: the plan is stamped in layers, so scenery, rails and pools no
 		// longer land on the racing line; 8: the River cairn's spring sits in a basin, and
 		// a relay clears what older plans left (stray water washed the boost pads out); 9: class-based
-		// stands inside and outside the loop, the island ground reaching under each.
+		// stands inside and outside the loop, the island ground reaching under each; 10: shortcut
+		// markers; 11: the 48-course swap (grand prix laps lengthened on six courses, boost
+		// strips and set pieces follow the new format).
 		// Older islands have to be re-laid either way.
-		assertEquals(10, SquareBuilder.COURSE_VERSION);
+		assertEquals(11, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

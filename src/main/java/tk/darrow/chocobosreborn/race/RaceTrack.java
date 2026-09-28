@@ -7,11 +7,14 @@ import java.util.Locale;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 
 /**
- * Whiskerwind's courses, kart-racer style: six per class (three sprints of one
- * lap, three grands prix of three laps), each a themed circuit on its own sky
- * island. A circuit is a {@link Shape} (a closed spline with straights, sweepers,
- * hairpins, chicanes and hills) scaled to the class's lap length, dressed in a
- * {@link Theme}, and carrying {@link Feature}s along the way:
+ * Whiskerwind's courses, kart-racer style: every class has sprints (one long lap) and
+ * grands prix (three to five laps of a shorter circuit, the most laps on the shortest
+ * lap), each a themed circuit on its own sky island. Sprint or grand prix is decided by
+ * {@link #getLaps()} alone ({@link #isSprint()}); how many courses a class has is simply
+ * how many rows of this table carry its class ({@link #ofClass}), so a new course is a
+ * new row. A circuit is a {@link Shape} (a closed spline with straights, sweepers,
+ * hairpins, chicanes and hills) scaled to its lap length, dressed in a {@link Theme},
+ * and carrying {@link Feature}s along the way:
  * <ul>
  * <li>BOOST strips (every class): a burst of speed for whoever drives over them;</li>
  * <li>WATER, RIDGE and LAVA across the direct line: the birds that excel (river
@@ -30,38 +33,60 @@ import tk.darrow.chocobosreborn.breed.ChocoboColor;
  * not free-hand: each sits on a level stretch of a bend that puts its detour near
  * {@link #detourTarget()} ({@link #detourCost}), spread round the lap, clear of the
  * bunched field off the grid, with the bog always the cheapest thing to go round.
- * Boost strips take what is left on the corner exits — three on a sprint, five on a
- * grand prix. {@code CourseBalanceTest} holds all of that in place.
+ * Boost strips take what is left on the corner exits: five on a sprint's long lap,
+ * three on a grand prix's short one. {@code CourseBalanceTest} holds all of that in place.
+ * <p>
+ * <b>Adding a course</b>: HANDOFF.md, "48 courses, phase 1" / "How to add a course".
+ * Ordinals are saved (heats, the picker's answer), so a row is never removed or
+ * reordered; new rows go at the END, inside their class's block.
  */
 public enum RaceTrack {
-	// ---- C: meadow, orchard, shore
-	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 600, 1, boost(0.10), boost(0.56), boost(0.93)),
-	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 612, 1, boost(0.18), boost(0.36), boost(0.93)),
-	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 624, 1, boost(0.19), boost(0.80), boost(0.93)),
-	C_DOWNS(RaceClass.C, 3, Theme.MEADOW, Shape.ROVAL, 1150, 3, boost(0.11), boost(0.47), boost(0.58), boost(0.66), boost(0.93)),
-	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 3, boost(0.42), boost(0.59), boost(0.70), boost(0.85), boost(0.93)),
-	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 3, boost(0.10), boost(0.22), boost(0.46), boost(0.81), boost(0.92)),
+	// columns: class, course index (0, 1, 2 ... within the class in table order; it places
+	// the island, see slotOf), theme, shape, lap length target in blocks, laps (1 = sprint,
+	// 3-5 = grand prix), features
+	// ---- C: meadow, orchard, shore (0-2 grands prix, 3-5 sprints)
+	C_MEADOW(RaceClass.C, 0, Theme.MEADOW, Shape.STADIUM, 600, 5, boost(0.10), boost(0.56), boost(0.93)),
+	C_ORCHARD(RaceClass.C, 1, Theme.ORCHARD, Shape.ZIGZAG, 660, 4, boost(0.18), boost(0.36), boost(0.93)),
+	C_SHORE(RaceClass.C, 2, Theme.SHORE, Shape.PEANUT, 760, 3, boost(0.19), boost(0.80), boost(0.93)),
+	C_DOWNS(RaceClass.C, 3, Theme.MEADOW, Shape.ROVAL, 1150, 1, boost(0.11), boost(0.47), boost(0.58), boost(0.66), boost(0.93)),
+	C_CIDER(RaceClass.C, 4, Theme.ORCHARD, Shape.CLOUD, 1170, 1, boost(0.42), boost(0.59), boost(0.70), boost(0.85), boost(0.93)),
+	C_LAGOON(RaceClass.C, 5, Theme.SHORE, Shape.WAVE, 1190, 1, boost(0.10), boost(0.22), boost(0.46), boost(0.81), boost(0.92)),
 	// ---- B: canyon, river, snow
-	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 650, 1, ridge(0.50, 0.54), boost(0.31), boost(0.71), boost(0.93)),
-	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.LOLLIPOP, 662, 1, water(0.59, 0.64), boost(0.14), boost(0.68), boost(0.93)),
-	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.KIDNEY, 674, 1, ridge(0.47, 0.51), boost(0.41), boost(0.77), boost(0.92)),
-	B_MESA(RaceClass.B, 3, Theme.CANYON, Shape.SERPENT, 1280, 3, ridge(0.44, 0.48), boost(0.20), boost(0.35), boost(0.53), boost(0.83), boost(0.91)),
-	B_RAPIDS(RaceClass.B, 4, Theme.RIVER, Shape.HAIRPIN, 1300, 3, water(0.51, 0.56), boost(0.22), boost(0.39), boost(0.60), boost(0.75), boost(0.92)),
-	B_GLACIER(RaceClass.B, 5, Theme.SNOW, Shape.STAIRS, 1320, 3, water(0.33, 0.38), boost(0.45), boost(0.58), boost(0.66), boost(0.78), boost(0.87)),
+	B_CANYON(RaceClass.B, 0, Theme.CANYON, Shape.DELTA, 650, 5, ridge(0.50, 0.54), boost(0.31), boost(0.71), boost(0.93)),
+	B_FORD(RaceClass.B, 1, Theme.RIVER, Shape.LOLLIPOP, 715, 4, water(0.59, 0.64), boost(0.14), boost(0.68), boost(0.93)),
+	B_FROST(RaceClass.B, 2, Theme.SNOW, Shape.KIDNEY, 825, 3, ridge(0.55, 0.59), boost(0.41), boost(0.77), boost(0.92)),
+	B_MESA(RaceClass.B, 3, Theme.CANYON, Shape.SERPENT, 1280, 1, ridge(0.44, 0.48), boost(0.20), boost(0.35), boost(0.53), boost(0.83), boost(0.91)),
+	B_RAPIDS(RaceClass.B, 4, Theme.RIVER, Shape.HAIRPIN, 1300, 1, water(0.51, 0.56), boost(0.22), boost(0.39), boost(0.60), boost(0.75), boost(0.92)),
+	B_GLACIER(RaceClass.B, 5, Theme.SNOW, Shape.STAIRS, 1320, 1, water(0.33, 0.38), boost(0.45), boost(0.58), boost(0.66), boost(0.78), boost(0.87)),
 	// ---- A: cavern, jungle, nether
-	A_CRYSTAL(RaceClass.A, 0, Theme.CAVERN, Shape.DEE, 700, 1, ridge(0.12, 0.16), water(0.51, 0.56), mud(0.80, 0.83), boost(0.46), boost(0.72), boost(0.93)),
-	A_CANOPY(RaceClass.A, 1, Theme.JUNGLE, Shape.ELBOW, 712, 1, water(0.34, 0.39), ridge(0.46, 0.50), mud(0.78, 0.81), boost(0.10), boost(0.68), boost(0.92)),
-	A_EMBER(RaceClass.A, 2, Theme.NETHER, Shape.TRIDENT, 724, 1, lava(0.31, 0.36), ridge(0.54, 0.58), mud(0.84, 0.87), boost(0.22), boost(0.73), boost(0.93)),
-	A_DEEPS(RaceClass.A, 3, Theme.CAVERN, Shape.SWITCHBACK, 1420, 3, ridge(0.13, 0.17), water(0.49, 0.54), mud(0.77, 0.80), boost(0.23), boost(0.41), boost(0.60), boost(0.68), boost(0.84)),
-	A_TEMPLE(RaceClass.A, 4, Theme.JUNGLE, Shape.CASTLE, 1440, 3, water(0.15, 0.20), ridge(0.48, 0.52), mud(0.70, 0.73), boost(0.34), boost(0.57), boost(0.77), boost(0.84), boost(0.92)),
-	A_INFERNO(RaceClass.A, 5, Theme.NETHER, Shape.CROWN, 1460, 3, lava(0.19, 0.24), lava(0.38, 0.43), ridge(0.68, 0.72), mud(0.86, 0.89), boost(0.11), boost(0.30), boost(0.50), boost(0.63), boost(0.79)),
+	A_CRYSTAL(RaceClass.A, 0, Theme.CAVERN, Shape.DEE, 700, 5, ridge(0.12, 0.16), water(0.51, 0.56), mud(0.80, 0.83), boost(0.46), boost(0.72), boost(0.93)),
+	A_CANOPY(RaceClass.A, 1, Theme.JUNGLE, Shape.ELBOW, 770, 4, water(0.34, 0.39), ridge(0.46, 0.50), mud(0.78, 0.81), boost(0.10), boost(0.68), boost(0.92)),
+	A_EMBER(RaceClass.A, 2, Theme.NETHER, Shape.TRIDENT, 890, 3, lava(0.27, 0.32), ridge(0.54, 0.58), mud(0.84, 0.87), boost(0.22), boost(0.73), boost(0.93)),
+	A_DEEPS(RaceClass.A, 3, Theme.CAVERN, Shape.SWITCHBACK, 1420, 1, ridge(0.13, 0.17), water(0.49, 0.54), mud(0.77, 0.80), boost(0.23), boost(0.41), boost(0.60), boost(0.68), boost(0.84)),
+	A_TEMPLE(RaceClass.A, 4, Theme.JUNGLE, Shape.CASTLE, 1440, 1, water(0.15, 0.20), ridge(0.48, 0.52), mud(0.70, 0.73), boost(0.34), boost(0.57), boost(0.77), boost(0.84), boost(0.92)),
+	A_INFERNO(RaceClass.A, 5, Theme.NETHER, Shape.CROWN, 1460, 1, lava(0.19, 0.24), lava(0.38, 0.43), ridge(0.68, 0.72), mud(0.86, 0.89), boost(0.11), boost(0.30), boost(0.50), boost(0.63), boost(0.79)),
 	// ---- S: skyway, keep, end
-	S_SKYWAY(RaceClass.S, 0, Theme.SKYWAY, Shape.BOOMERANG, 750, 1, ridge(0.23, 0.27), water(0.67, 0.73), ridge(0.82, 0.86), boost(0.11), boost(0.41), boost(0.50)),
-	S_KEEP(RaceClass.S, 1, Theme.KEEP, Shape.RAMPART, 762, 1, lava(0.09, 0.14), ridge(0.36, 0.40), mud(0.61, 0.64), lava(0.80, 0.84), boost(0.52), boost(0.73), boost(0.93)),
-	S_VOID(RaceClass.S, 2, Theme.END, Shape.HAMMER, 774, 1, water(0.20, 0.25), ridge(0.67, 0.71), mud(0.87, 0.90), boost(0.37), boost(0.47), boost(0.58)),
-	S_STARFALL(RaceClass.S, 3, Theme.SKYWAY, Shape.SWEEPS, 1560, 3, ridge(0.09, 0.13), water(0.22, 0.28), ridge(0.49, 0.53), water(0.68, 0.72), boost(0.44), boost(0.60), boost(0.76), boost(0.81), boost(0.89)),
-	S_CITADEL(RaceClass.S, 4, Theme.KEEP, Shape.HOOK, 1580, 3, lava(0.25, 0.30), ridge(0.56, 0.60), mud(0.65, 0.68), lava(0.74, 0.79), boost(0.11), boost(0.34), boost(0.51), boost(0.83), boost(0.87)),
-	S_MAELSTROM(RaceClass.S, 5, Theme.END, Shape.BEE, 1600, 3, water(0.15, 0.20), ridge(0.28, 0.32), water(0.62, 0.68), ridge(0.88, 0.92), boost(0.10), boost(0.49), boost(0.54), boost(0.75), boost(0.80));
+	S_SKYWAY(RaceClass.S, 0, Theme.SKYWAY, Shape.BOOMERANG, 750, 5, ridge(0.23, 0.27), water(0.67, 0.73), ridge(0.82, 0.86), boost(0.11), boost(0.41), boost(0.50)),
+	S_KEEP(RaceClass.S, 1, Theme.KEEP, Shape.RAMPART, 825, 4, lava(0.09, 0.14), ridge(0.36, 0.40), mud(0.61, 0.64), lava(0.80, 0.84), boost(0.52), boost(0.73), boost(0.93)),
+	S_VOID(RaceClass.S, 2, Theme.END, Shape.HAMMER, 950, 3, water(0.20, 0.25), ridge(0.67, 0.71), mud(0.87, 0.90), boost(0.37), boost(0.47), boost(0.58)),
+	S_STARFALL(RaceClass.S, 3, Theme.SKYWAY, Shape.SWEEPS, 1560, 1, ridge(0.09, 0.13), water(0.22, 0.28), ridge(0.49, 0.53), water(0.68, 0.72), boost(0.44), boost(0.60), boost(0.76), boost(0.81), boost(0.89)),
+	S_CITADEL(RaceClass.S, 4, Theme.KEEP, Shape.HOOK, 1580, 1, lava(0.25, 0.30), ridge(0.56, 0.60), mud(0.65, 0.68), lava(0.74, 0.79), boost(0.11), boost(0.34), boost(0.51), boost(0.83), boost(0.87)),
+	S_MAELSTROM(RaceClass.S, 5, Theme.END, Shape.BEE, 1600, 1, water(0.15, 0.20), ridge(0.28, 0.32), water(0.62, 0.68), ridge(0.88, 0.92), boost(0.10), boost(0.49), boost(0.54), boost(0.75), boost(0.80)),
+	// ==== phase 2: new courses. Add rows ONLY between your own class's begin / end
+	// markers (course indices 6-11 in order: three sprints, then three grands prix), one
+	// row per line, every row ending in a comma. ====
+	// ---- new C courses (phase 2) begin ----
+	// ---- new C courses (phase 2) end ----
+
+	// ---- new B courses (phase 2) begin ----
+	// ---- new B courses (phase 2) end ----
+
+	// ---- new A courses (phase 2) begin ----
+	// ---- new A courses (phase 2) end ----
+
+	// ---- new S courses (phase 2) begin ----
+	// ---- new S courses (phase 2) end ----
+	;
 
 	/** A stretch of the direct line: terrain (with a detour road around it) or a boost strip. */
 	public record Feature(Type type, double start, double end) {
@@ -88,7 +113,14 @@ public enum RaceTrack {
 		}
 	}
 
-	/** Visual dressing of a course: road, kerbs (corner stripes), rail, wall / trim, margin ground, island rock, posts, lamps. */
+	/**
+	 * Visual dressing of a course: road, kerbs (corner stripes), rail, wall / trim, margin
+	 * ground, island rock, posts, lamps. Four per class: the first three are shared by the
+	 * original sprint / grand prix pairs, the fourth (FARMLAND, SAVANNA, MUSHROOM, DEEP_DARK)
+	 * arrived with the 48-course plan. A theme's scenery lives in {@code RaceCourseLayout}
+	 * ({@code decorate}, {@code verge}, {@code themeLandmark}); its music in
+	 * {@link RaceScoring#raceLoopKey}; its picker name in lang {@code chocobosreborn.select.theme.<name>}.
+	 */
 	public enum Theme {
 		MEADOW("dirt_path", "red_concrete", "white_concrete", "oak_fence", "mossy_stone_bricks", "grass_block", "dirt", "oak_log", "lantern[hanging=false]"),
 		ORCHARD("packed_mud", "orange_concrete", "white_concrete", "spruce_fence", "mud_bricks", "grass_block", "dirt", "stripped_spruce_log", "lantern[hanging=false]"),
@@ -101,7 +133,28 @@ public enum RaceTrack {
 		NETHER("basalt", "red_nether_bricks", "nether_bricks", "nether_brick_fence", "polished_blackstone", "netherrack", "netherrack", "polished_blackstone", "glowstone"),
 		SKYWAY("white_concrete", "magenta_stained_glass", "cyan_stained_glass", "air", "quartz_block", "quartz_block", "quartz_block", "quartz_pillar", "sea_lantern"),
 		KEEP("polished_blackstone", "red_concrete", "black_concrete", "polished_blackstone_wall", "polished_blackstone_bricks", "blackstone", "blackstone", "crying_obsidian", "shroomlight"),
-		END("end_stone_bricks", "purple_concrete", "white_concrete", "end_stone_brick_wall", "purpur_block", "end_stone", "end_stone", "purpur_pillar", "end_rod");
+		END("end_stone_bricks", "purple_concrete", "white_concrete", "end_stone_brick_wall", "purpur_block", "end_stone", "end_stone", "purpur_pillar", "end_rod"),
+		// the 48-course themes, one per class (open road / water or ridge / all four / all four)
+		/** C: wheat fields, hay bales, scarecrows and birch fences; open road. */
+		FARMLAND("coarse_dirt", "lime_concrete", "white_concrete", "birch_fence", "bricks", "grass_block", "dirt", "stripped_birch_log", "lantern[hanging=false]"),
+		/** B: acacia and coarse dirt under terracotta mesas; a watering hole (water) or a kopje (ridge). */
+		SAVANNA("smooth_red_sandstone", "orange_concrete", "black_concrete", "acacia_fence", "stripped_acacia_wood", "coarse_dirt", "red_sandstone", "stripped_acacia_log", "lantern[hanging=false]"),
+		/** A: mycelium and giant mushrooms, mushroom-block kerbs, froglights; every feature. */
+		MUSHROOM("podzol", "red_mushroom_block", "mushroom_stem", "mangrove_fence", "tuff_bricks", "mycelium", "dirt", "mushroom_stem", "pearlescent_froglight"),
+		/** S: the ancient city: sculk, deepslate tiles, soul lanterns, a warden's frame; every feature. */
+		DEEP_DARK("deepslate_tiles", "cyan_concrete", "light_gray_concrete", "cobbled_deepslate_wall", "polished_deepslate", "sculk", "cobbled_deepslate", "chiseled_deepslate", "soul_lantern[hanging=false]"),
+		// ---- new C themes (phase 2, only if a course truly needs one) begin ----
+		// ---- new C themes (phase 2) end ----
+
+		// ---- new B themes (phase 2) begin ----
+		// ---- new B themes (phase 2) end ----
+
+		// ---- new A themes (phase 2) begin ----
+		// ---- new A themes (phase 2) end ----
+
+		// ---- new S themes (phase 2) begin ----
+		// ---- new S themes (phase 2) end ----
+		;
 
 		public final String road, kerbA, kerbB, rail, wall, ground, base, post, lamp;
 
@@ -172,7 +225,23 @@ public enum RaceTrack {
 		/** A drag straight into a loop that doubles back on itself. */
 		HOOK(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 0, 0), p(180, 0, 0), p(214, 12, 1), p(230, 44, 2), p(216, 76, 3), p(184, 88, 3), p(150, 80, 2), p(130, 56, 2), p(110, 40, 2), p(80, 44, 2), p(60, 64, 3), p(60, 100, 4), p(80, 120, 4), p(110, 124, 3), p(140, 140, 2), p(140, 170, 1), p(110, 190, 0), p(60, 192, 0), p(20, 180, 0), p(-10, 150, 0), p(-20, 110, 0), p(-24, 70, 0), p(-30, 30, 0), p(-30, 0, 0)),
 		/** A B: a straight spine and two round bulges pinched in the middle. */
-		BEE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 6, 1), p(170, 30, 2), p(176, 64, 3), p(166, 90, 3), p(150, 104, 4), p(166, 120, 4), p(178, 146, 5), p(170, 184, 4), p(140, 206, 3), p(100, 212, 2), p(60, 208, 1), p(20, 206, 0), p(-10, 190, 0), p(-20, 150, 0), p(-24, 110, 0), p(-26, 70, 0), p(-28, 36, 0), p(-30, 0, 0));
+		BEE(p(0, 0, 0), p(30, 0, 0), p(60, 0, 0), p(100, 0, 0), p(140, 6, 1), p(170, 30, 2), p(176, 64, 3), p(166, 90, 3), p(150, 104, 4), p(166, 120, 4), p(178, 146, 5), p(170, 184, 4), p(140, 206, 3), p(100, 212, 2), p(60, 208, 1), p(20, 206, 0), p(-10, 190, 0), p(-20, 150, 0), p(-24, 110, 0), p(-26, 70, 0), p(-28, 36, 0), p(-30, 0, 0)),
+		// ==== phase 2: new silhouettes, one per new course. Add ONLY between your own
+		// class's markers, one shape per line (javadoc line above it), ending in a comma.
+		// Rules: HANDOFF.md "How to add a course" (first three points collinear along +x,
+		// last point (-30, 0), legs far enough apart for detours, hills 2-12 blocks). ====
+		// ---- new C shapes (phase 2) begin ----
+		// ---- new C shapes (phase 2) end ----
+
+		// ---- new B shapes (phase 2) begin ----
+		// ---- new B shapes (phase 2) end ----
+
+		// ---- new A shapes (phase 2) begin ----
+		// ---- new A shapes (phase 2) end ----
+
+		// ---- new S shapes (phase 2) begin ----
+		// ---- new S shapes (phase 2) end ----
+		;
 
 		final List<TrackSpline.Ctl> points;
 		final double unitLength;
@@ -220,11 +289,23 @@ public enum RaceTrack {
 	public static final double DETOUR_OUTER = 16.0D;
 	/** Shared by the built openings, detour cost model, and AI steering. */
 	public static final double DETOUR_CONNECT = 0.012D;
-	/** Course islands: one per class row (z), one per course column (x); the village sits near the origin. */
+	/**
+	 * Course islands: one row per class (z), one column per course (x); the village sits
+	 * near the origin. Courses 0-5 keep the columns they were built in (x -2050 .. +2050);
+	 * course 6 and up alternate west and east of them ({@link #columnOf}), so a class's
+	 * row grows outward from the middle and every future index already has a place.
+	 */
 	private static final double ROW_Z0 = 700.0D;
 	private static final double ROW_DZ = 900.0D;
 	private static final double COL_DX = 820.0D;
-	public static final int COURSES_PER_CLASS = 6;
+	/**
+	 * Largest island half extent ({@link #getRadiusX} / {@link #getRadiusZ}) the grid is
+	 * spaced for: two neighbours of this size still keep 40 blocks of void between them
+	 * (column step 820, row step 900). {@code RaceTrackTest} holds every course to it.
+	 */
+	public static final double MAX_ISLAND_RADIUS = 385.0D;
+	/** The most courses a class can hold on its row today (six sprints and six grands prix). */
+	public static final int MAX_COURSES_PER_CLASS = 12;
 
 	private final RaceClass raceClass;
 	private final int course;
@@ -253,16 +334,16 @@ public enum RaceTrack {
 		this.offsetZ = centerZ() - (spline.minZ() + spline.maxZ()) / 2.0D;
 	}
 
+	/** Course {@code course} of the class (clamped to the courses it has). */
 	public static RaceTrack forClass(RaceClass raceClass, int course) {
-		int slot = Math.max(0, Math.min(COURSES_PER_CLASS - 1, course));
-		for (RaceTrack track : values()) {
-			if (track.raceClass == raceClass && track.course == slot) {
-				return track;
-			}
+		List<RaceTrack> all = ofClass(raceClass);
+		if (all.isEmpty()) {
+			return C_MEADOW;
 		}
-		return C_MEADOW;
+		return all.get(Math.max(0, Math.min(all.size() - 1, course)));
 	}
 
+	/** Every course of the class in table order (= course index order). */
 	public static List<RaceTrack> ofClass(RaceClass raceClass) {
 		List<RaceTrack> out = new ArrayList<>();
 		for (RaceTrack t : values()) {
@@ -271,6 +352,55 @@ public enum RaceTrack {
 			}
 		}
 		return out;
+	}
+
+	/** How many courses the class has: however many rows of the table carry it. */
+	public static int courseCount(RaceClass raceClass) {
+		return ofClass(raceClass).size();
+	}
+
+	/** The class's sprints (one lap), in table order. */
+	public static List<RaceTrack> sprintsOf(RaceClass raceClass) {
+		List<RaceTrack> out = new ArrayList<>();
+		for (RaceTrack t : ofClass(raceClass)) {
+			if (t.isSprint()) {
+				out.add(t);
+			}
+		}
+		return out;
+	}
+
+	/** The class's grands prix (three laps or more), in table order. */
+	public static List<RaceTrack> grandsPrixOf(RaceClass raceClass) {
+		List<RaceTrack> out = new ArrayList<>();
+		for (RaceTrack t : ofClass(raceClass)) {
+			if (t.isGrandPrix()) {
+				out.add(t);
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * Grid column of course index {@code course}: 0-5 are the original columns, then 6 goes
+	 * west of column 0, 7 east of column 5, 8 west again and so on.
+	 */
+	static int columnOf(int course) {
+		if (course < 6) {
+			return course;
+		}
+		int k = course - 6;
+		return (k % 2 == 0) ? -1 - k / 2 : 6 + k / 2;
+	}
+
+	/** Island centre x of course index {@code course} in any class. */
+	static double slotX(int course) {
+		return 0.5D + (columnOf(course) - 2.5D) * COL_DX;
+	}
+
+	/** Island centre z of the class row. */
+	static double slotZ(RaceClass raceClass) {
+		return 0.5D + ROW_Z0 + raceClass.getId() * ROW_DZ;
 	}
 
 	public static RaceTrack byId(int id) {
@@ -289,12 +419,23 @@ public enum RaceTrack {
 		return course;
 	}
 
-	public boolean isShort() {
-		return course < 3;
+	/** One lap: a sprint (1 point, the base purse). Everything sprint-or-GP keys off the lap count. */
+	public boolean isSprint() {
+		return laps <= 1;
+	}
+
+	/** Three to five laps: a grand prix (3 points, three times the purse). */
+	public boolean isGrandPrix() {
+		return laps > 1;
 	}
 
 	public int getLaps() {
 		return laps;
+	}
+
+	/** Blocks for the whole heat: lap length x laps. */
+	public double raceLength() {
+		return lapLength() * laps;
 	}
 
 	public Theme theme() {
@@ -330,11 +471,11 @@ public enum RaceTrack {
 	}
 
 	public double centerX() {
-		return 0.5D + (course - 2.5D) * COL_DX;
+		return slotX(course);
 	}
 
 	public double centerZ() {
-		return 0.5D + ROW_Z0 + raceClass.getId() * ROW_DZ;
+		return slotZ(raceClass);
 	}
 
 	/**

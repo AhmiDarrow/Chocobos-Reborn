@@ -72,7 +72,8 @@ class CourseBalanceTest {
 							+ " has a boost strip inside the " + g.type() + " detour connector");
 				}
 			}
-			assertEquals(track.getLaps() == 1 ? 3 : 5, boosts, track.name() + " boost count");
+			// by lap length: a sprint's long lap carries five, a grand prix's short lap three
+			assertEquals(track.isSprint() ? 5 : 3, boosts, track.name() + " boost count");
 		}
 	}
 }

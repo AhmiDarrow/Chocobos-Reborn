@@ -130,8 +130,10 @@ with the overlook over the void, the winners' board, the ranch, the nest barn an
 nursery, the jockey lounge, a pond with a dock, an orchard, a gysahl bed by Sage Wynn,
 signposts, and a shrine islet. Ten townsfolk (`TownRole.RESIDENT_*`, `TownRoutineGoal`)
 keep a day (home, work, the fountain, the inn) and line the overlook to cheer when a heat
-is called; the inn bell rings the calls and the start (`TownLife`). Each of the 24 courses is its own circuit island built on first use at
-`RaceTrack.centerX/Z()`. The dimension is a true void (`the_void` biome, no layers), natural
+is called; the inn bell rings the calls and the start (`TownLife`). Each course is its own circuit island built on first use at
+`RaceTrack.centerX/Z()`: one row per class (z 700 + 900 per class), courses 0-5 in columns
+x = (column - 2.5) x 820, course 6 and up alternating west / east of them (`RaceTrack.columnOf`),
+room for `MAX_COURSES_PER_CLASS` (12) a class, islands up to `MAX_ISLAND_RADIUS` (385). The dimension is a true void (`the_void` biome, no layers), natural
 spawns are cancelled (`RaceManager.onFinalizeSpawn`), blocks cannot be broken or placed by
 players (`onBreak` / `onPlace`, creative operators excepted), and untamable town birds
 (`ChocoboEntity.townBird`) live in three patches: the ranch flock, a saddled pair in the
@@ -150,17 +152,24 @@ Overworld (foot or saddle); owned awake birds within 16 blocks follow
 (`RaceManager.bringBirds`). Return gate, Esther on foot, or the pocketwatch send you
 home (birds follow again).
 
-Courses (`RaceTrack`, `TrackSpline`): six per class, courses 0-2 sprints (1 lap, >= 60 s
-at 9 b/s) and 3-5 grands prix (3 laps, >= 120 s per lap, longer up the classes), kart
-style: a `Shape` template (straights, sweepers, hairpins, chicanes, hills) as a closed
-spline scaled to the lap length, dressed in a `Theme` (three per class: meadow /
-orchard / shore, canyon / river / snow, cavern / jungle / nether, skyway / keep / end)
+Courses (`RaceTrack`, `TrackSpline`): six per class today (twelve once the 48-course plan's
+phase 2 lands; every count derives from the table: `ofClass`, `sprintsOf`, `grandsPrixOf`).
+Sprint or grand prix is the lap count alone (`isSprint` = 1 lap: 1 point and the base purse;
+`isGrandPrix` = 3-5 laps: 3 points, three times the purse). Sprints are one long lap
+(1150-1600 blocks, >= 120 s at 9 b/s, longer up the classes); grands prix are 3, 4 or 5
+laps of a shorter circuit (600-950 blocks, the most laps on the shortest lap, never under
+600). Since the swap, courses 0-2 of each class are grands prix (5 / 4 / 3 laps) and 3-5
+sprints. Kart style: a `Shape` template (straights, sweepers, hairpins, chicanes, hills) as a closed
+spline scaled to the lap length, dressed in a `Theme` (four per class: meadow /
+orchard / shore / farmland, canyon / river / snow / savanna, cavern / jungle / nether /
+mushroom, skyway / keep / end / deep dark; the fourth of each arrived with the 48-course
+plan and is raced from phase 2)
 with striped corner kerbs, rails, a chequered start line and painted grid under the
 gantry, a yellow arrow just past it, warning posts before terrain, margins of themed
 decoration and an infield grandstand on the start straight where the crowd
 (`RaceSession.spawnFans`) stands.
 Features across the direct line: BOOST strips (every class; `boost_pad` block, +55%
-for 50 ticks; three per sprint, five per grand prix, each on a corner exit), WATER
+for 50 ticks; five on a sprint's long lap, three on a grand prix's short one, each on a corner exit), WATER
 (river birds walk it), RIDGE (3-5 blocks; climbers go over), LAVA (Nether bird and
 Gold), MUD bogs (everyone -55%), each terrain feature with a detour road outside
 (`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A two plus a bog,
