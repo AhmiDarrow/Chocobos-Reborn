@@ -19,6 +19,15 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.19 - Back on track
+Uploaded 2026-09-27: `chocobosreborn-1.0.19.jar` as file **8996621** ("Chocobos Reborn 1.0.19 - Back on track",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.19.md`) via
+`tools/upload_curseforge.py`. A wide line keeps the lap, a real shortcut sets the rider back on the road, and every fork is marked. Older birds convert once. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.19
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/8996621
+SHA-256: `3463648ad51b2c461003162721a483acc4c4c5170564d3057c6c69a346076c66`.
+The GitHub asset digest matches the tested local jar.
+
 ## 1.0.18 - Race day
 Uploaded 2026-09-27: `chocobosreborn-1.0.18.jar` as file **8996427** ("Chocobos Reborn 1.0.18 - Race day",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.18.md`) via
