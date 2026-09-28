@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.0.18 - Race day
+Uploaded 2026-09-27: `chocobosreborn-1.0.18.jar` as file **8996427** ("Chocobos Reborn 1.0.18 - Race day",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.18.md`) via
+`tools/upload_curseforge.py`. Other birds' legs move again, class C is a race, Teiyo and Jolo pace off the rider's bird, class-based stands with a client-drawn crowd, and Whiskerwind v13. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.0.18
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/8996427
+SHA-256: `401a2400583600ce4c3dc561c7a9236776ae123c1ba79b8d77faee82f9f54814`.
+
 ## 1.0.17 - Held pace
 Uploaded 2026-09-27: `chocobosreborn-1.0.17.jar` as file **8995550** ("Chocobos Reborn 1.0.17 - Held pace",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.0.17.md`) via
