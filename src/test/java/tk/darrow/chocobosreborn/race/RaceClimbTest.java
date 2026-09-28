@@ -24,8 +24,10 @@ class RaceClimbTest {
 
 	@Test
 	void noBirdStepsOntoTheRailInARace() {
-		assertTrue(RaceScoring.stepHeight(true, 2.0F) <= 1.0F, "a climbing colour steps two blocks, a rail stands 1.5");
+		assertTrue(RaceScoring.stepHeight(true, 2.0F) < 1.5F, "a climbing colour steps two blocks, a rail stands 1.5");
 		assertTrue(RaceScoring.stepHeight(true, 1.0F) >= 1.0F, "the road's hill steps are one block");
+		assertTrue(RaceScoring.stepHeight(true, 1.0F) >= 1.0F + 1.0F / 16.0F, "from a dirt-path road up onto a concrete kerb or paint a block higher");
+		assertTrue(RaceScoring.stepHeight(true, 1.0F) < 1.5F, "never onto the rail");
 		assertTrue(RaceScoring.stepHeight(false, 2.0F) == 2.0F, "off the course the colour keeps its step");
 	}
 

@@ -784,14 +784,17 @@ public final class RaceScoring {
 	}
 
 	/** Highest step in a race: the road's hill steps are one block; a rail stands 1.5, a pool wall one above the road. */
-	public static final float RACE_STEP = 1.0F;
+	public static final float RACE_STEP = 1.1F;
 
 	/**
-	 * Step height a bird has: its colour's (2 for the climbing colours), capped at
-	 * {@link #RACE_STEP} in a race so no bird walks up onto the rail and off the course.
+	 * Step height a bird has: its colour's (2 for the climbing colours) off the course, and
+	 * exactly {@link #RACE_STEP} for every bird in a race. Under the 1.5 of the rail, so no bird
+	 * walks up onto it and off the course; over the 1.0625 from a dirt-path road (15/16 high) up
+	 * onto a full block, so a road that climbs a block where kerb or paint is concrete never walls
+	 * off a lane (the hub harness wedged a Yellow on C_HEARTFIELD's dip, lane -3.5, at a 1.0 step).
 	 */
 	public static float stepHeight(boolean racing, float colourStep) {
-		return racing ? Math.min(colourStep, RACE_STEP) : colourStep;
+		return racing ? RACE_STEP : colourStep;
 	}
 
 	public static boolean stallFitsTrack(double offset, double halfWidth) {
