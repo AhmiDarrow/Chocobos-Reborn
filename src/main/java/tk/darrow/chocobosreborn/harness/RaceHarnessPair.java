@@ -15,7 +15,8 @@ import tk.darrow.chocobosreborn.entity.*;
 import tk.darrow.chocobosreborn.net.RaceLatency;
 import tk.darrow.chocobosreborn.race.*;
 
-/** Actual integrated host and delayed guests in ordinary six-bird races. Never shipped. */
+/** Actual integrated host and delayed guests in ordinary six-bird races, or three remote clients on a
+ * dedicated server ({@code -Dchocobosreborn.harness=hub}, tools/hub_race_harness.py). Never shipped. */
 @EventBusSubscriber(modid = ChocobosReborn.MOD_ID)
 public final class RaceHarnessPair {
     private static final Path OUT = Path.of(System.getProperty("chocobosreborn.harness.output", "build/latency-pair/results"));
@@ -33,9 +34,14 @@ public final class RaceHarnessPair {
     private static final int[] stalled = new int[NAMES.length];
     private static long tickStart;
 
+    private static boolean active() {
+        String mode = System.getProperty("chocobosreborn.harness");
+        return "host".equals(mode) || "hub".equals(mode);
+    }
+
     @SubscribeEvent
     public static void beforeTick(ServerTickEvent.Pre event) {
-        if ("host".equals(System.getProperty("chocobosreborn.harness"))) tickStart = System.nanoTime();
+        if (active()) tickStart = System.nanoTime();
     }
 
     private static void write(String file, String line) {
@@ -47,8 +53,10 @@ public final class RaceHarnessPair {
 
     @SubscribeEvent
     public static void tick(ServerTickEvent.Post event) {
-        if (!"host".equals(System.getProperty("chocobosreborn.harness")) || done) return;
+        if (!active() || done) return;
         var server = event.getServer();
+        // a dedicated server (hub mode) already listens on its own port
+        if (!opened && server.isDedicatedServer()) opened = true;
         if (!opened) {
             try {
                 // The integrated server stays an actual host, but its test listener is loopback-only.
