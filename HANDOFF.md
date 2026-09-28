@@ -1755,3 +1755,52 @@ and both earn a full lap. Results: 244 unit tests (1 skipped, AtlasTint), all 29
 * AI: C birds bumping about one pass in three, S and the rivals clean, leaders covering the inside once
   without weaving, nobody stuck behind a slower bird for long.
 * Ghosts: a set-back bird dropped into traffic, finished AI parking, a finished rider coasting.
+
+### Short grands prix: class S
+
+Six class S grands prix rebuilt as short technical circuits (Ahmi: "grand prix are supposed to be short
+courses, multiple laps; sprints long one-lap tracks"; "Mario Kart meets F1"). Sprints (3-8) untouched; the
+class's shortest sprint is still S_STARFALL at 1560. Every course keeps its theme, laps, landmark, name and
+colour lean; every course now has a bog (S_SKYWAY had none: ridge, water, ridge + a new bog in the notch), no
+new lava (S_KEEP keeps its two, nothing else gains any: only Gold gains from lava now Flame birds cannot race).
+All six shapes are new outlines under the old enum names.
+
+| id | name | laps x lap | heat (blocks, x sprint) | shape | features (detour / target 13) | landmark | borrowed from |
+|---|---|---|---|---|---|---|---|
+| s_skyway | Rainbow Skyway | 5 x 448 | 2240, 1.44x | BOOMERANG: an elbow off the line, up one arm to a crest hairpin at the tip (+5), down into the notch, along the other arm, hairpin home | ridge 0.15 (16.4), bog 0.43-0.54 in the notch (10.7), water 0.57 (15.5), ridge 0.65 (16.3); boosts 0.115 0.365 0.895 | glass arch (t 0.71, over the home hairpin) | COTA turn 1 (uphill hairpin at a crest), Rainbow Road risk/reward line on the back arm, Monaco Grand Hotel hairpin onto the line |
+| s_keep | Obsidian Keep | 4 x 485 | 1940, 1.24x | RAMPART: a square keep, four right-angle corners, up to the battlements (+4) and back, the west curtain pinched in round its moat | lava 0.43 (15.9), ridge 0.51 (15.8), bog 0.69-0.78 on the moat bend (10.5), lava 0.89 before the line (16.1); boosts 0.125 0.37 0.625 | blackstone arch (t 0.59) | Baku's castle section (square walls, 90-degree street corners), Monaco harbour: the moat bend and a lava pool before the line |
+| s_void | Void Reach | 3 x 610 | 1830, 1.17x | HAMMER on its head: the head along the line with a hairpin at each end, a tall handle climbing (+5) over a crest hairpin, down a waisted side | water 0.28 (15.2), ridge 0.36 (14.2) up the handle, bog 0.60-0.67 in the waist (9.9); boosts 0.17 0.545 0.88 | obsidian spire (t 0.50, crest hairpin) | La Source / Monaco hairpins at both ends of the head, a Monza-style drag up the handle, Maggotts-Becketts esses in the waist |
+| s_orbit | Ringed Orbit | 5 x 450 | 2250, 1.44x | SATURN: the ring along the line with a sharp tip at each end, the planet swelling up (+5) between two sweeping shoulders | water 0.12 (16.3), bog 0.38-0.48 on the first shoulder (14.8), water 0.71 (16.4); boosts 0.275 0.555 0.63 | ringed planet (t 0.53) | Baby Park / Luigi Circuit's tiny many-lap loop, Monaco swimming-pool water after the line, Suzuka-style shoulders into the dome |
+| s_eclipse | Eclipse Crescent | 4 x 485 | 1940, 1.24x | CRESCENT_MOON: the outer arc along the line and up to two curled horns (+5), the hollow of the moon dipping deep between them | bog 0.36-0.465 in the hollow (13.0), ridge 0.49 (14.8), ridge 0.89 before the line (16.3); boosts 0.105 0.30 0.56 | eclipse disc (t 0.56) | Monza Parabolica (the long outer arc), Interlagos-style crest hairpins at the horns, a long constant-radius hollow |
+| s_rift | Sculk Rift | 3 x 610 | 1830, 1.17x | FISSURE: a split block, the line along the foot, a climb up the far wall to the lip (+3), a jagged fissure falling in esses to its flooded bottom and back out | ridge 0.21, ridge 0.32 (14.3 each) up the wall, bog 0.52-0.62 on the lip (9.7), water 0.72 in the flooded bottom (14.6); boosts 0.15 0.645 0.87 | rift shards (t 0.65) | Spa Eau Rouge / Raidillon climb up the wall, Suzuka S-curves down the fissure, Interlagos' climb out to the line |
+
+Laps 5 x 448-450 (0.287-0.288x the shortest sprint), 4 x 485 (0.311x), 3 x 610 (0.391x); heats 1.17-1.44x.
+3 x 610 keeps the 3-lap heats over the 1.15 floor; every 5-lap lap is over 415 so S stays above A (being rebuilt
+to 376-410) on the ladder test. Legs 40.3-57.8 apart (need > 38), islands at most 115 x 111 half extent.
+
+**Why the features sit where they do** (engine facts, measured with a Python port of `TrackSpline` + `detourCost`
+that matches Java to 0.1 block; scratch, not committed): at 450 a detour on a straight costs 16.3-16.5 (the
+connector swing alone; ceiling 16.9), at 485 about 15.9, at 610 about 14.4. A concave bend only saves on the inside
+detour if it is long and gentle (radius about 80-120, 25-40 degrees); a tight one costs more because `detourCost`
+samples the tangent per block. So every course has one long gentle concave bend (the notch, the moat, the waist, the
+shoulder, the hollow, the lip) and the bog lives there (9.7-14.8, always the cheapest); the colour features sit on
+straights (14.2-16.4).
+
+**Stands** (`CourseCrowdTest`: an S course must seat exactly ten): on 450-485 laps with three or four features the
+planner could only find 3-9 sites (every stand keeps 12 blocks off a feature connector or boost strip and 22 off the
+landmark). `CourseStands.planStands` gained three last-resort tries (half and third-length stands, gentler turn
+limit), which only run for a stand that found no site before, so every course that already seated all its stands is
+unchanged (C/B/A/S sprints included). With them, and with the features and boosts packed to leave room (a Python
+emulation of the planner matched Java exactly), all six S grands prix seat 10 stands and 203-242 fans. Shared-code
+change: flag it at merge if another class touched the same line.
+
+**RaceSim** (S, mean heat seconds over all twelve S courses, before -> after): field best 54.5 -> 36.1, maxed Black
+driven well 47.8 -> 30.9 with Teiyo against it 50.2 -> 33.4 (the Black wins by 5.0 % -> 7.8 %), maxed Gold 35.7 ->
+24.8 with Teiyo 38.7 -> 26.6 (Teiyo 8.4 % -> 7.1 % behind the Gold, bound 9 %), 90-trained Black beats the field
+best by 6.7 % -> 11.4 %, half-trained still loses (50.5 vs field average 40.4), maxed cruising still loses (52.3).
+Every ladder line holds; no expectation moved, nothing in the AI retuned.
+
+**Merge notes**: `COURSE_VERSION` not bumped (the merge will; the six islands shrank a lot, as for B). S_ORBIT's first
+pool sits at 0.12 so its shortcut stripe starts after the start arrow (at 0.08 the stripe painted over the arrow).
+In-game look wanted: the crest hairpins (Skyway tip, Void handle top, Eclipse horns), the Rampart right angles at
+r 18, ten grand stands on a 450-block lap, and five colliding birds on the Skyway notch bog.

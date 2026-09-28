@@ -209,8 +209,10 @@ public final class CourseStands {
 			double target = 0.07D + 0.9D * ((j + 0.5D) / extra);
 			int rows = extraRows(rc, j);
 			Plan p = null;
-			// straights first; then gentler sweepers, then a shorter stand; either side as a last resort
-			double[][] tries = {{len, 0.30D}, {len, 0.55D}, {len * 0.7D, 0.55D}, {len * 0.7D, 0.8D}};
+			// straights first; then gentler sweepers, then a shorter stand; either side as a last resort.
+			// The half and third-length stands only come into play on a short grand-prix lap crowded with
+			// features (class S: ten stands on a 450-block lap); a course that seats every stand without them is unchanged
+			double[][] tries = {{len, 0.30D}, {len, 0.55D}, {len * 0.7D, 0.55D}, {len * 0.7D, 0.8D}, {len * 0.5D, 0.8D}, {len * 0.5D, 1.2D}, {len * 0.35D, 1.2D}};
 			for (double[] tr : tries) {
 				p = search(plans.size(), target, side, rows, tr[0], tr[1], tier);
 				if (p == null) {
