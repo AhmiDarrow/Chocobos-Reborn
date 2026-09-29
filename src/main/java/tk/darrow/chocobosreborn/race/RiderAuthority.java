@@ -34,12 +34,10 @@ import tk.darrow.chocobosreborn.net.RaceMovePayloads;
  * is one snap, never a chain of them.
  */
 public final class RiderAuthority {
-	/** Blocks a server tick a rider may cover: above the fastest legitimate race bird (about 4.6 at the 99.9th percentile). */
-	public static final double PER_TICK = 6.0D;
-	/** Ticks of movement that may be banked for a backlog after a stall. */
-	public static final double BANK_TICKS = 20.0D;
-	/** The longest single step one packet may make (vanilla's limit). */
-	public static final double STEP_CAP = 10.0D;
+	/** The budget's numbers live in {@link RiderBudget} (pure, unit-tested). */
+	public static final double PER_TICK = RiderBudget.PER_TICK;
+	public static final double BANK_TICKS = RiderBudget.BANK_TICKS;
+	public static final double STEP_CAP = RiderBudget.STEP_CAP;
 	static final int RESEND_TICKS = 20;
 	static final int GIVE_UP_TICKS = 200;
 	/**
@@ -150,13 +148,8 @@ public final class RiderAuthority {
 		return null;
 	}
 
-	/** The bank after {@code last} (Long.MIN_VALUE: never spent) up to {@code now}. */
 	public static double refill(double budget, long last, long now) {
-		double cap = PER_TICK * BANK_TICKS;
-		if (last == Long.MIN_VALUE) {
-			return cap;
-		}
-		return Math.min(cap, budget + Math.max(0L, now - last) * PER_TICK);
+		return RiderBudget.refill(budget, last, now);
 	}
 
 	/** Count a refusal against the rider (logged by the caller). */

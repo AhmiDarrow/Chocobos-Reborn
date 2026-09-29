@@ -38,9 +38,10 @@ class PlayoutClockTest {
 		double previous = Double.NaN;
 		int starved = 0;
 		int next = 0;
-		// the client ticks on its own clock, a little off the server's and not exactly regular
+		// the client ticks on its own clock, a little off the server's, and each tick runs on the
+		// first frame after it is due: up to a third of a tick late at 60 fps
 		for (int c = 0; c < ticks; c++) {
-			double now = c * 1.001D + rng.nextGaussian() * 0.05D;
+			double now = c * 1.001D + rng.nextDouble() / 3.0D;
 			while (next < flight.size() && flight.get(next)[0] <= now) {
 				int tick = (int) flight.get(next)[1];
 				clock.observe(flight.get(next)[0], tick);
@@ -77,6 +78,25 @@ class PlayoutClockTest {
 		assertEquals(0, run.starved(), "never shown past the newest frame");
 		assertTrue(worstDeviation(run.steps()) < 0.06D, "each tick's step within 6 % of the true speed: " + worstDeviation(run.steps()));
 		assertTrue(run.finalDelay() <= 2.1D, "a steady connection needs almost no buffer: " + run.finalDelay());
+	}
+
+	@Test
+	void aThirtyFpsClientIsJustAsSmooth() {
+		// ticks up to two thirds of a tick late: the shown tick must not follow that noise
+		PlayoutClock clock = new PlayoutClock();
+		java.util.Random rng = new java.util.Random(4);
+		double previous = Double.NaN;
+		double worst = 0.0D;
+		for (int c = 0; c < 1200; c++) {
+			double now = c + rng.nextDouble() * 0.66D;
+			clock.observe(now, c - 2);   // a frame each tick, two ticks in flight
+			double shown = clock.advance(now);
+			if (!Double.isNaN(previous) && c > 100) {
+				worst = Math.max(worst, Math.abs(shown - previous - 1.0D));
+			}
+			previous = shown;
+		}
+		assertTrue(worst < 0.06D, "the shown tick steps one tick at a time, within 6 %: " + worst);
 	}
 
 	@Test
