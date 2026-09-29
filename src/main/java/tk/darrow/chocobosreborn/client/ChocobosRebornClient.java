@@ -30,6 +30,7 @@ public final class ChocobosRebornClient {
 		}
 		tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.NET_HANDLER = RemoteRaceFrames.INSTANCE::receive;
 		tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport.CLIENT_HANDLER = RemoteRaceFrames::applyTeleport;
+		tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge.CLIENT_HANDLER = RemoteRaceFrames::applyNudge;
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientTickEvent.Pre.class,
 				RemoteRaceFrames.INSTANCE::tick);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(

@@ -83,6 +83,8 @@ public final class ChocobosReborn {
 				tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport::handle);
 		movement.playToServer(tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck.TYPE,
 				tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck::handle);
+		movement.playToClient(tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge.TYPE,
+				tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge::handle);
 		event.registrar("4").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK)
 				.playToClient(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.TYPE,
 						tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame::handle);

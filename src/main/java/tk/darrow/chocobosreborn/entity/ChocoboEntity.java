@@ -2091,6 +2091,59 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/** Every racing bird's position this tick, stamped with the tick, to the players near it (see RaceMovePayloads.Frame). */
+	/** Pushes the server has asked riders' clients to make (the race harness reports it). */
+	public static final java.util.concurrent.atomic.AtomicInteger RIDER_NUDGES = new java.util.concurrent.atomic.AtomicInteger();
+	private long lastNudge = Long.MIN_VALUE / 2;
+	private double lastNudgeDepth;
+
+	/**
+	 * A rider's client drives this bird, so the server cannot push it out of another racer the
+	 * way an AI bird separates itself; it asks the rider to ({@link tk.darrow.chocobosreborn.race.RiderNudge}).
+	 */
+	private void refereeRiderContact() {
+		if (!(getControllingPassenger() instanceof net.minecraft.server.level.ServerPlayer rider) || mirrorOf != null
+				|| !contactSolid() || !rider.connection.hasChannel(tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge.TYPE)) {
+			return;
+		}
+		var virtual = tk.darrow.chocobosreborn.race.RiderAuthority.VIRTUAL;
+		if (virtual != null && virtual.isVirtual(rider)) {
+			return;
+		}
+		net.minecraft.world.phys.AABB mine = getBoundingBox();
+		double dvx = 0.0D, dvz = 0.0D, depth = 0.0D;
+		for (Entity e : level().getEntities(this, mine, e -> e instanceof ChocoboEntity && canCollideWith(e))) {
+			net.minecraft.world.phys.AABB theirs = e.getBoundingBox();
+			if (Math.min(mine.maxY, theirs.maxY) - Math.max(mine.minY, theirs.minY) <= 0.01D) {
+				continue;
+			}
+			double[] push = tk.darrow.chocobosreborn.race.RiderNudge.push(mine.minX, mine.maxX, mine.minZ, mine.maxZ,
+					theirs.minX, theirs.maxX, theirs.minZ, theirs.maxZ);
+			if (push != null) {
+				dvx += push[0];
+				dvz += push[1];
+				depth = Math.max(depth, push[2]);
+			}
+		}
+		if (depth <= 0.0D) {
+			return;
+		}
+		long now = level().getGameTime();
+		if (!tk.darrow.chocobosreborn.race.RiderNudge.due(now, lastNudge,
+				tk.darrow.chocobosreborn.race.RiderNudge.cooldown(rider.connection.latency()), lastNudgeDepth, depth)) {
+			return;
+		}
+		double length = Math.hypot(dvx, dvz);
+		if (length > tk.darrow.chocobosreborn.race.RiderNudge.MAX) {
+			dvx *= tk.darrow.chocobosreborn.race.RiderNudge.MAX / length;
+			dvz *= tk.darrow.chocobosreborn.race.RiderNudge.MAX / length;
+		}
+		lastNudge = now;
+		lastNudgeDepth = depth;
+		RIDER_NUDGES.incrementAndGet();
+		net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(rider,
+				new tk.darrow.chocobosreborn.net.RaceMovePayloads.Nudge(getId(), (float) dvx, (float) dvz));
+	}
+
 	private void broadcastRaceFrame() {
 		if (!(level() instanceof net.minecraft.server.level.ServerLevel server) || mirrorOf != null) {
 			return;
@@ -2589,6 +2642,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		super.tick();
 		trackContactVelocity();
 		if (!level().isClientSide && racing()) {
+			refereeRiderContact();
 			broadcastRaceFrame();
 		}
 		if (level().isClientSide) {

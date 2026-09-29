@@ -44,6 +44,19 @@ public final class RaceMovePayloads {
 		}
 	}
 
+	/** Server to the rider: your bird overlaps another racer; add this velocity to slide it clear ({@code race/RiderNudge}). */
+	public record Nudge(int entityId, float dvx, float dvz) implements CustomPacketPayload {
+		public static java.util.function.Consumer<Nudge> CLIENT_HANDLER;
+		public static final Type<Nudge> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rider_nudge"));
+		public static final StreamCodec<RegistryFriendlyByteBuf, Nudge> CODEC = StreamCodec.of((b, p) -> {
+			b.writeVarInt(p.entityId); b.writeFloat(p.dvx); b.writeFloat(p.dvz);
+		}, b -> new Nudge(b.readVarInt(), b.readFloat(), b.readFloat()));
+		@Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+		public static void handle(Nudge p, IPayloadContext ctx) {
+			ctx.enqueueWork(() -> { if (CLIENT_HANDLER != null) CLIENT_HANDLER.accept(p); });
+		}
+	}
+
 	/** Rider to server: the move numbered {@code id} is applied; everything sent from now on starts there. */
 	public record TeleportAck(int entityId, int id) implements CustomPacketPayload {
 		public static final Type<TeleportAck> TYPE = new Type<>(ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rider_teleport_ack"));

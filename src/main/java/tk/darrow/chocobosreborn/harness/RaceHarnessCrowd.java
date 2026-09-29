@@ -221,8 +221,9 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		ticks++;
 		double tickMs = (System.nanoTime() - tickStart) / 1e6;
 		int[] kinds = overlapKinds(players0());
-		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d,%d,%d,%d,%d,%.3f%n", track().name(), ticks, tickMs,
-				session.fieldSize(), kinds[0] + kinds[1] + kinds[2], kinds[0], kinds[1], kinds[2], kinds[3] / 1000.0));
+		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d,%d,%d,%d,%d,%.3f,%d%n", track().name(), ticks, tickMs,
+				session.fieldSize(), kinds[0] + kinds[1] + kinds[2], kinds[0], kinds[1], kinds[2], kinds[3] / 1000.0,
+				ChocoboEntity.RIDER_NUDGES.get()));
 		if (ticks % 20 == 0) for (VirtualRider r : riders) {
 			r.flush();
 			r.trace(ticks);

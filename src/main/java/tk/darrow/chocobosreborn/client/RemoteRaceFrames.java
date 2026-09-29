@@ -124,6 +124,18 @@ public final class RemoteRaceFrames implements ChocoboEntity.RemoteDisplay {
 		PacketDistributor.sendToServer(new RaceMovePayloads.TeleportAck(p.entityId(), p.id()));
 	}
 
+	/** Server pushes applied to this client's bird (the harness reports it). */
+	public static final AtomicInteger NUDGES = new AtomicInteger();
+
+	/** The server found the bird this client drives inside another racer: slide it clear. */
+	public static void applyNudge(RaceMovePayloads.Nudge p) {
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level != null && mc.level.getEntity(p.entityId()) instanceof ChocoboEntity bird && bird.isControlledByLocalInstance()) {
+			bird.setDeltaMovement(bird.getDeltaMovement().add(p.dvx(), 0.0D, p.dvz()));
+			NUDGES.incrementAndGet();
+		}
+	}
+
 	public void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
 		clear();
 	}
