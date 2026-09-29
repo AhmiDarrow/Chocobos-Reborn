@@ -45,6 +45,19 @@ public final class RiderAuthority {
 	 * to vanilla's replay-and-refuse (for comparison runs, or if this ever misbehaves on a live server).
 	 */
 	public static final boolean ENABLED = !Boolean.getBoolean("chocobosreborn.vanillaRiderMovement");
+	/**
+	 * Race harness only: players whose client is simulated inside this server (they have no
+	 * network channel). Their race packets are handed over here instead of sent.
+	 */
+	public interface VirtualClients {
+		boolean isVirtual(ServerPlayer player);
+
+		void teleport(ServerPlayer player, RaceMovePayloads.Teleport teleport);
+
+		void frame(ServerPlayer player, RaceMovePayloads.Frame frame);
+	}
+
+	public static VirtualClients VIRTUAL;
 	/** Set by GameTests: mock connections have no channel, so teleports are recorded instead of sent. */
 	public static boolean testCapture;
 	public static RaceMovePayloads.Teleport lastCaptured;
@@ -104,6 +117,10 @@ public final class RiderAuthority {
 				bird.getYRot(), bird.getXRot());
 		if (testCapture) {
 			lastCaptured = payload;
+			return;
+		}
+		if (VIRTUAL != null && VIRTUAL.isVirtual(rider)) {
+			VIRTUAL.teleport(rider, payload);
 			return;
 		}
 		// A connection that never negotiated the channel (a GameTest mock player) cannot take it.

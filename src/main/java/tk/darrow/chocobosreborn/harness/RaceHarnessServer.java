@@ -34,7 +34,7 @@ public final class RaceHarnessServer {
 
     @SubscribeEvent
     public static void tick(ServerTickEvent.Post event) {
-        if (!"server".equals(System.getProperty("chocobosreborn.harness")) || complete) return;
+        if (!"server".equals(System.getProperty("chocobosreborn.harness")) || complete || RaceHarnessCrowd.active()) return;
         var server = event.getServer();
         ServerPlayer player = server.getPlayerList().getPlayers().stream()
                 .filter(p -> p.getGameProfile().getName().equals("LatencyRider")).findFirst().orElse(null);

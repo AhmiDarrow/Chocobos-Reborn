@@ -120,6 +120,33 @@ def client_report(path):
     return {"vanilla_corrections": corrections, "acknowledged_teleports": teleports}
 
 
+def crowd_report(folder):
+    """Server tick times of a crowded heat, and each simulated player's link and what it went through."""
+    ticks, riders = [], []
+    for path in glob.glob(os.path.join(folder, "**", "crowd-server.csv"), recursive=True):
+        for row in csv.reader(open(path, encoding="utf-8")):
+            try:
+                ticks.append(float(row[2]))
+            except (ValueError, IndexError):
+                continue
+    for path in glob.glob(os.path.join(folder, "**", "crowd-riders.csv"), recursive=True):
+        for row in csv.reader(open(path, encoding="utf-8")):
+            if len(row) >= 9:
+                riders.append({"name": row[0], "rtt_ms": row[1], "jitter_ms": row[2], "client_ticks": row[3],
+                               "teleports": row[4], "vanilla_corrections": row[5], "player_teleports": row[6],
+                               "frames": row[7], "playout_delay_ticks": row[8]})
+    if not ticks and not riders:
+        return None
+    return {
+        "server_ticks": len(ticks),
+        "tick_ms_p50": round(pct(ticks, 0.5), 2) if ticks else None,
+        "tick_ms_p99": round(pct(ticks, 0.99), 2) if ticks else None,
+        "tick_ms_max": round(max(ticks), 2) if ticks else None,
+        "ticks_over_50ms": sum(1 for t in ticks if t > 50),
+        "simulated_players": riders,
+    }
+
+
 def server_logs(folder):
     counts = {"move_refused": 0, "moved_wrongly": 0, "moved_too_quickly": 0}
     for log in glob.glob(os.path.join(folder, "**", "*.log"), recursive=True):
@@ -139,6 +166,9 @@ def main():
     ap.add_argument("--json", default="")
     args = ap.parse_args()
     report = {"clients": {}, "server": server_logs(args.folder)}
+    crowd = crowd_report(args.folder)
+    if crowd:
+        report["crowd"] = crowd
     for path in glob.glob(os.path.join(args.folder, "**", "motion-*.csv"), recursive=True):
         name = os.path.basename(path)[len("motion-"):-4]
         report["clients"].setdefault(name, {})["motion"] = motion_report(path)

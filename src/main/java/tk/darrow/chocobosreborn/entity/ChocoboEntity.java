@@ -700,6 +700,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return !squareProtected() && super.isPushable();
 	}
 
+	@Override
+	protected void pushEntities() {
+		if (mirrorOf == null) {
+			super.pushEntities();
+		}
+	}
+
 	// ------------------------------------------------------ racer contact
 
 	/** Pace loss from the last bump, fading (see {@link RacerContact.Slow}). */
@@ -728,6 +735,19 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	public static RemoteDisplay REMOTE_DISPLAY;
+
+	/**
+	 * Race harness only: this bird is a simulated rider's own client-side copy of {@code mirrorOf}
+	 * (never added to the level). It drives the way a rider's client would, ignores its server copy
+	 * when it looks at traffic or bumps, pushes nothing and sends no frames.
+	 */
+	@org.jetbrains.annotations.Nullable
+	public ChocoboEntity mirrorOf;
+
+	/** Whether {@code other} is a bird this one races against (not itself, nor, for a harness copy, its server twin). */
+	public boolean racesAgainst(ChocoboEntity other) {
+		return other != this && other != mirrorOf;
+	}
 	/** Beyond this a player is not tracking the bird anyway (view distance). */
 	private static final double FRAME_RANGE_SQ = 192.0D * 192.0D;
 
@@ -816,7 +836,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				? RacerContact.leadTicks(CLIENT_RTT_MS.getAsInt(), REMOTE_DISPLAY != null ? REMOTE_DISPLAY.behindTicks() : -1.0D) : 0;
 		double reach = RacerContact.REACH + 2.0D + lead * 0.5D;
 		List<ChocoboEntity> near = level().getEntitiesOfClass(ChocoboEntity.class,
-				getBoundingBox().inflate(reach, RacerContact.HEIGHT, reach), e -> e != this && e.contactSolid());
+				getBoundingBox().inflate(reach, RacerContact.HEIGHT, reach), e -> racesAgainst(e) && e.contactSolid());
 		if (!near.isEmpty()) {
 			List<RacerContact.Body> others = new ArrayList<>(near.size());
 			for (ChocoboEntity o : near) {
@@ -2046,18 +2066,22 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Every racing bird's position this tick, stamped with the tick, to the players near it (see RaceMovePayloads.Frame). */
 	private void broadcastRaceFrame() {
-		if (!(level() instanceof net.minecraft.server.level.ServerLevel server)) {
+		if (!(level() instanceof net.minecraft.server.level.ServerLevel server) || mirrorOf != null) {
 			return;
 		}
 		var frame = new tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame(getId(), (int) server.getGameTime(),
 				getX(), getY(), getZ(), getYRot(), yBodyRot, onGround());
 		Entity driver = getControllingPassenger();
+		var virtual = tk.darrow.chocobosreborn.race.RiderAuthority.VIRTUAL;
 		for (net.minecraft.server.level.ServerPlayer p : server.players()) {
-			if (p == driver || p.distanceToSqr(this) > FRAME_RANGE_SQ
-					|| !p.connection.hasChannel(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.TYPE)) {
+			if (p == driver || p.distanceToSqr(this) > FRAME_RANGE_SQ) {
 				continue;
 			}
-			net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, frame);
+			if (virtual != null && virtual.isVirtual(p)) {
+				virtual.frame(p, frame);
+			} else if (p.connection.hasChannel(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.TYPE)) {
+				net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, frame);
+			}
 		}
 	}
 

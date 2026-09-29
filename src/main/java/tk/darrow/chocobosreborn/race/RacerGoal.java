@@ -197,7 +197,7 @@ public class RacerGoal extends Goal {
 		if (ticks % 5 == 0) {
 			nearby = bird.level().getEntitiesOfClass(ChocoboEntity.class,
 					bird.getBoundingBox().inflate(TRAFFIC_RANGE, 2.0D, TRAFFIC_RANGE),
-					e -> e != bird && e.contactSolid());
+					e -> bird.racesAgainst(e) && e.contactSolid());
 		}
 		double follow = 1.0D;
 		if (!finished && bird.contactSolid()) {

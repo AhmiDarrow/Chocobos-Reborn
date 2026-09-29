@@ -21,6 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "build/latency"
 OUT = Path(os.environ["LATENCY_RESULTS"]) if os.environ.get("LATENCY_RESULTS") else BASE / "results"
 TRACK = "C_MEADOW"
+# --crowd N: N humans (this real client and N-1 simulated players, RaceHarnessCrowd); --field M: M birds in the heat
+CROWD = 0
+FIELD = 0
 UPSTREAM_HOST = os.environ.get("LATENCY_UPSTREAM_HOST", "127.0.0.1")
 UPSTREAM_PORT = int(os.environ.get("LATENCY_UPSTREAM_PORT", "25578"))
 
@@ -73,7 +76,9 @@ def runtime_env():
     temp = ROOT / "build/tmp/net"
     temp.mkdir(parents=True, exist_ok=True)
     env["JAVA_TOOL_OPTIONS"] = (env.get("JAVA_TOOL_OPTIONS", "") + ' -Djdk.net.unixdomain.tmpdir="' + str(temp) + '"'
-                               + " -Dchocobosreborn.harness.track=" + TRACK)
+                               + " -Dchocobosreborn.harness.track=" + TRACK
+                               + (" -Dchocobosreborn.harness.crowd=%d" % CROWD if CROWD > 1 else "")
+                               + (" -Dchocobosreborn.race.field=%d" % FIELD if FIELD > 0 else ""))
     return env
 
 
@@ -111,7 +116,7 @@ async def main():
         "server-ip=127.0.0.1\nserver-port=25578\nonline-mode=false\nlevel-name=latency-world\n"
         'level-type=minecraft:flat\ngenerator-settings={"layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}],"biome":"minecraft:plains"}\n'
         "spawn-protection=0\nview-distance=6\nsimulation-distance=6\n"
-        "max-players=2\nallow-flight=true\nmotd=Local latency harness\n")
+        "max-players=%d\nallow-flight=true\nmotd=Local latency harness\n" % max(2, CROWD + 1))
     (BASE / "client/options.txt").write_text(
         "onboardAccessibility:false\npauseOnLostFocus:false\ntutorialStep:none\n"
         "skipMultiplayerWarning:true\njoinedFirstServer:true\nrenderDistance:6\n"
@@ -198,7 +203,12 @@ async def main():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--track", default="C_MEADOW", help="RaceTrack enum name, e.g. C_SHORE or B_FORD")
-    TRACK = parser.parse_args().track.upper()
+    parser.add_argument("--crowd", type=int, default=0, help="Humans in one heat: this client plus simulated players")
+    parser.add_argument("--field", type=int, default=0, help="Birds in the heat (AI fill the rest); rows of six")
+    args = parser.parse_args()
+    TRACK = args.track.upper()
+    CROWD = args.crowd
+    FIELD = args.field
     if not TRACK.replace("_", "").isalnum():
         parser.error("track must be a RaceTrack enum name")
     asyncio.run(main())

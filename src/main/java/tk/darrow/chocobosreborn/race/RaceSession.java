@@ -42,7 +42,11 @@ public class RaceSession {
 	private static final int RUN_CAP_TICKS = 12000;
 	static final String NAME_TEIYO = "Teiyo";
 	static final String NAME_JOLO = "Jolo";
-	public static final int FIELD = 6;
+	/**
+	 * Birds in a heat. Six on every server; the race harness may set more with
+	 * {@code -Dchocobosreborn.race.field=N} (a bigger field lines up in rows, see RaceTrack.stallPos).
+	 */
+	public static final int FIELD = Math.max(1, Integer.getInteger("chocobosreborn.race.field", 6));
 
 	private final class Racer {
 		final UUID bird;

@@ -7,7 +7,7 @@ name: Race netcode
 # and publishes tools/analyze_smoothness.py reports for each.
 on:
   push:
-    branches: [racing-netcode]
+    branches: [racing-netcode, racing-netcode-crowd]
   workflow_dispatch:
 
 concurrency:
@@ -69,13 +69,26 @@ jobs:
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils > /dev/null
           pip install -q -r tools/requirements-latency.txt
           xvfb-run -a -s "-screen 0 1280x720x24" glxinfo -B | head -20
+      # The dedicated server always writes build/latency/results (LATENCY_RESULTS moves only the
+      # client's output), so each run starts it empty and is copied aside afterwards.
+      - name: Twenty birds - this client, nine simulated players, ten AI
+        run: |
+          mkdir -p out/crowd
+          rm -rf build/latency/results
+          xvfb-run -a -s "-screen 0 1280x720x24" python tools/latency_harness.py --track C_MEADOW --crowd 10 --field 20 \
+            || echo "::warning::crowd harness exited $? (${{ matrix.mode }})"
+          cp -r build/latency/results/. out/crowd/ 2>/dev/null || true
+          cp build/latency/server.log out/crowd/server.log 2>/dev/null || true
+          cp build/latency/client.log out/crowd/client.log 2>/dev/null || true
       - name: Single rider against five AI (baseline, 120 ms, 300 ms, jitter, bursts)
-        env:
-          LATENCY_RESULTS: ${{ github.workspace }}/out/single
         run: |
           mkdir -p out/single
+          rm -rf build/latency/results
           xvfb-run -a -s "-screen 0 1280x720x24" python tools/latency_harness.py --track C_MEADOW \
             || echo "::warning::single-rider harness exited $? (${{ matrix.mode }})"
+          cp -r build/latency/results/. out/single/ 2>/dev/null || true
+          cp build/latency/server.log out/single/server.log 2>/dev/null || true
+          cp build/latency/client.log out/single/client.log 2>/dev/null || true
       - name: Host and two delayed guests against three AI
         run: |
           xvfb-run -a -s "-screen 0 1280x720x24" python tools/paired_race_harness.py \
@@ -87,11 +100,13 @@ jobs:
           mkdir -p out/pair
           cp -r build/latency-pair/results/. out/pair/ 2>/dev/null || true
           for f in build/latency/*.log build/latency-pair/*.log; do [ -f "$f" ] && cp "$f" out/ ; done
+          python tools/analyze_smoothness.py out/crowd --json out/crowd-smoothness.json || true
           python tools/analyze_smoothness.py out/single --json out/single-smoothness.json || true
           python tools/analyze_smoothness.py out/pair --json out/pair-smoothness.json || true
           python tools/analyze_latency.py out/single > out/single-latency.txt 2>&1 || true
           {
             echo "## ${{ matrix.mode }}"
+            echo '### twenty birds: this client, nine simulated players, ten AI'; echo '```json'; cat out/crowd-smoothness.json 2>/dev/null; echo '```'
             echo '### single rider'; echo '```json'; cat out/single-smoothness.json 2>/dev/null; echo '```'
             echo '### host + two guests'; echo '```json'; cat out/pair-smoothness.json 2>/dev/null; echo '```'
             echo '### refused / corrected moves (server logs)'; echo '```'

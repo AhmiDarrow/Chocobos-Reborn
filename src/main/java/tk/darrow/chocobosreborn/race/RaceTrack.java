@@ -650,12 +650,34 @@ public enum RaceTrack {
 		return spline.nearestFineFrom(x - offsetX, z - offsetZ, coarse);
 	}
 
+	/** Stalls across the road; a bigger field lines up behind in rows of this many, in the same lanes. */
+	public static final int GRID_ROW = 6;
+	/** Blocks between one row of the grid and the next. */
+	public static final double GRID_ROW_SPACING = 4.0D;
+
 	public static double stallOffset(int stall, int total) {
+		if (total > GRID_ROW) {
+			return stallOffset(stall % GRID_ROW, GRID_ROW);   // every row uses the lanes of a full row
+		}
 		return (stall - (total - 1) / 2.0D) * STALL_SPACING;
 	}
 
+	/** Grid rows for a field of {@code total}: one for up to {@link #GRID_ROW}. */
+	public static int gridRows(int total) {
+		return Math.max(1, (total + GRID_ROW - 1) / GRID_ROW);
+	}
+
+	/**
+	 * Stall {@code stall} of {@code total}. Up to {@link #GRID_ROW} birds stand in one row across
+	 * the road just past the line; a bigger field lines up in rows behind the front one. The rows
+	 * are laid out from the back row just past the line forward, so every bird starts past it and
+	 * the lap count is untouched.
+	 */
 	public RacePoint stallPos(int stall, int total) {
-		return pointAtLane(0.02D, stallOffset(stall, total));
+		int rows = gridRows(total);
+		int row = stall / GRID_ROW;
+		double ahead = (rows - 1 - row) * GRID_ROW_SPACING / Math.max(1.0D, lapLength());
+		return pointAtLane(0.02D + ahead, stallOffset(stall, total));
 	}
 
 	/** Point at lane {@code offset} blocks from the centre line: positive = inside the loop, negative = outside. */
