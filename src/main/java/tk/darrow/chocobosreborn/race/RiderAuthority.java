@@ -42,6 +42,11 @@ public final class RiderAuthority {
 	public static final double STEP_CAP = 10.0D;
 	static final int RESEND_TICKS = 20;
 	static final int GIVE_UP_TICKS = 200;
+	/**
+	 * Off with {@code -Dchocobosreborn.vanillaRiderMovement=true} on the server: riders' birds go back
+	 * to vanilla's replay-and-refuse (for comparison runs, or if this ever misbehaves on a live server).
+	 */
+	public static final boolean ENABLED = !Boolean.getBoolean("chocobosreborn.vanillaRiderMovement");
 	/** Set by GameTests: mock connections have no channel, so teleports are recorded instead of sent. */
 	public static boolean testCapture;
 	public static RaceMovePayloads.Teleport lastCaptured;
@@ -80,6 +85,9 @@ public final class RiderAuthority {
 
 	/** The server moved {@code bird} (already at its new place): tell its rider, and wait for the answer. */
 	public static void teleport(ServerPlayer rider, ChocoboEntity bird) {
+		if (!ENABLED) {
+			return;
+		}
 		State s = state(rider, bird);
 		s.awaiting = ++s.nextId;
 		if (s.awaiting == 0) {
