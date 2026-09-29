@@ -1302,6 +1302,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public void onAddedToLevel() {
 		super.onAddedToLevel();
+		if (level().isClientSide && REMOTE_DISPLAY != null && !isControlledByLocalInstance() && REMOTE_DISPLAY.place(this)) {
+			// A racer coming back into tracking range (vanilla drops it at the edge of the view distance and
+			// re-adds it) spawns where the server has it now, ticks ahead of the delayed field. It already has
+			// frames: stand it where they say, old position too, so it is not drawn lurching forward and back.
+			setOldPosAndRot();
+			yBodyRotO = yBodyRot;
+			yHeadRotO = yHeadRot = yBodyRot;
+			lerpSteps = 0;
+		}
 		if (level() instanceof ServerLevel sl) {
 			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
 			ledgerUpdate();

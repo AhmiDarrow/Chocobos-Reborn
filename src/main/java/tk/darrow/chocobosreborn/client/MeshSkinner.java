@@ -25,6 +25,11 @@ final class MeshSkinner {
 
 	private final float[] poseRows = new float[12], normalRows = new float[9];
 
+	/** The composed 3x4 position matrices, per bone (the first {@code nb * 12} floats); GpuBirds sends them to the shader. */
+	float[] composed() {
+		return posMat;
+	}
+
 	/** Fold a JOML pose into the sampled bone matrices. */
 	void compose(float[] bone, int nb, Matrix4f pose, Matrix3f normal) {
 		for (int i = 0; i < 3; i++) {

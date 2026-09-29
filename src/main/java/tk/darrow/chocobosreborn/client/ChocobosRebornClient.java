@@ -15,6 +15,7 @@ public final class ChocobosRebornClient {
 		modBus.addListener(this::renderers);
 		modBus.addListener(this::screens);
 		modBus.addListener(SquareSky::registerShaders);
+		modBus.addListener(GpuBirds::registerShaders);
 		modBus.addListener((net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent event) ->
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);

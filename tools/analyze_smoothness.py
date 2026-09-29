@@ -13,7 +13,10 @@ what the rider saw. For a racer the step along the road changes gradually (speed
 much a tick's horizontal step differs from the average of its neighbours, relative to the bird's speed: a
 steady bird scores ~0, a bird that stalls one tick and leaps the next scores ~1. Stalls are ticks a moving
 bird did not move; leaps are steps over twice the neighbouring average. Teleports (steps over 16 blocks) are
-excluded. Vertical pops are ticks a bird rose or fell more than 0.3 blocks (step-ups shown in one tick).
+excluded. Vertical pops are ticks a bird rose or fell more than 0.3 blocks out of line with the ticks either
+side (a step-up shown in one tick); a jump arc or an eased step moves that much per tick smoothly and is only
+counted in vertical_fast_ticks. Reversals are ticks a moving bird was drawn going backwards (the next step
+points against the last), as when it is re-added at the edge of tracking range ahead of the delayed field.
 """
 import argparse
 import csv
@@ -42,19 +45,33 @@ def motion_report(path):
             by_bird[(row[0], int(row[2]))].append((int(row[1]), float(row[3]), float(row[4]), float(row[5])))
         except ValueError:
             continue
-    judder, stalls, leaps, samples, pops = [], 0, 0, 0, 0
+    judder, stalls, leaps, samples, pops, fast, reversals = [], 0, 0, 0, 0, 0, 0
     for rows in by_bird.values():
         rows.sort()
-        steps = []
+        steps, rises, moves = [], [], []
         for (t0, x0, y0, z0), (t1, x1, y1, z1) in zip(rows, rows[1:]):
             if t1 - t0 != 1:
                 steps.append(None)
+                rises.append(None)
+                moves.append(None)
                 continue
             # along the road only: a climb or a drop is Minecraft's own step physics, counted as pops below
             d = math.hypot(x1 - x0, z1 - z0)
             steps.append(None if d > 16 else d)
-            if abs(y1 - y0) > 0.3 and d <= 16:
+            rises.append(None if d > 16 else y1 - y0)
+            moves.append(None if d > 16 else (x1 - x0, z1 - z0))
+        for i, dy in enumerate(rises):
+            if dy is None or abs(dy) <= 0.3:
+                continue
+            fast += 1
+            near = [rises[j] for j in (i - 1, i + 1) if 0 <= j < len(rises) and rises[j] is not None]
+            if not any(abs(dy - n) < 0.25 for n in near):
                 pops += 1
+        for a, b in zip(moves, moves[1:]):
+            if a is None or b is None:
+                continue
+            if math.hypot(*a) > 0.15 and math.hypot(*b) > 0.15 and a[0] * b[0] + a[1] * b[1] < 0:
+                reversals += 1
         for i in range(1, len(steps) - 1):
             a, b, c = steps[i - 1], steps[i], steps[i + 1]
             if a is None or b is None or c is None:
@@ -77,6 +94,8 @@ def motion_report(path):
         "stalls_per_1000": round(1000 * stalls / samples, 2) if samples else None,
         "leaps_per_1000": round(1000 * leaps / samples, 2) if samples else None,
         "vertical_pops_per_1000": round(1000 * pops / samples, 2) if samples else None,
+        "vertical_fast_ticks_per_1000": round(1000 * fast / samples, 2) if samples else None,
+        "reversals_per_1000": round(1000 * reversals / samples, 2) if samples else None,
     }
 
 

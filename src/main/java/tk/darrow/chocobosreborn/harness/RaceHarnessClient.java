@@ -21,7 +21,7 @@ import tk.darrow.chocobosreborn.race.RacerLine;
 /** Drives only ordinary client movement input and yaw; physics and packets remain real. */
 @EventBusSubscriber(modid = ChocobosReborn.MOD_ID, value = Dist.CLIENT)
 public final class RaceHarnessClient {
-    private static int ticks, run;
+    private static int ticks, run, heldTicks;
     private static boolean held;
     private static double hint = Double.NaN;
     /** This bot's lane, taken from its grid stall, so three bots do not pile onto the centre line. */
@@ -110,7 +110,20 @@ public final class RaceHarnessClient {
             return;
         }
         if (bird.raceHeld()) {
-            if (!held) run++;
+            if (!held) {
+                run++;
+                heldTicks = 0;
+            }
+            heldTicks++;
+            // the field stands still on the grid: one frame on the CPU path, the next on the graphics card
+            if (heldTicks == 40) {
+                tk.darrow.chocobosreborn.client.GpuBirds.forceCpu = true;
+            } else if (heldTicks == 42) {
+                Screenshot.grab(mc.gameDirectory, "grid-" + run + "-cpu.png", mc.getMainRenderTarget(), c -> {});
+                tk.darrow.chocobosreborn.client.GpuBirds.forceCpu = false;
+            } else if (heldTicks == 44) {
+                Screenshot.grab(mc.gameDirectory, "grid-" + run + "-gpu.png", mc.getMainRenderTarget(), c -> {});
+            }
             ticks = 0;
             lastSampleNanos = 0;
             hint = Double.NaN;

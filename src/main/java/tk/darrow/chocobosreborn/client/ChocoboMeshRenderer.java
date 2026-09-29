@@ -206,8 +206,20 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		ResourceLocation tex = texture(e, mesh);
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();
-		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
+		// on the graphics card unless the bird glows (the outline pass reads buffered quads), is a GUI
+		// preview (drawn outside the level's matrices), or the path is off (see GpuBirds)
+		boolean gpu = !quads && e.isAddedToLevel() && GpuBirds.usable(nb);
+		VertexConsumer vc = null;
 		for (WhiskerMesh.Part part : m.parts(lodLevel(e), e.male())) {
+			if (gpu && part.emissiveTri.length == 0
+					&& GpuBirds.draw(part, RenderType.entityCutoutNoCull(tex), skinner.composed(), nb, hidden,
+							PLUMAGE[breed], YELLOW, light, overlay)) {
+				VERTICES.add(part.triCount * 3L);
+				continue;
+			}
+			if (vc == null) {
+				vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
+			}
 			long t0 = System.nanoTime();
 			skinner.skin(part, hidden, anyHidden);
 			long t1 = System.nanoTime();
