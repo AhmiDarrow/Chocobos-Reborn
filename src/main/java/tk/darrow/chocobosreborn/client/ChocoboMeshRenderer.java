@@ -116,6 +116,10 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	/** CPU time spent skinning and emitting birds, and how many were drawn (the race harness reports them). */
 	public static final java.util.concurrent.atomic.LongAdder RENDER_NANOS = new java.util.concurrent.atomic.LongAdder();
 	public static final java.util.concurrent.atomic.LongAdder RENDERED = new java.util.concurrent.atomic.LongAdder();
+	/** Of RENDER_NANOS: skinning (positions and normals) and vertex output; vertices written (the harness reports them). */
+	public static final java.util.concurrent.atomic.LongAdder SKIN_NANOS = new java.util.concurrent.atomic.LongAdder();
+	public static final java.util.concurrent.atomic.LongAdder EMIT_NANOS = new java.util.concurrent.atomic.LongAdder();
+	public static final java.util.concurrent.atomic.LongAdder VERTICES = new java.util.concurrent.atomic.LongAdder();
 
 	@Override
 	public void render(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
@@ -204,8 +208,13 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		boolean quads = e.isCurrentlyGlowing();
 		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
 		for (WhiskerMesh.Part part : m.parts(lodLevel(e), e.male())) {
+			long t0 = System.nanoTime();
 			skinner.skin(part, hidden, anyHidden);
+			long t1 = System.nanoTime();
 			emit(vc, part, colors(part, breed), light, overlay, quads);
+			SKIN_NANOS.add(t1 - t0);
+			EMIT_NANOS.add(System.nanoTime() - t1);
+			VERTICES.add(part.triCount * (quads ? 4L : 3L));
 			if (part.emissiveTri.length > 0) {
 				emitGlow(buf.getBuffer(RenderType.eyes(tex)), part, glow(part));
 			}

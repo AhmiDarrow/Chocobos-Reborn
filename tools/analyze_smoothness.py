@@ -82,6 +82,7 @@ def motion_report(path):
 
 def frames_report(path):
     p50, p99, worst, over33, frames, delay, bird_ms, birds, overlap = [], [], 0.0, 0, 0, [], [], [], 0
+    skin_ms, emit_ms, verts = [], [], []
     for row in csv.reader(open(path, encoding="utf-8")):
         if len(row) < 7:
             continue
@@ -99,6 +100,10 @@ def frames_report(path):
                 birds.append(float(row[9]))
             if len(row) > 10:
                 overlap += int(row[10])
+            if len(row) > 13:
+                skin_ms.append(float(row[11]))
+                emit_ms.append(float(row[12]))
+                verts.append(float(row[13]))
         except ValueError:
             continue
     return {
@@ -113,6 +118,9 @@ def frames_report(path):
         "bird_render_cpu_ms_per_frame_max_window": round(max(bird_ms), 3) if bird_ms else None,
         "birds_drawn_per_frame_median": round(statistics.median(birds), 1) if birds else None,
         "own_bird_overlapping_another_ticks": overlap,
+        "bird_skin_cpu_ms_per_frame_median": round(statistics.median(skin_ms), 3) if skin_ms else None,
+        "bird_emit_cpu_ms_per_frame_median": round(statistics.median(emit_ms), 3) if emit_ms else None,
+        "bird_vertices_per_frame_median": round(statistics.median(verts)) if verts else None,
     }
 
 

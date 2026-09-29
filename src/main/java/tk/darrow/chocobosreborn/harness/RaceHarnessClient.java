@@ -254,10 +254,13 @@ public final class RaceHarnessClient {
                     long birdNanos = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDER_NANOS.sumThenReset();
                     long birds = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDERED.sumThenReset();
                     Files.writeString(out.resolve("frames-" + name + ".csv"), String.format(Locale.ROOT,
-                            "%s,%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.3f,%.1f,%d%n", track.name(), ticks, n,
+                            "%s,%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.3f,%.1f,%d,%.3f,%.3f,%.0f%n", track.name(), ticks, n,
                             sorted.get(n / 2) / 1e6, sorted.get(Math.min(n - 1, (int) (n * 0.99))) / 1e6, sorted.get(n - 1) / 1e6,
                             over33, tk.darrow.chocobosreborn.client.RemoteRaceFrames.INSTANCE.delayTicks(),
-                            birdNanos / 1e6 / n, birds / (double) n, overlapTicks),
+                            birdNanos / 1e6 / n, birds / (double) n, overlapTicks,
+                            tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.SKIN_NANOS.sumThenReset() / 1e6 / n,
+                            tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.EMIT_NANOS.sumThenReset() / 1e6 / n,
+                            tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.VERTICES.sumThenReset() / (double) n),
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     frameNanos.clear();
                     overlapTicks = 0;
