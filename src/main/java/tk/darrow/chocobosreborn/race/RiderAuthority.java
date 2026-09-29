@@ -71,7 +71,18 @@ public final class RiderAuthority {
 		double budget = PER_TICK * BANK_TICKS;
 		long budgetTick = Long.MIN_VALUE;
 		int refused;
+		/** Vehicle packets received: a rider's client sends exactly one each of its ticks, so this counts its ticks. */
+		long packets;
+		/** (packet count, server tick - packet count) for recent packets; the smallest is the fastest path. */
+		final java.util.ArrayDeque<long[]> offsets = new java.util.ArrayDeque<>();
+		long offset = Long.MAX_VALUE;
+		long lastStamp = Long.MIN_VALUE;
+		/** Accepted positions stamped with the rider's own timeline, waiting for this tick's frame broadcast. */
+		final java.util.ArrayDeque<RaceMovePayloads.Frame> stamped = new java.util.ArrayDeque<>();
 	}
+
+	/** Offsets remembered for the rider timeline (packets, one a client tick: five seconds). */
+	static final int STAMP_WINDOW = 100;
 
 	private static final Map<UUID, State> STATES = new HashMap<>();
 
@@ -84,8 +95,75 @@ public final class RiderAuthority {
 			s.awaiting = 0;
 			s.budget = PER_TICK * BANK_TICKS;
 			s.budgetTick = Long.MIN_VALUE;
+			s.packets = 0;
+			s.offsets.clear();
+			s.offset = Long.MAX_VALUE;
+			s.lastStamp = Long.MIN_VALUE;
+			s.stamped.clear();
 		}
 		return s;
+	}
+
+	/**
+	 * A vehicle packet from {@code rider} arrived (taken or not): one tick of its client. The fastest
+	 * packets over the last {@link #STAMP_WINDOW} set how the rider's ticks line up with the server's.
+	 */
+	public static void packetArrived(ServerPlayer rider, ChocoboEntity bird) {
+		State s = state(rider, bird);
+		s.packets++;
+		long sample = bird.level().getGameTime() - s.packets;
+		s.offsets.addLast(new long[] { s.packets, sample });
+		boolean dropped = false;
+		while (s.offsets.size() > STAMP_WINDOW) {
+			dropped |= s.offsets.removeFirst()[1] == s.offset;
+		}
+		if (sample < s.offset) {
+			s.offset = sample;
+		} else if (dropped) {
+			long min = Long.MAX_VALUE;
+			for (long[] o : s.offsets) min = Math.min(min, o[1]);
+			s.offset = min;
+		}
+	}
+
+	/**
+	 * The rider's move was taken: remember where the bird stood on the rider's own timeline. A rider's
+	 * packets reach the server in bunches (none one tick, two the next); stamped by the server's tick
+	 * the bird would stutter for everyone watching, stamped by the rider's tick it moves as it was driven.
+	 */
+	public static void accepted(ServerPlayer rider, ChocoboEntity bird) {
+		State s = state(rider, bird);
+		if (s.offset == Long.MAX_VALUE) {
+			return;
+		}
+		long stamp = s.packets + s.offset;
+		if (stamp <= s.lastStamp) {
+			return;
+		}
+		s.lastStamp = stamp;
+		s.stamped.addLast(new RaceMovePayloads.Frame(bird.getId(), (int) stamp, bird.getX(), bird.getY(), bird.getZ(),
+				bird.getYRot(), bird.getYRot(), bird.onGround()));
+		while (s.stamped.size() > 40) {
+			s.stamped.removeFirst();
+		}
+	}
+
+	/**
+	 * This tick's frames for a bird {@code rider} drives: its stamped positions since the last broadcast
+	 * (none, one or several). Null when the rider's timeline is not known (then the server's tick is used).
+	 */
+	@org.jetbrains.annotations.Nullable
+	public static java.util.List<RaceMovePayloads.Frame> drainStamped(ServerPlayer rider, ChocoboEntity bird) {
+		if (!ENABLED) {
+			return null;
+		}
+		State s = STATES.get(rider.getUUID());
+		if (s == null || s.entityId != bird.getId() || s.lastStamp == Long.MIN_VALUE) {
+			return null;
+		}
+		java.util.List<RaceMovePayloads.Frame> out = new java.util.ArrayList<>(s.stamped);
+		s.stamped.clear();
+		return out;
 	}
 
 	/** A teleport of this rider's bird is unanswered: drop their packet, it was sent from where the bird was. */
@@ -207,7 +285,7 @@ public final class RiderAuthority {
 		AABB box = d.makeBoundingBox(x, y, z);
 		double top = Math.max(box.minY + lift + 0.1D, box.maxY - 0.3D);
 		AABB core = new AABB(box.minX + 0.3D, box.minY + lift, box.minZ + 0.3D, box.maxX - 0.3D, top, box.maxZ - 0.3D);
-		return !level.noCollision(bird, core);
+		return !level.noBlockCollision(bird, core);   // blocks only: another racer is not a wall to pass through
 	}
 
 	/** Resend an unanswered teleport each second; give up after ten (the rider left or runs another build). */

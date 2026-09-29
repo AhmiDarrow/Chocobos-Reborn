@@ -60,8 +60,17 @@ public final class RacerRecovery {
 	 * turning it aside at the top dropped it back down the face).
 	 */
 	public Mode step(double forwardBlocks, boolean climbing) {
+		return step(forwardBlocks, climbing, false);
+	}
+
+	/**
+	 * One tick, {@code inTraffic} when the bird is held up by another racer (racers are solid to
+	 * each other): that is not being stuck on the road, and backing off a wall would not help. The
+	 * caller stops passing it on after a while, so two birds can never pin each other for good.
+	 */
+	public Mode step(double forwardBlocks, boolean climbing, boolean inTraffic) {
 		travelled += forwardBlocks;
-		if (climbing) {
+		if (climbing || inTraffic) {
 			since = 0;
 			mode = Mode.RACE;
 			modeTicks = 0;

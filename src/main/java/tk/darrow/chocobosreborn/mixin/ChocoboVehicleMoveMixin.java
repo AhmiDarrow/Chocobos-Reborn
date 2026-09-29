@@ -65,6 +65,7 @@ public abstract class ChocoboVehicleMoveMixin {
 			return;
 		}
 		ci.cancel();
+		RiderAuthority.packetArrived(this.player, bird);
 		if (this.updateAwaitingTeleport() || RiderAuthority.awaiting(this.player, bird)) {
 			// sent before the client had its own teleport or the bird's: dropped, never answered with a correction
 			return;
@@ -81,7 +82,9 @@ public abstract class ChocoboVehicleMoveMixin {
 			refuse(bird, refused, fx, fy, fz, tx, ty, tz);
 			return;
 		}
-		boolean wasClear = level.noCollision(bird, bird.getBoundingBox().deflate(0.0625D));
+		// blocks only: racers are solid to each other (ChocoboEntity.canCollideWith), and the client
+		// sees them where they were a moment ago, so a bump is never a reason to refuse a move
+		boolean wasClear = level.noBlockCollision(bird, bird.getBoundingBox().deflate(0.0625D));
 		boolean landedBelow = bird.verticalCollisionBelow;
 		if (bird.onClimbable()) {
 			bird.resetFallDistance();
@@ -91,7 +94,7 @@ public abstract class ChocoboVehicleMoveMixin {
 		bird.move(MoverType.PLAYER, new Vec3(tx - fx, RaceScoring.vehicleValidationY(dy), tz - fz));
 		bird.absMoveTo(tx, ty, tz, yRot, xRot);
 		this.resyncPlayerWithVehicle(bird);
-		if (wasClear && !level.noCollision(bird, bird.getBoundingBox().deflate(0.0625D))) {
+		if (wasClear && !level.noBlockCollision(bird, bird.getBoundingBox().deflate(0.0625D))) {
 			bird.absMoveTo(fx, fy, fz, yRot, xRot);
 			this.resyncPlayerWithVehicle(bird);
 			refuse(bird, "inside a block", fx, fy, fz, tx, ty, tz);
@@ -107,6 +110,7 @@ public abstract class ChocoboVehicleMoveMixin {
 		this.vehicleLastGoodX = bird.getX();
 		this.vehicleLastGoodY = bird.getY();
 		this.vehicleLastGoodZ = bird.getZ();
+		RiderAuthority.accepted(this.player, bird);
 	}
 
 	private void refuse(ChocoboEntity bird, String why, double fx, double fy, double fz, double tx, double ty, double tz) {

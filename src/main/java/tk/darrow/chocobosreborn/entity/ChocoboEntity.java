@@ -707,6 +707,23 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 	}
 
+	/**
+	 * Racers are solid to each other: a bird cannot move into another racer's body. This is
+	 * vanilla's own movement collision (the way a boat is solid), built from the moving entity's
+	 * {@code canCollideWith}: on a rider's client against the birds it sees, on the server for the
+	 * field. Only bird against bird, and only while both are solid for contact (a live heat, not
+	 * held or ghosted; outside heats, ridden birds): a player on foot is never blocked by one, and a
+	 * set-back bird stays a ghost until it is clear. RacerContact still adds the bump itself.
+	 */
+	@Override
+	public boolean canCollideWith(Entity other) {
+		if (other instanceof ChocoboEntity o && racesAgainst(o) && contactSolid() && o.contactSolid()
+				&& !isPassengerOfSameVehicle(o)) {
+			return true;
+		}
+		return super.canCollideWith(other);
+	}
+
 	// ------------------------------------------------------ racer contact
 
 	/** Pace loss from the last bump, fading (see {@link RacerContact.Slow}). */
@@ -2069,18 +2086,33 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (!(level() instanceof net.minecraft.server.level.ServerLevel server) || mirrorOf != null) {
 			return;
 		}
-		var frame = new tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame(getId(), (int) server.getGameTime(),
-				getX(), getY(), getZ(), getYRot(), yBodyRot, onGround());
 		Entity driver = getControllingPassenger();
+		// a rider's bird moves on the rider's own timeline (RiderAuthority.accepted); anything else on the server's
+		java.util.List<tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame> frames =
+				driver instanceof net.minecraft.server.level.ServerPlayer rider
+						? tk.darrow.chocobosreborn.race.RiderAuthority.drainStamped(rider, this) : null;
+		if (frames == null) {
+			frames = java.util.List.of(new tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame(getId(), (int) server.getGameTime(),
+					getX(), getY(), getZ(), getYRot(), yBodyRot, onGround()));
+		}
+		if (frames.isEmpty()) {
+			return;
+		}
 		var virtual = tk.darrow.chocobosreborn.race.RiderAuthority.VIRTUAL;
 		for (net.minecraft.server.level.ServerPlayer p : server.players()) {
 			if (p == driver || p.distanceToSqr(this) > FRAME_RANGE_SQ) {
 				continue;
 			}
-			if (virtual != null && virtual.isVirtual(p)) {
-				virtual.frame(p, frame);
-			} else if (p.connection.hasChannel(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.TYPE)) {
-				net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, frame);
+			boolean simulated = virtual != null && virtual.isVirtual(p);
+			if (!simulated && !p.connection.hasChannel(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame.TYPE)) {
+				continue;
+			}
+			for (var frame : frames) {
+				if (simulated) {
+					virtual.frame(p, frame);
+				} else {
+					net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, frame);
+				}
 			}
 		}
 	}
@@ -2109,6 +2141,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// this side simulates the bird (the early return above takes remote birds); ridden birds
 			// bump each other outside heats too, since vanilla never pushes a vehicle
 			applyRacerContact();
+			slideOffRacer();
 		}
 		ChocoboColor c = color();
 		Player player = getControllingPassenger() instanceof Player p ? p : null;
@@ -2168,14 +2201,91 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 */
 	@Override
 	public void move(net.minecraft.world.entity.MoverType type, Vec3 movement) {
-		if ((type == net.minecraft.world.entity.MoverType.SELF || type == net.minecraft.world.entity.MoverType.PLAYER)
-				&& !noPhysics && getControllingPassenger() instanceof Player) {
+		boolean own = type == net.minecraft.world.entity.MoverType.SELF || type == net.minecraft.world.entity.MoverType.PLAYER;
+		if (own && !noPhysics && getControllingPassenger() instanceof Player) {
 			boolean ground = RaceScoring.riderStepGround(true, onGround(), hasFooting());
 			if (ground != onGround()) {
 				setOnGround(ground);
 			}
 		}
 		super.move(type, movement);
+		if (own) {
+			noteBlocker(movement);
+		}
+	}
+
+	/** The racer this bird ran into on its last move (racers are solid to each other), or null. */
+	@org.jetbrains.annotations.Nullable
+	private ChocoboEntity blockingRacer;
+	/** Its last move was stopped by terrain (a block), not only by another bird. */
+	private boolean blockedByTerrain;
+
+	/**
+	 * After a move that was stopped sideways: was it a block or another racer? A tenth of a block
+	 * ahead, lifted off the floor, is where the bird was going. The racing AI hops a block edge but
+	 * never a bird ({@link tk.darrow.chocobosreborn.race.RacerGoal}).
+	 */
+	private void noteBlocker(Vec3 movement) {
+		blockingRacer = null;
+		blockedByTerrain = false;
+		if (!horizontalCollision) {
+			return;
+		}
+		double length = Math.hypot(movement.x, movement.z);
+		double dx, dz;
+		if (length > 1.0E-4D) {
+			dx = movement.x / length;
+			dz = movement.z / length;
+		} else {
+			float yaw = getYRot() * ((float) Math.PI / 180F);
+			dx = -Mth.sin(yaw);
+			dz = Mth.cos(yaw);
+		}
+		net.minecraft.world.phys.AABB probe = getBoundingBox().move(dx * 0.1D, 0.01D, dz * 0.1D);
+		blockedByTerrain = !level().noBlockCollision(this, probe);
+		for (Entity o : level().getEntities(this, probe, e -> e instanceof ChocoboEntity && canCollideWith(e))) {
+			blockingRacer = (ChocoboEntity) o;
+			break;
+		}
+	}
+
+	@org.jetbrains.annotations.Nullable
+	public ChocoboEntity blockingRacer() {
+		return blockingRacer;
+	}
+
+	/** Sideways push a tick off another racer's back. */
+	static final double SLIDE_OFF = 0.12D;
+
+	/**
+	 * Racers are solid all round, so a bird can come down on another's back (a hop, a fall off a
+	 * ridge). It never rides there: resting on a racer with no block under it, it is pushed off
+	 * sideways, away from that bird's middle, the way one bubble rolls off another.
+	 */
+	private void slideOffRacer() {
+		net.minecraft.world.phys.AABB feet = getBoundingBox();
+		net.minecraft.world.phys.AABB below = new net.minecraft.world.phys.AABB(feet.minX + 0.05D, feet.minY - 0.08D, feet.minZ + 0.05D,
+				feet.maxX - 0.05D, feet.minY, feet.maxZ - 0.05D);
+		if (!level().noBlockCollision(this, below)) {
+			return;   // standing on rock (maybe beside a bird): nothing to slide off
+		}
+		for (Entity o : level().getEntities(this, below, e -> e instanceof ChocoboEntity && canCollideWith(e))) {
+			double dx = getX() - o.getX(), dz = getZ() - o.getZ();
+			double d = Math.hypot(dx, dz);
+			if (d < 1.0E-3D) {
+				float yaw = getYRot() * ((float) Math.PI / 180F);   // dead centre: off to the side it faces
+				dx = Mth.cos(yaw);
+				dz = Mth.sin(yaw);
+				d = 1.0D;
+			}
+			Vec3 v = getDeltaMovement();
+			setDeltaMovement(v.x + dx / d * SLIDE_OFF, v.y, v.z + dz / d * SLIDE_OFF);
+			return;
+		}
+	}
+
+	public boolean blockedByTerrain() {
+		return blockedByTerrain;
 	}
 
 	/** Something solid (or water a water bird stands on) within {@link RaceScoring#FOOTING_PROBE} under the feet. */
@@ -2202,9 +2312,24 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public boolean onClimbable() {
 		boolean climbs = color().climb(), racing = racing();
-		// onRidge is only worked out for a climber in a race that is pressed on something
-		return RaceScoring.mayClimb(climbs, horizontalCollision, racing, climbs && racing && horizontalCollision && onRidge())
+		// a climber climbs rock, never another bird: racers are solid, and pressed against one it is not a wall
+		boolean againstRock = horizontalCollision && climbs && againstTerrain();
+		// onRidge is only worked out for a climber in a race that is pressed on rock
+		return RaceScoring.mayClimb(climbs, againstRock, racing, againstRock && racing && onRidge())
 				|| super.onClimbable();
+	}
+
+	/**
+	 * A block right in front of the bird: where its last move was going, or, when it barely moved
+	 * sideways (a climb is mostly straight up), where it faces.
+	 */
+	private boolean againstTerrain() {
+		if (blockedByTerrain) {
+			return true;
+		}
+		float yaw = getYRot() * ((float) Math.PI / 180F);
+		net.minecraft.world.phys.AABB probe = getBoundingBox().move(-Mth.sin(yaw) * 0.1D, 0.01D, Mth.cos(yaw) * 0.1D);
+		return !level().noBlockCollision(this, probe);
 	}
 
 	/** Progress hint for {@link #onRidge}, so a climber pressed on a wall does not scan the whole lap each tick. */

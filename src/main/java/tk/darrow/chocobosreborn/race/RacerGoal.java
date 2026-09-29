@@ -77,6 +77,9 @@ public class RacerGoal extends Goal {
 	private final RacerRecovery recovery = new RacerRecovery();
 	/** Pace while re-aiming or backing off a wall. */
 	private static final double RECOVER_PACE = 0.5D;
+	/** Ticks pressed against another racer after which it counts as stuck after all (two birds pinning each other). */
+	static final int TRAFFIC_PATIENCE = 60;
+	private int contactTicks;
 	private List<ChocoboEntity> nearby = List.of();
 
 	public RacerGoal(ChocoboEntity bird, RaceTrack track, double lane, RacerProfile profile) {
@@ -204,6 +207,29 @@ public class RacerGoal extends Goal {
 			follow = traffic(t, lane);
 			lane = trafficLane;
 		}
+		// --- solid contact: racers are solid to each other, and a hop never clears a bird. Pressed
+		// against one ahead: hold its pace and go round it on the side with room. Side by side: give
+		// it a lane. (A bird pushing from behind is its rider's problem.)
+		ChocoboEntity pressing = finished ? null : bird.blockingRacer();
+		if (pressing != null) {
+			double ot = track.progressAt(pressing.getX(), pressing.getZ(), t);
+			double oLane = laneOf(ot, pressing.getX(), pressing.getZ());
+			double myLane = laneOf(t, bird.getX(), bird.getZ());
+			double ahead = RacerLine.blocksAhead(t, ot, track.lapLength());
+			if (ahead > ALONGSIDE * 0.5D) {
+				if (passTicks == 0) {
+					passSide = RacerLine.passSide(myLane, oLane);
+					passTicks = PASS_TICKS;
+				}
+				double mySpeed = Math.max(0.05D, bird.getDeltaMovement().horizontalDistance());
+				follow = Math.min(follow, RacerLine.followScale(mySpeed, Math.hypot(pressing.contactVx(), pressing.contactVz()), ahead));
+			} else if (ahead > -ALONGSIDE * 0.5D) {
+				lane = myLane + (myLane >= oLane ? 1.0D : -1.0D) * RacerLine.PASS_OFFSET * 0.5D;
+			}
+			contactTicks++;
+		} else {
+			contactTicks = 0;
+		}
 		if (finished) {
 			lane = RacerLine.PARK_LANE;   // out of the racing line: the riders behind are still racing
 		}
@@ -244,7 +270,8 @@ public class RacerGoal extends Goal {
 			recovery.reset();
 			mode = RacerRecovery.Mode.RACE;
 		} else {
-			mode = recovery.step(forward, bird.onClimbable() && bird.horizontalCollision && bird.getDeltaMovement().y > 0.0D);
+			mode = recovery.step(forward, bird.onClimbable() && bird.horizontalCollision && bird.getDeltaMovement().y > 0.0D,
+					pressing != null && contactTicks < TRAFFIC_PATIENCE);
 		}
 		double myLane = track.laneAt(t, bird.getX(), bird.getZ());
 		double behind = track.openingBehind(t, myLane, RacerRecovery.BACK_BLOCKS);
@@ -300,7 +327,8 @@ public class RacerGoal extends Goal {
 				le.setYHeadRot(bird.getYRot());
 			}
 		}
-		if (bird.horizontalCollision && bird.onGround()) {
+		// hop a block edge; never a bird (it would only bounce, or land on its back)
+		if (bird.horizontalCollision && bird.onGround() && (bird.blockedByTerrain() || bird.blockingRacer() == null)) {
 			bird.getJumpControl().jump();
 		}
 		if (!layout.onCourse(bird.getX(), bird.getZ()) && bird.tickCount % 10 == 0) {

@@ -283,9 +283,10 @@ public class FieldHeatGameTests {
 
 	private static String describe(RaceTrack track, RaceCourseLayout layout, Bird b, double progress, ServerLevel level) {
 		ChocoboEntity e = b.e;
-		return String.format(Locale.ROOT, "%s %s stall %d: laps %d progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b climb=%b rescues=%d setBacks=%d mode=%s near %s blocks %s",
+		return String.format(Locale.ROOT, "%s %s stall %d: laps %d progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b climb=%b rescues=%d setBacks=%d mode=%s near %s blocks %s racers%s",
 				track.name(), b.colour, b.stall, b.lapTicks.size(), progress, track.laneAt(progress, e.getX(), e.getZ()), e.getX(), e.getY(),
 				e.getZ(), layout.onCourse(e.getX(), e.getZ()), e.horizontalCollision, e.onGround(), e.onClimbable(), b.rescues, b.setBacks,
-				b.goal.recoveryMode(), AiLapSweepGameTests.nearFeature(track, progress), AiLapSweepGameTests.around(level, e));
+				b.goal.recoveryMode(), AiLapSweepGameTests.nearFeature(track, progress), AiLapSweepGameTests.around(level, e),
+				AiLapSweepGameTests.racersNear(level, e));
 	}
 }

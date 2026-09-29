@@ -32,6 +32,8 @@ public final class RaceHarnessClient {
     private static int correctionBase;
     private static RaceTrack activeTrack;
     private static long lastSampleNanos;
+    /** Ticks since the last 10-tick sample on which this rider's bird overlapped another racer as this client shows it. */
+    private static int overlapTicks;
     /** Frame-to-frame times since the last 10-tick sample, in nanoseconds (smoothness, not average fps). */
     private static final java.util.ArrayList<Long> frameNanos = new java.util.ArrayList<>();
     private static long lastFrameNanos;
@@ -210,6 +212,16 @@ public final class RaceHarnessClient {
                         StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             } catch (java.io.IOException e) { throw new RuntimeException(e); }
         }
+        if (ticks > 0 && bird.contactSolid()) {
+            var mine = bird.getBoundingBox().deflate(0.1D);
+            for (ChocoboEntity other : mc.level.getEntitiesOfClass(ChocoboEntity.class, bird.getBoundingBox().inflate(3.0D),
+                    e -> e != bird && e.contactSolid())) {
+                if (mine.intersects(other.getBoundingBox().deflate(0.1D))) {
+                    overlapTicks++;
+                    break;
+                }
+            }
+        }
         if (ticks > 0) {
             // every tick, where each other racer stands on this client: the game draws it between
             // consecutive tick positions, so these steps are exactly the motion the rider saw
@@ -242,12 +254,13 @@ public final class RaceHarnessClient {
                     long birdNanos = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDER_NANOS.sumThenReset();
                     long birds = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDERED.sumThenReset();
                     Files.writeString(out.resolve("frames-" + name + ".csv"), String.format(Locale.ROOT,
-                            "%s,%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.3f,%.1f%n", track.name(), ticks, n,
+                            "%s,%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.3f,%.1f,%d%n", track.name(), ticks, n,
                             sorted.get(n / 2) / 1e6, sorted.get(Math.min(n - 1, (int) (n * 0.99))) / 1e6, sorted.get(n - 1) / 1e6,
                             over33, tk.darrow.chocobosreborn.client.RemoteRaceFrames.INSTANCE.delayTicks(),
-                            birdNanos / 1e6 / n, birds / (double) n),
+                            birdNanos / 1e6 / n, birds / (double) n, overlapTicks),
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                     frameNanos.clear();
+                    overlapTicks = 0;
                 }
                 Files.writeString(out.resolve("performance-" + name + ".csv"), String.format(Locale.ROOT,
                         "%s,%d,%d,%.3f%n", track.name(), ticks, mc.getFps(),

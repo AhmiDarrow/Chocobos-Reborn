@@ -390,12 +390,32 @@ public class AiLapSweepGameTests {
 		String near = nearFeature(track, progress);
 		BlockPos bp = e.blockPosition();
 		return String.format(Locale.ROOT,
-				"%s %s start-lane %.1f from %.4f: progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b feet=%s below=%s rescues=%d setBacks=%d mode=%s near %s",
+				"%s %s start-lane %.1f from %.4f: progress %.4f lane %.2f pos (%.2f, %.2f, %.2f) onCourse=%b collide=%b ground=%b feet=%s below=%s rescues=%d setBacks=%d mode=%s near %s racers%s",
 				track.name(), r.colour, r.lane, r.start, progress, track.laneAt(progress, e.getX(), e.getZ()), e.getX(), e.getY(), e.getZ(),
 				layout.onCourse(e.getX(), e.getZ()), e.horizontalCollision, e.onGround(),
 				level.getBlockState(bp).getBlock().getDescriptionId().replace("block.minecraft.", ""),
 				level.getBlockState(bp.below()).getBlock().getDescriptionId().replace("block.minecraft.", ""), r.rescues, r.setBacks,
-				r.goal.recoveryMode(), near);
+				r.goal.recoveryMode(), near, racersNear(level, e));
+	}
+
+	/**
+	 * Racers within four blocks of {@code e}, as they touch it: offset, colour, whether solid, and
+	 * whether {@code e} is standing on it ("under") or it on {@code e} ("over"). Racers are solid to
+	 * each other, so a stall beside one says who pinned whom.
+	 */
+	static String racersNear(ServerLevel level, ChocoboEntity e) {
+		StringBuilder out = new StringBuilder();
+		net.minecraft.world.phys.AABB mine = e.getBoundingBox();
+		for (ChocoboEntity o : level.getEntitiesOfClass(ChocoboEntity.class, mine.inflate(4.0D), o -> o != e)) {
+			net.minecraft.world.phys.AABB theirs = o.getBoundingBox();
+			boolean side = mine.minX < theirs.maxX && mine.maxX > theirs.minX && mine.minZ < theirs.maxZ && mine.maxZ > theirs.minZ;
+			String rel = side && Math.abs(mine.minY - theirs.maxY) < 0.1D ? " under"
+					: side && Math.abs(theirs.minY - mine.maxY) < 0.1D ? " over" : "";
+			out.append(String.format(Locale.ROOT, " [%s %+.2f,%+.2f,%+.2f%s%s%s]", o.color().name(), o.getX() - e.getX(),
+					o.getY() - e.getY(), o.getZ() - e.getZ(), o.contactSolid() ? " solid" : " ghost", rel,
+					o.horizontalCollision ? " pressed" : ""));
+		}
+		return out.isEmpty() ? " none" : out.toString();
 	}
 
 	/** The terrain feature nearest {@code progress}: "on RIDGE[...] +3.1b", "WATER[...] end+5.6b". */

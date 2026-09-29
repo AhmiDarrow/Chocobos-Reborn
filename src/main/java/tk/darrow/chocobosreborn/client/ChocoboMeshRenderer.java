@@ -354,12 +354,11 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private void vertex(VertexConsumer vc, WhiskerMesh.Part p, int v, int color, int light, int overlay) {
 		final float[] pos = skinner.pos, nrm = skinner.nrm;
 		int u = p.posIndex[v] * 3;
-		vc.addVertex(pos[u], pos[u + 1], pos[u + 2])
-				.setColor(color)
-				.setUv(p.uv[v * 2], p.uv[v * 2 + 1])
-				.setOverlay(overlay)
-				.setLight(light)
-				.setNormal(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
+		// One call: the level's entity buffers write it straight to memory (BufferBuilder's fast path for
+		// the entity vertex format). Six chained setters, each checked, cost several times as much per
+		// vertex, and a near bird is ~93k vertices a frame.
+		vc.addVertex(pos[u], pos[u + 1], pos[u + 2], color, p.uv[v * 2], p.uv[v * 2 + 1], overlay, light,
+				nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
 	}
 
 	private static boolean isPlumage(int r, int g, int b) {

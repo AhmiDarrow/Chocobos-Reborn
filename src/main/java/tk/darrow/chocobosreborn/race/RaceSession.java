@@ -1412,8 +1412,8 @@ public class RaceSession {
 		double y = at.y();
 		for (int up = 0; up < 8; up++) {
 			net.minecraft.world.phys.AABB box = e.getDimensions(e.getPose()).makeBoundingBox(at.x(), y, at.z());
-			if (level.noCollision(e, box)) {
-				break;
+			if (level.noBlockCollision(e, box)) {
+				break;   // blocks only: a set-back bird is a ghost until clear of the others
 			}
 			y += 1.0D;
 		}

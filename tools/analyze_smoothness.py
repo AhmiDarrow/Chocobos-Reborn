@@ -81,7 +81,7 @@ def motion_report(path):
 
 
 def frames_report(path):
-    p50, p99, worst, over33, frames, delay, bird_ms, birds = [], [], 0.0, 0, 0, [], [], []
+    p50, p99, worst, over33, frames, delay, bird_ms, birds, overlap = [], [], 0.0, 0, 0, [], [], [], 0
     for row in csv.reader(open(path, encoding="utf-8")):
         if len(row) < 7:
             continue
@@ -97,6 +97,8 @@ def frames_report(path):
             if len(row) > 9:
                 bird_ms.append(float(row[8]))
                 birds.append(float(row[9]))
+            if len(row) > 10:
+                overlap += int(row[10])
         except ValueError:
             continue
     return {
@@ -110,6 +112,7 @@ def frames_report(path):
         "bird_render_cpu_ms_per_frame_median": round(statistics.median(bird_ms), 3) if bird_ms else None,
         "bird_render_cpu_ms_per_frame_max_window": round(max(bird_ms), 3) if bird_ms else None,
         "birds_drawn_per_frame_median": round(statistics.median(birds), 1) if birds else None,
+        "own_bird_overlapping_another_ticks": overlap,
     }
 
 
@@ -127,11 +130,14 @@ def client_report(path):
 
 def crowd_report(folder):
     """Server tick times of a crowded heat, and each simulated player's link and what it went through."""
-    ticks, riders = [], []
+    ticks, riders, overlap_pairs, overlap_ticks = [], [], 0, 0
     for path in glob.glob(os.path.join(folder, "**", "crowd-server.csv"), recursive=True):
         for row in csv.reader(open(path, encoding="utf-8")):
             try:
                 ticks.append(float(row[2]))
+                if len(row) > 4 and int(row[4]) > 0:
+                    overlap_pairs += int(row[4])
+                    overlap_ticks += 1
             except (ValueError, IndexError):
                 continue
     for path in glob.glob(os.path.join(folder, "**", "crowd-riders.csv"), recursive=True):
@@ -148,6 +154,8 @@ def crowd_report(folder):
         "tick_ms_p99": round(pct(ticks, 0.99), 2) if ticks else None,
         "tick_ms_max": round(max(ticks), 2) if ticks else None,
         "ticks_over_50ms": sum(1 for t in ticks if t > 50),
+        "server_ticks_with_overlapping_racers": overlap_ticks,
+        "overlapping_pair_ticks": overlap_pairs,
         "simulated_players": riders,
     }
 

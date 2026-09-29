@@ -64,8 +64,16 @@ import tk.darrow.chocobosreborn.race.Square;
  */
 @EventBusSubscriber(modid = ChocobosReborn.MOD_ID)
 public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
-	/** Humans in the heat, the real client included; 0 or 1 leaves the ordinary harness in charge. */
+	/** Humans in the heat, the real clients included; 0 or 1 leaves the ordinary harness in charge. */
 	static final int HUMANS = Integer.getInteger("chocobosreborn.harness.crowd", 0);
+	/**
+	 * Real clients to wait for, by name ({@code chocobosreborn.harness.crowdNames}, comma-separated; the
+	 * crowd race launcher starts them). Empty: the one real client LatencyRider, and simulated players for the rest.
+	 */
+	static final List<String> NAMES = java.util.Arrays.stream(System.getProperty("chocobosreborn.harness.crowdNames", "").split(","))
+			.map(String::trim).filter(n -> !n.isEmpty()).toList();
+	/** Simulated players on top of the real clients. */
+	static final int SIMULATED = Integer.getInteger("chocobosreborn.harness.simulated", NAMES.isEmpty() ? Math.max(0, HUMANS - 1) : 0);
 	private static final int MAX_TICKS = 7200;
 	private static final Path OUT = Path.of(System.getProperty("chocobosreborn.harness.output", "build/latency/results"));
 	private static final RaceHarnessCrowd INSTANCE = new RaceHarnessCrowd();
@@ -79,7 +87,10 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 	private static final List<VirtualRider> riders = new ArrayList<>();
 	private static final Map<UUID, VirtualRider> byPlayer = new HashMap<>();
 	private static RaceSession session;
-	private static ChocoboEntity realBird;
+	private static final List<ServerPlayer> reals = new ArrayList<>();
+	private static final List<ChocoboEntity> realBirds = new ArrayList<>();
+	/** Real clients already taken to the square: the first to join must not wait in the overworld's night. */
+	private static final java.util.Set<UUID> placed = new java.util.HashSet<>();
 	private static boolean setup, complete;
 	private static int wait = 400, ticks;
 	private static long tickStart;
@@ -136,24 +147,44 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 	public static void post(ServerTickEvent.Post event) {
 		if (!active() || complete) return;
 		MinecraftServer server = event.getServer();
-		ServerPlayer real = server.getPlayerList().getPlayers().stream()
-				.filter(p -> p.getGameProfile().getName().equals("LatencyRider")).findFirst().orElse(null);
-		if (real == null) return;
+		List<String> wanted = NAMES.isEmpty() ? List.of("LatencyRider") : NAMES;
+		List<ServerPlayer> online = new ArrayList<>();
+		for (String name : wanted) {
+			ServerPlayer p = server.getPlayerList().getPlayerByName(name);
+			if (p == null) continue;
+			online.add(p);
+			if (!setup && placed.add(p.getUUID())) {
+				p.setGameMode(GameType.SURVIVAL);
+				RaceManager.enterSquareOnFoot(p);
+			}
+		}
+		if (online.size() < wanted.size()) {
+			if (session != null) {
+				// a real client dropped out mid-race: end it, the clients stop on done.txt
+				append("events.jsonl", "{\"event\":\"error\",\"reason\":\"participant_disconnected\",\"online\":" + online.size() + "}\n");
+				if (session.live()) session.abort();
+				append("done.txt", "failed");
+				complete = true;
+			}
+			return;
+		}
 		// a real connection ticks its player after the level; a mock connection is not on the server's list
 		for (VirtualRider r : riders) r.player.connection.tick();
 		if (!setup) {
 			setup = true;
 			RiderAuthority.VIRTUAL = INSTANCE;
-			configureRealLink();
-			real.setGameMode(GameType.SURVIVAL);
-			RaceManager.enterSquareOnFoot(real);
-			realBird = bird(real);
-			for (int i = 1; i < HUMANS; i++) {
+			if (NAMES.isEmpty()) configureRealLink();
+			for (ServerPlayer real : online) {
+				reals.add(real);
+				realBirds.add(bird(real));
+			}
+			for (int i = 1; i <= SIMULATED; i++) {
 				VirtualRider r = new VirtualRider(server, i, LINKS[(i - 1) % LINKS.length]);
 				riders.add(r);
 				byPlayer.put(r.player.getUUID(), r);
 			}
-			append("events.jsonl", "{\"event\":\"crowd\",\"humans\":" + HUMANS + ",\"field\":" + RaceSession.FIELD + "}\n");
+			append("events.jsonl", "{\"event\":\"crowd\",\"real\":" + reals.size() + ",\"simulated\":" + riders.size()
+					+ ",\"field\":" + RaceSession.FIELD + "}\n");
 			return;
 		}
 		if (session == null) {
@@ -161,17 +192,19 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 			RaceTrack track = track();
 			List<ServerPlayer> players = new ArrayList<>();
 			List<ChocoboEntity> birds = new ArrayList<>();
-			RaceHarnessBirds.dress(realBird, track);
-			real.startRiding(realBird, true);
-			players.add(real);
-			birds.add(realBird);
+			for (int i = 0; i < reals.size(); i++) {
+				RaceHarnessBirds.dress(realBirds.get(i), track);
+				reals.get(i).startRiding(realBirds.get(i), true);
+				players.add(reals.get(i));
+				birds.add(realBirds.get(i));
+			}
 			for (VirtualRider r : riders) {
 				RaceHarnessBirds.dress(r.bird, track);
 				r.player.startRiding(r.bird, true);
 				players.add(r.player);
 				birds.add(r.bird);
 			}
-			session = new RaceSession(real.serverLevel(), track, false, players, birds, false, 0);
+			session = new RaceSession(players.get(0).serverLevel(), track, false, players, birds, false, 0);
 			try {
 				var register = RaceManager.class.getDeclaredMethod("addSession", RaceSession.class);
 				register.setAccessible(true);
@@ -179,7 +212,7 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 			} catch (ReflectiveOperationException e) {
 				throw new IllegalStateException(e);
 			}
-			for (int i = 0; i < riders.size(); i++) riders.get(i).startClient(track, i + 1);
+			for (int i = 0; i < riders.size(); i++) riders.get(i).startClient(track, reals.size() + i);
 			ticks = 0;
 			append("events.jsonl", "{\"event\":\"start\",\"track\":\"" + track.name() + "\",\"humans\":" + players.size()
 					+ ",\"field\":" + session.fieldSize() + ",\"laps\":" + track.getLaps() + "}\n");
@@ -187,7 +220,8 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		}
 		ticks++;
 		double tickMs = (System.nanoTime() - tickStart) / 1e6;
-		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d%n", track().name(), ticks, tickMs, session.fieldSize()));
+		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d,%d%n", track().name(), ticks, tickMs,
+				session.fieldSize(), overlaps(players0())));
 		if (ticks % 20 == 0) for (VirtualRider r : riders) {
 			r.flush();
 			r.trace(ticks);
@@ -207,6 +241,25 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 			append("done.txt", "complete");
 			complete = true;
 		}
+	}
+
+	/** Any racing bird in the level of the heat's first rider. */
+	private static ServerLevel players0() {
+		return reals.isEmpty() ? null : reals.get(0).serverLevel();
+	}
+
+	/** Pairs of solid racers whose bodies overlap on the server this tick (they should never). */
+	private static int overlaps(ServerLevel level) {
+		if (level == null || realBirds.isEmpty()) return 0;
+		List<ChocoboEntity> birds = level.getEntitiesOfClass(ChocoboEntity.class,
+				realBirds.get(0).getBoundingBox().inflate(2048.0D, 256.0D, 2048.0D), ChocoboEntity::contactSolid);
+		int n = 0;
+		for (int i = 0; i < birds.size(); i++) {
+			for (int j = i + 1; j < birds.size(); j++) {
+				if (birds.get(i).getBoundingBox().deflate(0.1D).intersects(birds.get(j).getBoundingBox().deflate(0.1D))) n++;
+			}
+		}
+		return n;
 	}
 
 	private static void configureRealLink() {
