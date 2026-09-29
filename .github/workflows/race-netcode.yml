@@ -1,0 +1,107 @@
+name: Race netcode
+
+# Builds and tests the racing-netcode branch on GitHub's Linux runners, then races real
+# (software-rendered) clients through the latency harnesses in two modes on separate runners:
+#   new       the branch as it is
+#   baseline  the same build with both halves switched back to vanilla handling
+# and publishes tools/analyze_smoothness.py reports for each.
+on:
+  push:
+    branches: [racing-netcode]
+  workflow_dispatch:
+
+concurrency:
+  group: race-netcode-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Unit tests
+        run: ./gradlew test --console=plain
+      - name: GameTests
+        run: ./gradlew runVerification --console=plain
+      - name: Keep reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests
+          path: |
+            build/reports/
+            build/test-results/
+            build/verification/logs/
+          if-no-files-found: ignore
+
+  harness:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [new, baseline]
+    env:
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      JAVA_TOOL_OPTIONS: ${{ matrix.mode == 'baseline' && '-Dchocobosreborn.vanillaRiderMovement=true -Dchocobosreborn.vanillaFieldPlayback=true' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: chmod +x gradlew
+      - name: Software OpenGL and a virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libegl1 mesa-utils > /dev/null
+          pip install -q -r tools/requirements-latency.txt
+          xvfb-run -a -s "-screen 0 1280x720x24" glxinfo -B | head -20
+      - name: Single rider against five AI (baseline, 120 ms, 300 ms, jitter, bursts)
+        env:
+          LATENCY_RESULTS: ${{ github.workspace }}/out/single
+        run: |
+          mkdir -p out/single
+          xvfb-run -a -s "-screen 0 1280x720x24" python tools/latency_harness.py --track C_MEADOW \
+            || echo "::warning::single-rider harness exited $? (${{ matrix.mode }})"
+      - name: Host and two delayed guests against three AI
+        run: |
+          xvfb-run -a -s "-screen 0 1280x720x24" python tools/paired_race_harness.py \
+            --tracks C_MEADOW,S_STARFALL --rtt 150 --rtt2 300 --jitter2 60 --burst2 400 \
+            || echo "::warning::paired harness exited $? (${{ matrix.mode }})"
+      - name: Smoothness reports
+        if: always()
+        run: |
+          mkdir -p out/pair
+          cp -r build/latency-pair/results/. out/pair/ 2>/dev/null || true
+          for f in build/latency/*.log build/latency-pair/*.log; do [ -f "$f" ] && cp "$f" out/ ; done
+          python tools/analyze_smoothness.py out/single --json out/single-smoothness.json || true
+          python tools/analyze_smoothness.py out/pair --json out/pair-smoothness.json || true
+          python tools/analyze_latency.py out/single > out/single-latency.txt 2>&1 || true
+          {
+            echo "## ${{ matrix.mode }}"
+            echo '### single rider'; echo '```json'; cat out/single-smoothness.json 2>/dev/null; echo '```'
+            echo '### host + two guests'; echo '```json'; cat out/pair-smoothness.json 2>/dev/null; echo '```'
+            echo '### refused / corrected moves (server logs)'; echo '```'
+            grep -h -E "move refused|moved wrongly|moved too quickly" out/*.log out/**/*.log 2>/dev/null | head -40
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-${{ matrix.mode }}
+          path: out/
+          if-no-files-found: warn
