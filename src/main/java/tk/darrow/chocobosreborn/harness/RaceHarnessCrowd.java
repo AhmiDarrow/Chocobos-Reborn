@@ -188,7 +188,10 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		ticks++;
 		double tickMs = (System.nanoTime() - tickStart) / 1e6;
 		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d%n", track().name(), ticks, tickMs, session.fieldSize()));
-		if (ticks % 20 == 0) for (VirtualRider r : riders) r.flush();
+		if (ticks % 20 == 0) for (VirtualRider r : riders) {
+			r.flush();
+			r.trace(ticks);
+		}
 		if (!session.live() || ticks > MAX_TICKS) {
 			boolean timeout = session.live();
 			String report = session.progressReport();
@@ -272,6 +275,9 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		final Map<Integer, FrameBuffer> buffers = new HashMap<>();
 		final StringBuilder motion = new StringBuilder();
 		ChocoboEntity shadow;
+		RacerGoal goal;
+		/** The hold has lifted once: the race is on for this client. */
+		boolean released;
 		RaceTrack track;
 		int clientTicks, teleports, corrections, playerTeleports, frames;
 
@@ -324,6 +330,8 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 			goal.paceScale = 1.0D;
 			copy.installRacer(goal);
 			copy.fillStamina();
+			copy.setPersistenceRequired();
+			this.goal = goal;
 			this.shadow = copy;
 		}
 
@@ -335,6 +343,11 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 				// what the client learns from the synced entity data
 				shadow.setRaceHeld(bird.raceHeld());
 				shadow.setRaceGhost(bird.raceGhost());
+				// the session starts its AI at GO; a rider starts when the grid hold lifts
+				if (!released && !bird.raceHeld()) {
+					released = true;
+					goal.running = true;
+				}
 				shadow.setOldPosAndRot();
 				shadow.tickCount++;
 				shadow.tick();
@@ -399,6 +412,16 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 				motion.append(String.format(Locale.ROOT, "%s,%d,%d,%.4f,%.4f,%.4f%n", track.name(), clientTicks, e.getKey(),
 						s.x(), s.y(), s.z()));
 			}
+		}
+
+		/** Where this client and its server bird stand, every second (debugging a simulated rider that does not race). */
+		void trace(int tick) {
+			if (shadow == null) return;
+			append("crowd-debug.csv", String.format(Locale.ROOT, "%s,%d,%.2f,%.2f,%.2f,%.3f,%.2f,%.2f,%.2f,%b,%b,%b,%b,%d,%d%n",
+					player.getGameProfile().getName(), tick, shadow.getX(), shadow.getY(), shadow.getZ(),
+					shadow.getDeltaMovement().horizontalDistance(), bird.getX(), bird.getY(), bird.getZ(),
+					player.getVehicle() == bird, bird.raceHeld(), goal != null && goal.running,
+					RiderAuthority.awaiting(player, bird), toServer.size(), toClient.size()));
 		}
 
 		void flush() {

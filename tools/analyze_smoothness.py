@@ -9,10 +9,11 @@ Reads, per client name:
 and any server log it finds for "move refused" / "moved wrongly" / "moved too quickly".
 
 Motion: the game draws a bird between its last two tick positions, so a bird's per-tick step is exactly
-what the rider saw. For a racer the step changes gradually (speed, turns). "Judder" is how much a step
-differs from the average of its neighbours, relative to the bird's speed: a steady bird scores ~0, a bird
-that stalls one tick and leaps the next scores ~1. Stalls are ticks a moving bird did not move; leaps are
-steps over twice the neighbouring average. Teleports (steps over 16 blocks) are excluded.
+what the rider saw. For a racer the step along the road changes gradually (speed, turns). "Judder" is how
+much a tick's horizontal step differs from the average of its neighbours, relative to the bird's speed: a
+steady bird scores ~0, a bird that stalls one tick and leaps the next scores ~1. Stalls are ticks a moving
+bird did not move; leaps are steps over twice the neighbouring average. Teleports (steps over 16 blocks) are
+excluded. Vertical pops are ticks a bird rose or fell more than 0.3 blocks (step-ups shown in one tick).
 """
 import argparse
 import csv
@@ -41,7 +42,7 @@ def motion_report(path):
             by_bird[(row[0], int(row[2]))].append((int(row[1]), float(row[3]), float(row[4]), float(row[5])))
         except ValueError:
             continue
-    judder, stalls, leaps, samples = [], 0, 0, 0
+    judder, stalls, leaps, samples, pops = [], 0, 0, 0, 0
     for rows in by_bird.values():
         rows.sort()
         steps = []
@@ -49,8 +50,11 @@ def motion_report(path):
             if t1 - t0 != 1:
                 steps.append(None)
                 continue
-            d = math.dist((x0, y0, z0), (x1, y1, z1))
+            # along the road only: a climb or a drop is Minecraft's own step physics, counted as pops below
+            d = math.hypot(x1 - x0, z1 - z0)
             steps.append(None if d > 16 else d)
+            if abs(y1 - y0) > 0.3 and d <= 16:
+                pops += 1
         for i in range(1, len(steps) - 1):
             a, b, c = steps[i - 1], steps[i], steps[i + 1]
             if a is None or b is None or c is None:
@@ -72,6 +76,7 @@ def motion_report(path):
         "judder_max": round(max(judder), 4) if judder else None,
         "stalls_per_1000": round(1000 * stalls / samples, 2) if samples else None,
         "leaps_per_1000": round(1000 * leaps / samples, 2) if samples else None,
+        "vertical_pops_per_1000": round(1000 * pops / samples, 2) if samples else None,
     }
 
 

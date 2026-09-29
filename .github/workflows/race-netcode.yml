@@ -9,6 +9,10 @@ on:
   push:
     branches: [racing-netcode, racing-netcode-crowd]
   workflow_dispatch:
+    inputs:
+      scenarios:
+        description: Which harness runs (any of crowd, single, pair)
+        default: crowd,single,pair
 
 concurrency:
   group: race-netcode-${{ github.ref }}
@@ -72,6 +76,7 @@ jobs:
       # The dedicated server always writes build/latency/results (LATENCY_RESULTS moves only the
       # client's output), so each run starts it empty and is copied aside afterwards.
       - name: Twenty birds - this client, nine simulated players, ten AI
+        if: contains(github.event.inputs.scenarios || 'crowd,single,pair', 'crowd')
         run: |
           mkdir -p out/crowd
           rm -rf build/latency/results
@@ -81,6 +86,7 @@ jobs:
           cp build/latency/server.log out/crowd/server.log 2>/dev/null || true
           cp build/latency/client.log out/crowd/client.log 2>/dev/null || true
       - name: Single rider against five AI (baseline, 120 ms, 300 ms, jitter, bursts)
+        if: contains(github.event.inputs.scenarios || 'crowd,single,pair', 'single')
         run: |
           mkdir -p out/single
           rm -rf build/latency/results
@@ -90,6 +96,7 @@ jobs:
           cp build/latency/server.log out/single/server.log 2>/dev/null || true
           cp build/latency/client.log out/single/client.log 2>/dev/null || true
       - name: Host and two delayed guests against three AI
+        if: contains(github.event.inputs.scenarios || 'crowd,single,pair', 'pair')
         run: |
           xvfb-run -a -s "-screen 0 1280x720x24" python tools/paired_race_harness.py \
             --tracks C_MEADOW,S_STARFALL --rtt 150 --rtt2 300 --jitter2 60 --burst2 400 \
