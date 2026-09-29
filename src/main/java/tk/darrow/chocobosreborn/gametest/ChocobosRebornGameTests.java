@@ -427,6 +427,69 @@ public class ChocobosRebornGameTests {
 		helper.succeed();
 	}
 
+	/**
+	 * Hub race 2026-09-28: after a set-back the rider's client kept driving from where it had been,
+	 * every one of those moves was refused with a correction, and the rider was snapped back again
+	 * and again for a whole round trip. A server move is now a numbered teleport: moves sent before
+	 * the client answers are dropped without a word, and a refused move is one teleport, not a chain.
+	 */
+	@GameTest(template = EMPTY, batch = "rider_authority")
+	public static void serverMovesAreAcknowledgedAndStaleMovesDropped(GameTestHelper helper) {
+		for (int x = 0; x <= 48; x++) for (int z = 0; z <= 4; z++) {
+			helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+			for (int y = 1; y <= 5; y++) helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+		}
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		ServerPlayer rider = packetRider(helper, bird);
+		tk.darrow.chocobosreborn.race.RiderAuthority.testCapture = true;
+		try {
+			double start = bird.getX();
+			vehiclePacket(rider, bird, start + 2);
+			helper.assertTrue(Math.abs(bird.getX() - (start + 2)) < 1e-5, "an ordinary move is taken");
+			bird.moveTo(start + 20, bird.getY(), bird.getZ(), bird.getYRot(), 0.0F);
+			tk.darrow.chocobosreborn.race.RiderAuthority.teleport(rider, bird);
+			var sent = tk.darrow.chocobosreborn.race.RiderAuthority.lastCaptured;
+			helper.assertTrue(sent != null && Math.abs(sent.x() - (start + 20)) < 1e-5, "the rider is told where the server put the bird");
+			vehiclePacket(rider, bird, start + 4);
+			helper.assertTrue(Math.abs(bird.getX() - (start + 20)) < 1e-5, "a move sent from the old place is dropped: x=" + bird.getX());
+			helper.assertTrue(tk.darrow.chocobosreborn.race.RiderAuthority.lastCaptured == sent, "and never answered with a correction");
+			tk.darrow.chocobosreborn.race.RiderAuthority.ack(rider, bird.getId(), sent.id());
+			vehiclePacket(rider, bird, start + 22);
+			helper.assertTrue(Math.abs(bird.getX() - (start + 22)) < 1e-5, "after the answer the rider drives again from the new place");
+			vehiclePacket(rider, bird, start + 22 + 12);
+			helper.assertTrue(Math.abs(bird.getX() - (start + 22)) < 1e-5, "one step over the cap is refused");
+			var refusal = tk.darrow.chocobosreborn.race.RiderAuthority.lastCaptured;
+			helper.assertTrue(refusal != sent && refusal.id() > sent.id(), "the refusal is a numbered teleport");
+			helper.assertTrue(tk.darrow.chocobosreborn.race.RiderAuthority.awaiting(rider, bird), "and moves wait for its answer");
+		} finally {
+			tk.darrow.chocobosreborn.race.RiderAuthority.testCapture = false;
+			tk.darrow.chocobosreborn.race.RiderAuthority.forget(rider);
+		}
+		bird.discard();
+		helper.succeed();
+	}
+
+	/**
+	 * The client's physics and the server's never agree exactly on a racing bird. Vanilla refused a
+	 * move whose replay ended a quarter block off; a rider's possible move is now taken as sent, and
+	 * the replay only runs for its side effects. Here: a hop up and forward is kept exactly.
+	 */
+	@GameTest(template = EMPTY, batch = "rider_authority")
+	public static void aPossibleMoveIsTakenAsSent(GameTestHelper helper) {
+		for (int x = 0; x <= 12; x++) for (int z = 0; z <= 4; z++) {
+			helper.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+			for (int y = 1; y <= 5; y++) helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+		}
+		ChocoboEntity bird = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		ServerPlayer rider = packetRider(helper, bird);
+		Vec3 to = bird.position().add(1.5, 0.5, 0);
+		vehiclePacketTo(rider, bird, to);
+		helper.assertTrue(bird.position().distanceTo(to) < 1.0E-5D, "the rider's move is taken: " + bird.position());
+		tk.darrow.chocobosreborn.race.RiderAuthority.forget(rider);
+		bird.discard();
+		helper.succeed();
+	}
+
 	/** A mock rider in the saddle, with vanilla's per-tick vehicle baselines, sending its own vehicle packets. */
 	private static ServerPlayer packetRider(GameTestHelper helper, ChocoboEntity bird) {
 		ServerPlayer rider = (ServerPlayer) owner(helper, bird);

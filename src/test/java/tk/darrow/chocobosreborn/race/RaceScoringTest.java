@@ -128,21 +128,6 @@ class RaceScoringTest {
 	}
 
 	@Test
-	void orderedBacklogUsesPerPacketMovementWithoutIncreasingItsLimit() {
-		for (int packets = 1; packets <= 40; packets++) {
-			double cumulative = packets * 3.6;
-			double allowance = RaceScoring.vehiclePacketAllowance(0, cumulative * cumulative, 3.6 * 3.6);
-			assertTrue(cumulative * cumulative - allowance <= 100, "valid step in backlog " + packets);
-		}
-		for (double firstDistance : new double[]{0, 5, 40, 2000}) {
-			assertTrue(firstDistance * firstDistance - RaceScoring.vehiclePacketAllowance(0, firstDistance * firstDistance, 10 * 10) <= 100);
-			assertTrue(firstDistance * firstDistance - RaceScoring.vehiclePacketAllowance(0, firstDistance * firstDistance, 10.1 * 10.1) > 100,
-					"large single steps still fail, including a packet doubling back toward the tick's start");
-		}
-		assertTrue(4_000_000 - RaceScoring.vehiclePacketAllowance(0, 4_000_000, 4_000_000) > 100, "course teleport rejected");
-	}
-
-	@Test
 	void cooperationIsHandlingForRiderAndField() {
 		assertEquals(0.35F, RaceScoring.turnCatchup(0), 1.0E-5F);
 		assertEquals(1.0F, RaceScoring.turnCatchup(100), 1.0E-5F);

@@ -136,6 +136,19 @@ public final class RacerContact {
 	}
 
 	/**
+	 * As {@link #leadTicks(int)}, with the remote field shown {@code displayTicks} behind its
+	 * fastest frames (played back from server frames) instead of vanilla's lerp lag. Negative:
+	 * no frames, vanilla's lerp.
+	 */
+	public static int leadTicks(int rttMs, double displayTicks) {
+		if (displayTicks < 0.0D) {
+			return leadTicks(rttMs);
+		}
+		int rtt = Math.max(0, Math.min(1000, rttMs));
+		return Math.min(MAX_LEAD_TICKS, (int) Math.round(displayTicks + rtt / 50.0D));
+	}
+
+	/**
 	 * Resolve contact for {@code self} against {@code others} this tick.
 	 * {@code hx, hz} is the bird's heading (unit; its velocity, or its facing when it is
 	 * nearly still).

@@ -473,6 +473,7 @@ public final class RaceManager {
 	@SubscribeEvent
 	public static void onServerTick(ServerTickEvent.Post event) {
 		tk.darrow.chocobosreborn.net.RaceLatency.tick(event.getServer());
+		RiderAuthority.tick(event.getServer());
 		ServerLevel square = testLevel != null ? testLevel : Square.level(event.getServer());
 		if (square != null) {
 			SquareBuilder.tickKeeperSync(square);
@@ -740,6 +741,7 @@ public final class RaceManager {
 		}
 		DuelDesk.withdraw(sp);
 		TradeDesk.withdraw(sp);
+		RiderAuthority.forget(sp);
 		refundPendingBet(sp);
 		HeatSchedule.drop(sp);
 		RaceSession s = sessionOf(sp.getUUID());
