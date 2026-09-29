@@ -661,7 +661,9 @@ public class ChocobosRebornGameTests {
 		var goal = new tk.darrow.chocobosreborn.race.RacerGoal(bird, track, lane,
 				tk.darrow.chocobosreborn.race.RacerProfile.of(track.getRaceClass(),
 						tk.darrow.chocobosreborn.race.RacerProfile.Role.FIELD));
-		goal.running = true;
+		// held until the island ticks: released before that, the bird could run the whole feature
+		// while the test was still waiting, and it was never seen on the detour (A_DEEPS, flaky)
+		goal.running = false;
 		bird.installRacer(goal);
 		bird.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
 		var jockey = ModEntities.KIN_STEWARD.get().create(level);
@@ -671,6 +673,10 @@ public class ChocobosRebornGameTests {
 		level.addFreshEntity(jockey);
 		jockey.startRiding(bird, true);
 		boolean[] detour = {false};
+		// what the bird did inside the feature band: furthest from the centre line, highest above the road,
+		// and whether the ridge stood where it crossed the centre line (a missing ridge lets it run straight)
+		double[] seen = {0.0D, Double.NEGATIVE_INFINITY};
+		StringBuilder crossing = new StringBuilder();
 		var lap = new tk.darrow.chocobosreborn.race.RaceLapProgress(startProgress);
 		if (fullLap) helper.onEachTick(() -> helper.assertTrue(RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()),
 				"AI leaves the legal course at " + track.progressAt(bird.getX(), bird.getZ()) + " position=" + bird.position()));
@@ -678,17 +684,27 @@ public class ChocobosRebornGameTests {
 			// after a batch that let go of thousands of chunks the island can take a while to tick
 			// entities again; a bird in a chunk that does not tick yet only stands there
 			AiLapSweepGameTests.islandTicking(helper, level, track);
-		}).thenWaitUntil(() -> {
+		}).thenExecute(() -> goal.running = true).thenWaitUntil(() -> {
 			double progress = track.progressAt(bird.getX(), bird.getZ(), lap.lastProgress());
 			boolean credited = lap.update(progress, RaceCourseLayout.of(track).onCourse(bird.getX(), bird.getZ()));
 			if (progress > feature.start() + .01 && progress < feature.end() - .01) {
 				RacePoint center = track.pointAt(progress);
-				detour[0] |= Math.hypot(bird.getX() - center.x(), bird.getZ() - center.z()) > 8;
+				double off = Math.hypot(bird.getX() - center.x(), bird.getZ() - center.z());
+				detour[0] |= off > 8;
+				seen[0] = Math.max(seen[0], off);
+				seen[1] = Math.max(seen[1], bird.getY() - center.y());
+				if (off < 3 && crossing.length() < 400) {
+					BlockPos top = BlockPos.containing(center.x(), center.y() + track.ridgeHeight() - 0.5D, center.z());
+					crossing.append(String.format(java.util.Locale.ROOT, " [t%d p%.4f off%.1f y+%.1f ridge=%s]", bird.tickCount, progress, off,
+							bird.getY() - center.y(), level.getBlockState(top).getBlock().getDescriptionId().replace("block.minecraft.", "")));
+				}
 			}
 			helper.assertTrue(fullLap ? credited : progress > feature.end() + .04 && progress < feature.end() + .3, track.name() + " " + color + " racer clears route; progress=" + progress
 					+ " position=" + bird.position() + " ticks=" + bird.tickCount + " noAI=" + bird.isNoAi() + " forward=" + bird.zza);
 		}).thenExecute(() -> {
-			helper.assertTrue(fullLap || detour[0], "the racer actually used the dry detour");
+			helper.assertTrue(fullLap || detour[0], "the racer actually used the dry detour: " + track.name() + " " + color
+					+ String.format(java.util.Locale.ROOT, " furthest off centre %.1f, highest %.1f above the road;", seen[0], seen[1])
+					+ " on the centre line:" + crossing);
 			jockey.discard();
 			bird.discard();
 			forceTrack(level, track, false);

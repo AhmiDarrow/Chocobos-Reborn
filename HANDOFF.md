@@ -2543,10 +2543,9 @@ and logs `FIELD-HEAT` lap times. The sweep's rescue now uses `RaceSession.setBac
 
 ### Open after 1.1.0
 
-* `glacierAiUsesTheDetourOpening` (GameTest) is flaky: on the 1.1.0 release gate it failed once
-  ("the racer actually used the dry detour") and passed on the immediate rerun (71/71). A
-  non-water AI bird on B_GLACIER sometimes takes another line past the water instead of the dry
-  detour; it costs time, never a stall. Make the test deterministic (seed / start lane) or find
-  the steering branch that skips the opening.
+* ~~`glacierAiUsesTheDetourOpening` / `deepsAiUsesTheRidgeDetour` flaky~~ fixed 2026-09-29: the
+  test released the bird before the island's chunks ticked, so a slow island let it run the whole
+  feature before the check started watching (diagnostics showed it never sampled inside the band).
+  The bird is now held until the island ticks; 9/9 repeats passed.
 * In-game look still wanted: bump feel, the tightest short-GP corners, flared detour exits,
   climbers up a ridge's side, three boost strips on a ~300-block lap.

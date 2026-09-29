@@ -2142,6 +2142,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// bump each other outside heats too, since vanilla never pushes a vehicle
 			applyRacerContact();
 			slideOffRacer();
+			separateFromRacers();
 		}
 		ChocoboColor c = color();
 		Player player = getControllingPassenger() instanceof Player p ? p : null;
@@ -2256,6 +2257,36 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Sideways push a tick off another racer's back. */
 	static final double SLIDE_OFF = 0.12D;
+	/** The most overlap undone in one tick: firm, never a teleport. */
+	static final double SEPARATE_MAX = 0.3D;
+
+	/**
+	 * The forcefield: racers are solid, but a box already inside another is never stopped by it
+	 * (vanilla collision only stops a box moving into one). Each side moves its own birds out of
+	 * any racer they overlap: a rider's client its bird, out of the birds it sees; the server its AI,
+	 * out of everyone. Out along the shallower overlap, away from the other's middle, at most
+	 * {@link #SEPARATE_MAX} a tick.
+	 */
+	private void separateFromRacers() {
+		net.minecraft.world.phys.AABB mine = getBoundingBox();
+		for (Entity e : level().getEntities(this, mine, e -> e instanceof ChocoboEntity && canCollideWith(e))) {
+			net.minecraft.world.phys.AABB theirs = e.getBoundingBox();
+			double ox = Math.min(mine.maxX, theirs.maxX) - Math.max(mine.minX, theirs.minX);
+			double oz = Math.min(mine.maxZ, theirs.maxZ) - Math.max(mine.minZ, theirs.minZ);
+			double oy = Math.min(mine.maxY, theirs.maxY) - Math.max(mine.minY, theirs.minY);
+			if (ox <= 0.01D || oz <= 0.01D || oy <= 0.01D) {
+				continue;
+			}
+			Vec3 v = getDeltaMovement();
+			if (ox < oz) {
+				double side = getX() >= e.getX() ? 1.0D : -1.0D;
+				setDeltaMovement(v.x + side * Math.min(ox, SEPARATE_MAX), v.y, v.z);
+			} else {
+				double side = getZ() >= e.getZ() ? 1.0D : -1.0D;
+				setDeltaMovement(v.x, v.y, v.z + side * Math.min(oz, SEPARATE_MAX));
+			}
+		}
+	}
 
 	/**
 	 * Racers are solid all round, so a bird can come down on another's back (a hop, a fall off a
