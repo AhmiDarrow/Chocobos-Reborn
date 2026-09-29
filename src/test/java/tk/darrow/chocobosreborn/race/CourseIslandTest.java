@@ -224,8 +224,8 @@ class CourseIslandTest {
 	void everyStallStandsOnSomething() {
 		for (RaceTrack track : RaceTrack.values()) {
 			Set<Long> filled = columns(RaceCourseLayout.of(track));
-			for (int stall = 0; stall < RaceSession.FIELD; stall++) {
-				RacePoint p = track.stallPos(stall, RaceSession.FIELD);
+			for (int stall = 0; stall < RaceScoring.FIELD; stall++) {
+				RacePoint p = track.stallPos(stall, RaceScoring.FIELD);
 				assertTrue(filled.contains(key((int) Math.floor(p.x()), (int) Math.floor(p.z()))),
 						track.name() + " stall " + stall + " stands over the void");
 			}

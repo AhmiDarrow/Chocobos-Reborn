@@ -59,7 +59,7 @@ class RaceSimTest {
 
 	/** Field birds on a one-rider ranked card. */
 	static int fieldBirds(RaceClass rc) {
-		return RaceSession.FIELD - 1 - (rc.includesTeioh() ? 2 : 0);
+		return RaceScoring.FIELD - 1 - (rc.includesTeioh() ? 2 : 0);
 	}
 
 	static Set<ChocoboColor> homeColours(RaceClass rc) {

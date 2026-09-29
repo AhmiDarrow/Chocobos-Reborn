@@ -908,6 +908,13 @@ public final class RaceScoring {
 		};
 	}
 
+	/**
+	 * Birds in a heat. Six on every server; the race harness may set more with
+	 * {@code -Dchocobosreborn.race.field=N} (a bigger field lines up in rows, see RaceTrack.stallPos).
+	 * Here, not in RaceSession, so pure tests can read it without Minecraft on the classpath.
+	 */
+	public static final int FIELD = Math.max(1, Integer.getInteger("chocobosreborn.race.field", 6));
+
 	public static final int MAX_STAKE = 16;
 
 	public enum BetPick {

@@ -42,11 +42,8 @@ public class RaceSession {
 	private static final int RUN_CAP_TICKS = 12000;
 	static final String NAME_TEIYO = "Teiyo";
 	static final String NAME_JOLO = "Jolo";
-	/**
-	 * Birds in a heat. Six on every server; the race harness may set more with
-	 * {@code -Dchocobosreborn.race.field=N} (a bigger field lines up in rows, see RaceTrack.stallPos).
-	 */
-	public static final int FIELD = Math.max(1, Integer.getInteger("chocobosreborn.race.field", 6));
+	/** Birds in a heat ({@link RaceScoring#FIELD}). */
+	public static final int FIELD = RaceScoring.FIELD;
 
 	private final class Racer {
 		final UUID bird;
