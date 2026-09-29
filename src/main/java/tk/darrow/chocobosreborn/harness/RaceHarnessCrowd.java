@@ -220,8 +220,9 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		}
 		ticks++;
 		double tickMs = (System.nanoTime() - tickStart) / 1e6;
-		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d,%d%n", track().name(), ticks, tickMs,
-				session.fieldSize(), overlaps(players0())));
+		int[] kinds = overlapKinds(players0());
+		append("crowd-server.csv", String.format(Locale.ROOT, "%s,%d,%.3f,%d,%d,%d,%d,%d,%.3f%n", track().name(), ticks, tickMs,
+				session.fieldSize(), kinds[0] + kinds[1] + kinds[2], kinds[0], kinds[1], kinds[2], kinds[3] / 1000.0));
 		if (ticks % 20 == 0) for (VirtualRider r : riders) {
 			r.flush();
 			r.trace(ticks);
@@ -248,18 +249,27 @@ public final class RaceHarnessCrowd implements RiderAuthority.VirtualClients {
 		return reals.isEmpty() ? null : reals.get(0).serverLevel();
 	}
 
-	/** Pairs of solid racers whose bodies overlap on the server this tick (they should never). */
-	private static int overlaps(ServerLevel level) {
-		if (level == null || realBirds.isEmpty()) return 0;
+	/**
+	 * Pairs of solid racers whose bodies overlap on the server this tick (they should never), by kind:
+	 * {rider and rider, rider and AI, AI and AI, deepest overlap in thousandths of a block}.
+	 */
+	private static int[] overlapKinds(ServerLevel level) {
+		int[] out = new int[4];
+		if (level == null || realBirds.isEmpty()) return out;
 		List<ChocoboEntity> birds = level.getEntitiesOfClass(ChocoboEntity.class,
 				realBirds.get(0).getBoundingBox().inflate(2048.0D, 256.0D, 2048.0D), ChocoboEntity::contactSolid);
-		int n = 0;
 		for (int i = 0; i < birds.size(); i++) {
 			for (int j = i + 1; j < birds.size(); j++) {
-				if (birds.get(i).getBoundingBox().deflate(0.1D).intersects(birds.get(j).getBoundingBox().deflate(0.1D))) n++;
+				net.minecraft.world.phys.AABB a = birds.get(i).getBoundingBox(), b = birds.get(j).getBoundingBox();
+				if (!a.deflate(0.1D).intersects(b.deflate(0.1D))) continue;
+				int riders = (birds.get(i).getControllingPassenger() instanceof ServerPlayer ? 1 : 0)
+						+ (birds.get(j).getControllingPassenger() instanceof ServerPlayer ? 1 : 0);
+				out[riders == 2 ? 0 : riders == 1 ? 1 : 2]++;
+				double depth = Math.min(Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX), Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ));
+				out[3] = Math.max(out[3], (int) Math.round(depth * 1000.0D));
 			}
 		}
-		return n;
+		return out;
 	}
 
 	private static void configureRealLink() {

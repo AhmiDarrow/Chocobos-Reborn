@@ -158,6 +158,7 @@ def client_report(path):
 def crowd_report(folder):
     """Server tick times of a crowded heat, and each simulated player's link and what it went through."""
     ticks, riders, overlap_pairs, overlap_ticks = [], [], 0, 0
+    kinds, depths = [0, 0, 0], []
     for path in glob.glob(os.path.join(folder, "**", "crowd-server.csv"), recursive=True):
         for row in csv.reader(open(path, encoding="utf-8")):
             try:
@@ -165,6 +166,10 @@ def crowd_report(folder):
                 if len(row) > 4 and int(row[4]) > 0:
                     overlap_pairs += int(row[4])
                     overlap_ticks += 1
+                    if len(row) > 8:
+                        for k in range(3):
+                            kinds[k] += int(row[5 + k])
+                        depths.append(float(row[8]))
             except (ValueError, IndexError):
                 continue
     for path in glob.glob(os.path.join(folder, "**", "crowd-riders.csv"), recursive=True):
@@ -183,6 +188,11 @@ def crowd_report(folder):
         "ticks_over_50ms": sum(1 for t in ticks if t > 50),
         "server_ticks_with_overlapping_racers": overlap_ticks,
         "overlapping_pair_ticks": overlap_pairs,
+        "overlap_pair_ticks_rider_rider": kinds[0],
+        "overlap_pair_ticks_rider_ai": kinds[1],
+        "overlap_pair_ticks_ai_ai": kinds[2],
+        "overlap_depth_p50": round(pct(depths, 0.5), 3) if depths else None,
+        "overlap_depth_max": round(max(depths), 3) if depths else None,
         "simulated_players": riders,
     }
 
