@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 import tk.darrow.chocobosreborn.net.RacePayloads;
+import tk.darrow.chocobosreborn.race.DuelStakes;
 import tk.darrow.chocobosreborn.race.RaceClass;
 import tk.darrow.chocobosreborn.race.RaceScoring;
 import tk.darrow.chocobosreborn.race.RaceTrack;
@@ -25,7 +26,9 @@ import tk.darrow.chocobosreborn.race.RaceTrack;
  * for a second rider at the duel master.
  */
 public class CourseSelectScreen extends Screen {
-	private static final int[] STAKES = {0, 4, 8, 16, 32};
+	/** Duel stakes on offer for the shown class: never over its biggest purse, the server's cap ({@link RaceScoring#clampDuelStake(int, int)}). */
+	private int[] stakes = {0};
+	private final java.util.ArrayList<CourseButton> courseButtons = new java.util.ArrayList<>();
 	private static final int HEADER = 38;
 	private static final int ROW = 20;
 	private final RaceClass raceClass;
@@ -54,6 +57,7 @@ public class CourseSelectScreen extends Screen {
 		// every course of the bird's class and below (lower classes pay half and do not count toward promotion)
 		moving.clear();
 		movingBaseY.clear();
+		courseButtons.clear();
 		scroll = 0;
 		int w = Math.min(460, width - 16);
 		int x = (width - w) / 2;
@@ -79,6 +83,10 @@ public class CourseSelectScreen extends Screen {
 		List<RaceTrack> sprints = RaceTrack.sprintsOf(shown);
 		List<RaceTrack> grands = RaceTrack.grandsPrixOf(shown);
 		boolean lower = shown.getId() < raceClass.getId();
+		if (mode == 1) {
+			stakes = DuelStakes.upTo(DuelStakes.biggestPurse(shown));
+			stakeIdx = Math.min(stakeIdx, stakes.length - 1);
+		}
 		for (int i = 0; i < sprints.size(); i++) {
 			course(sprints.get(i), x, y + i * ROW, lower);
 		}
@@ -89,8 +97,11 @@ public class CourseSelectScreen extends Screen {
 		if (mode == 1) {
 			y += 4;
 			stakeButton = addRenderableWidget(Button.builder(stakeLabel(), b -> {
-				stakeIdx = (stakeIdx + 1) % STAKES.length;
+				stakeIdx = (stakeIdx + 1) % stakes.length;
 				stakeButton.setMessage(stakeLabel());
+				for (CourseButton cb : courseButtons) {
+					cb.button().setTooltip(net.minecraft.client.gui.components.Tooltip.create(tip(cb.track(), cb.lower())));
+				}
 			}).bounds(x, y, w, 20).build());
 			track(stakeButton, y);
 			y += 22;
@@ -115,16 +126,32 @@ public class CourseSelectScreen extends Screen {
 			// the longest names: "5×630 m" keeps the points on the button at 480 x 270
 			label = Component.translatable("chocobosreborn.select.row_pts", name, length(t, true), t.winPoints());
 		}
-		Component win = Component.empty();
+		Button button = Button.builder(label, b -> choose(t)).bounds(bx, by, columnWidth, 18)
+				.tooltip(net.minecraft.client.gui.components.Tooltip.create(tip(t, lower))).build();
+		courseButtons.add(new CourseButton(button, t, lower));
+		track(addRenderableWidget(button), by);
+	}
+
+	/** The course tooltip; in a duel it names the side bet this course actually takes. */
+	private Component tip(RaceTrack t, boolean lower) {
+		boolean counts = mode == 0 && !lower && shown != RaceClass.S;
+		int purse = RaceScoring.purse(t);
+		Component win;
 		if (mode == 0) {
-			int purse = RaceScoring.purse(t);
 			win = counts ? Component.translatable("chocobosreborn.select.win", t.winPoints(), RaceClass.POINTS_TO_PROMOTE, purse)
 					: Component.translatable("chocobosreborn.select.win_gp", lower ? purse / 2 : purse);
+		} else {
+			win = Component.translatable("chocobosreborn.select.duel_stake", stakeFor(t), purse);
 		}
-		Component tip = Component.translatable("chocobosreborn.select.tip", Math.round(t.lapLength()), t.getLaps(), features(t),
+		return Component.translatable("chocobosreborn.select.tip", Math.round(t.lapLength()), t.getLaps(), features(t),
 				win, lower ? Component.translatable("chocobosreborn.select.lower") : Component.empty());
-		track(addRenderableWidget(Button.builder(label, b -> choose(t)).bounds(bx, by, columnWidth, 18)
-				.tooltip(net.minecraft.client.gui.components.Tooltip.create(tip)).build()), by);
+	}
+
+	private int stakeFor(RaceTrack t) {
+		return DuelStakes.onCourse(stakes[stakeIdx], t);
+	}
+
+	private record CourseButton(Button button, RaceTrack track, boolean lower) {
 	}
 
 	/**
@@ -183,7 +210,7 @@ public class CourseSelectScreen extends Screen {
 	}
 
 	private Component stakeLabel() {
-		return Component.translatable("chocobosreborn.select.stake", STAKES[stakeIdx]);
+		return Component.translatable("chocobosreborn.select.stake", stakes[stakeIdx]);
 	}
 
 	private static Component features(RaceTrack t) {
@@ -203,7 +230,7 @@ public class CourseSelectScreen extends Screen {
 	}
 
 	private void choose(RaceTrack t) {
-		PacketDistributor.sendToServer(new RacePayloads.CourseChoice(t.ordinal(), mode, mode == 1 ? STAKES[stakeIdx] : 0));
+		PacketDistributor.sendToServer(new RacePayloads.CourseChoice(t.ordinal(), mode, mode == 1 ? stakeFor(t) : 0));
 		onClose();
 	}
 

@@ -4,9 +4,9 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.1.1**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.1.2**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
-[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [1.1.1 development notes](docs/RELEASE_1.1.1.md)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [1.1.2 development notes](docs/RELEASE_1.1.2.md)
 
 Original work. Original birds, original calls, original art, original music. A fan work, not affiliated with Square Enix.
 
@@ -28,17 +28,17 @@ Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice.
 
 Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a wild bird (about one try in three) and heals a hurt one. Every green trains speed, stamina, intelligence or cooperation; a bird takes one training green every five minutes, and gets sated on each kind, so move up the ladder. Speed training makes a real difference: a fully trained bird runs a third faster. Gysahl grows from seeds found in grass and is the only green found in the wild; Krakka and Tantal can be crafted from it, and every other green comes from Sage Wynn in Whiskerwind or race prizes.
 
-Every green also heals a hurt bird a little, restores stamina, grows a chick faster, and a sated bird gets one feed of each green back per day.
+Every green also heals a hurt bird a little, restores stamina, grows a chicobo faster, and a sated bird gets one feed of each green back per day.
 
 ## Nuts (mating)
 
-Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chick of the parents' colour. **Carob** and **Zeio** change the line:
+Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chicobo of the parents' colour. **Carob** and **Zeio** change the line:
 
 1. Two **Good**-or-better Yellows + Carob → **Green** (mountain) or **Blue** (river).
 2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
 3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight. Race wins also pay Carob: 15% of the time at Class B, 40% at Class A, and every Class S race, with a rare Zeio on a Class S win.
+As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight. Race wins also pay Carob: 15% of the time at Class B, 40% at Class A, and first or second place in a ranked Class S heat, with a rare Zeio on a Class S win.
 
 ## Riding and fighting
 
@@ -60,7 +60,7 @@ Sneak-click your bird with an empty hand (or press your inventory key while ridi
 
 A race town on a sky island in the void, with its own day and night sky and its own music. Reach it with a **Chocobo Pocketwatch** or through the **Farmhand** at any Chocobo Farm, on foot or in the saddle; your birds nearby come along. Nothing spawns there and nothing there can be dug up.
 
-The town: a plaza round the arrival medallion, the chocobo fountain, awninged market stalls, eight timber cottages, an inn with a copper-capped bell tower, the Race Hall, a stable yard, a windmill, a ranch where the town flock grazes, a nest barn with a chick nursery, a jockey lounge, a pond, an orchard, the gatehouse and its overlook, a winners' board, and a shrine islet. Ten townsfolk keep their own day, and when a heat is called the inn bell rings and they line the overlook to cheer.
+The town: a plaza round the arrival medallion, the chocobo fountain, awninged market stalls, eight timber cottages, an inn with a copper-capped bell tower, the Race Hall, a stable yard, a windmill, a ranch where the town flock grazes, a nest barn with a chicobo nursery, a jockey lounge, a pond, an orchard, the gatehouse and its overlook, a winners' board, and a shrine islet. Ten townsfolk keep their own day, and when a heat is called the inn bell rings and they line the overlook to cheer.
 
 **Heats go off every five minutes.** Esther on the overlook enters you in the next heat of your bird's class or any class below: the first rider picks the course, riders of that class or higher who see her join, taking an AI racer's stall. You may race any course of your class or below (lower classes pay half and don't count toward promotion). She calls the heat at two minutes and one minute, counts the last ten seconds, and you are carried to the stalls for a big five-second countdown.
 

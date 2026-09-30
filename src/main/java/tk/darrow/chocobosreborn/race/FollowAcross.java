@@ -28,6 +28,7 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
  */
 public final class FollowAcross {
 	private static final Map<UUID, Integer> WAIT = new HashMap<>();
+	private static final int RETRY_TICKS = 40;
 
 	private FollowAcross() {
 	}
@@ -61,9 +62,7 @@ public final class FollowAcross {
 		if (!(bird.level() instanceof ServerLevel level) || !wants(bird)) {
 			return;
 		}
-		int now = level.getServer().getTickCount();
-		Integer wait = WAIT.get(bird.getUUID());
-		if (wait != null && now < wait) {
+		if (waiting(bird, level.getServer().getTickCount())) {
 			return;
 		}
 		ServerPlayer owner = level.getServer().getPlayerList().getPlayer(bird.getOwnerUUID());
@@ -92,8 +91,7 @@ public final class FollowAcross {
 			return bird;
 		}
 		int now = owner.server.getTickCount();
-		Integer wait = WAIT.get(bird.getUUID());
-		if (wait != null && now < wait) {
+		if (waiting(bird, now)) {
 			return bird;
 		}
 		if (bird.isVehicle()) {
@@ -114,12 +112,29 @@ public final class FollowAcross {
 		Entity moved = Square.teleport(bird, destination, spot, owner.getYRot());
 		WAIT.remove(bird.getUUID());
 		if (moved == null) {
-			WAIT.put(bird.getUUID(), now + 40);
+			WAIT.put(bird.getUUID(), now + RETRY_TICKS);
 			return null;
 		}
 		moved.setPortalCooldown(300);
 		moved.fallDistance = 0.0F;
 		return moved;
+	}
+
+	/**
+	 * A failed trip waits {@link #RETRY_TICKS} before the next try. A wait further off than that
+	 * was set by an earlier server in this JVM (singleplayer reopening a world restarts the tick
+	 * count) and would hold the bird back for as long as that server ran: dropped.
+	 */
+	private static boolean waiting(ChocoboEntity bird, int now) {
+		Integer wait = WAIT.get(bird.getUUID());
+		if (wait == null) {
+			return false;
+		}
+		if (now < wait && wait - now <= RETRY_TICKS) {
+			return true;
+		}
+		WAIT.remove(bird.getUUID());
+		return false;
 	}
 
 	/** Open ground a couple of blocks behind the owner, so a portal does not immediately send the bird back. */

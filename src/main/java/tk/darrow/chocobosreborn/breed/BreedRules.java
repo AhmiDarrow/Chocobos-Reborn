@@ -44,14 +44,14 @@ public final class BreedRules {
 
 	public static ChocoboColor resolve(ChocoboColor first, ChocoboColor second,
 	                                   ChocoboGrade firstGrade, ChocoboGrade secondGrade,
-	                                   ChocoboNut nut, int combinedWins,
+	                                   ChocoboNut nut, boolean winsQualify,
 	                                   boolean mutationHits, boolean pickGreen,
 	                                   ChocoboColor inherit) {
 		inherit = asBreedingColor(inherit);
 		Ff7Line.Result result = Ff7Line.resolve(
 				first.toLine(), second.toLine(),
 				firstGrade.getRank(), secondGrade.getRank(),
-				nut.getStrength(), combinedWins, mutationHits, pickGreen);
+				nut.getStrength(), winsQualify, mutationHits, pickGreen);
 		ChocoboColor color = switch (result) {
 			case GOLD -> ChocoboColor.GOLD;
 			case BLACK -> ChocoboColor.BLACK;

@@ -1,6 +1,6 @@
 # Chocobos Reborn
 
-**CurseForge summary (one line):** FF7 chocobos: Gysahl taming, eight greens, eight nuts, the farm line to Gold, and Whiskerwind, a race town in the void with 24 kart-style courses.
+**CurseForge summary (one line):** FF7 chocobos: Gysahl taming, eight greens, eight nuts, the farm line to Gold, and Whiskerwind, a race town in the void with 48 kart-style courses.
 
 Final Fantasy VII chocobos for Minecraft 1.21.1, NeoForge 21.1.249, Java 21. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
@@ -22,15 +22,15 @@ Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a 
 
 ## Nuts (mating)
 
-Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chick of the parents' colour. **Carob** and **Zeio** change the line:
+Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chicobo of the parents' colour. **Carob** and **Zeio** change the line:
 
 1. Two **Good**-or-better Yellows + Carob → **Green** (mountain) or **Blue** (river).
 2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
 3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
-**Bloodlines.** Every bird is born with stats of its own, and about a tenth of the training its parents were fed carries into the chick. A perfect bird is a long line: breed the blood down the middle and feed each chick full, and the line climbs clutch after clutch. The Almanac shows what a bird was born with and what you fed it. One chick in eight sparks a stat toward its stronger parent, and only a line that is already strong can reach the legendary top of a stat. Each nut adds a small gift to the chick, the rarer the nut the bigger.
+**Bloodlines.** Every bird is born with stats of its own, and about a tenth of the training its parents were fed carries into the chicobo. A perfect bird is a long line: breed the blood down the middle and feed each chicobo full, and the line climbs clutch after clutch. The Almanac shows what a bird was born with and what you fed it. One chicobo in eight sparks a stat toward its stronger parent, and only a line that is already strong can reach the legendary top of a stat. Each nut adds a small gift to the chicobo, the rarer the nut the bigger.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class A up pay out Carob, with a rare Zeio at Class S.
+As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class B up pay out Carob, with a rare Zeio at Class S.
 
 ## Riding and fighting
 
@@ -54,7 +54,7 @@ An illustrated guide to everything here, with a live "My Chocobos" section: ever
 
 A race town on a sky island in the void, with its own day and night sky and its own music. Reach it with a **Chocobo Pocketwatch** or through the **Farmhand** at any Chocobo Farm, on foot or in the saddle; your birds nearby come along. Nothing spawns there, nothing there can be dug up, and nobody sleeps there: its beds are furniture.
 
-The town: a plaza round the arrival medallion, the chocobo fountain, awninged market stalls, eight timber cottages, an inn with a copper-capped bell tower, the Race Hall, a stable yard, a windmill, a ranch where the town flock grazes, a nest barn with a chick nursery, a jockey lounge, a pond, an orchard, the gatehouse and its overlook, a winners' board, and a shrine islet. Ten townsfolk keep their own day, and when a heat is called the inn bell rings and they line the overlook to cheer.
+The town: a plaza round the arrival medallion, the chocobo fountain, awninged market stalls, eight timber cottages, an inn with a copper-capped bell tower, the Race Hall, a stable yard, a windmill, a ranch where the town flock grazes, a nest barn with a chicobo nursery, a jockey lounge, a pond, an orchard, the gatehouse and its overlook, a winners' board, and a shrine islet. Ten townsfolk keep their own day, and when a heat is called the inn bell rings and they line the overlook to cheer.
 
 **Heats go off every five minutes.** Esther on the overlook enters you in the next heat of your bird's class or any class below: the first rider picks the course, riders of that class or higher who see her join, taking an AI racer's stall. You may race any course of your class or below (lower classes pay half and don't count toward promotion). She calls the heat at two minutes and one minute, counts the last ten seconds, and you are carried to the stalls for a big five-second countdown.
 
@@ -103,4 +103,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.1.0. Created by Ahmi Darrow.
+Version 1.1.2. Created by Ahmi Darrow.

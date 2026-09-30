@@ -385,7 +385,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return this.entityData.get(DATA_GENE_COOP);
 	}
 
-	/** Born plus greens, capped at 100. This is what the bird races with. Blood is what a foal inherits. */
+	/** Born plus greens, capped at 100. This is what the bird races with. Blood is what a chicobo inherits. */
 	public int speedStat() {
 		return tk.darrow.chocobosreborn.breed.BreedGenes.passed(geneSpeed(), trainedSpeed());
 	}
@@ -1569,12 +1569,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			return null;
 		}
 		ChocoboNut nut = ChocoboNut.stronger(fedNut(), mate.fedNut());
-		int wins = raceWins() + mate.raceWins();
 		int guarantee = guaranteeWins(color(), mate.color(), nut);
 		int minEach = minWinsEach(color(), mate.color(), nut);
+		boolean qualify = BreedingOdds.qualifies(raceWins(), mate.raceWins(), minEach);
 		boolean hit = random.nextDouble() < BreedingOdds.chance(raceWins(), mate.raceWins(), minEach, guarantee);
 		ChocoboColor inherit = random.nextBoolean() ? color() : mate.color();
-		ChocoboColor child = BreedRules.resolve(color(), mate.color(), grade(), mate.grade(), nut, wins, hit,
+		ChocoboColor child = BreedRules.resolve(color(), mate.color(), grade(), mate.grade(), nut, qualify, hit,
 				random.nextBoolean(), inherit);
 		chick.setColor(child);
 		int rank = (bornGrade().getRank() + mate.bornGrade().getRank()) / 2;

@@ -2,7 +2,7 @@ package tk.darrow.chocobosreborn.breed;
 
 /**
  * Bloodline stats. Greens make this bird fast, and only a tenth of that work
- * enters the blood the next foal can inherit, so a line climbs over many
+ * enters the blood the next chicobo can inherit, so a line climbs over many
  * clutches. Most chicks land a little under that blood. One chick in eight
  * sparks one stat toward the stronger parent. A born stat above {@link #LEGEND}
  * still needs that spark, and only when both parents already offer
@@ -28,7 +28,7 @@ public final class BreedGenes {
 		return Math.min(ChocoboGreen.MAX_POINTS, Math.max(0, gene) + Math.max(0, trained));
 	}
 
-	/** What the next foal can inherit from this stat. */
+	/** What the next chicobo can inherit from this stat. */
 	public static int blood(int gene, int trained) {
 		int born = Math.max(0, Math.min(ChocoboGreen.MAX_POINTS, gene));
 		int fed = Math.max(0, Math.min(ChocoboGreen.MAX_POINTS, trained));
@@ -93,7 +93,7 @@ public final class BreedGenes {
 		return gifted;
 	}
 
-	/** True when the foal's born stat is past both parents' blood. */
+	/** True when the chicobo's born stat is past both parents' blood. */
 	public static boolean stepsUp(int chickGene, int parentBloodA, int parentBloodB) {
 		return chickGene > Math.max(parentBloodA, parentBloodB);
 	}

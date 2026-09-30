@@ -156,10 +156,14 @@ public final class DuelDesk {
 	/** A second rider accepts the oldest challenge their bird may enter. */
 	public static boolean accept(ServerPlayer acceptor, ChocoboEntity bird) {
 		int needGp = 0;
+		String away = null;
 		for (Challenge c : others(acceptor.getUUID())) {
 			ServerPlayer challenger = acceptor.server.getPlayerList().getPlayer(c.challenger());
 			if (challenger == null || !(challenger.getVehicle() instanceof ChocoboEntity theirs)
 					|| !Square.isSquare(challenger.level())) {
+				if (away == null) {
+					away = c.name();
+				}
 				continue;
 			}
 			if (RaceManager.sessionOf(challenger.getUUID()) != null
@@ -190,6 +194,8 @@ public final class DuelDesk {
 		}
 		if (needGp > 0) {
 			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.no_gp", needGp), true);
+		} else if (away != null) {
+			acceptor.displayClientMessage(Component.translatable("chocobosreborn.duel.challenger_away", away), true);
 		}
 		return false;
 	}

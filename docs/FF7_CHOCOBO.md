@@ -10,7 +10,7 @@ Minecraft 1 block = 1 m. Reference art was looked at, never fed into any tool.
 - FF7 chocobos are **moderately taller than humans**, rounder, with more obvious
   feathers than later entries (wiki, *Chocobo (Final Fantasy VII)*).
 - Target adult: **3.25 m** to the crest (about 1.9× Cloud, 1.8× Steve) — Ahmi asked for taller than the first 2.25, then 25 % over 2.6.
-- Adult hitbox: **1.75 × 3.25** blocks. Saddle sit **2.06 m**.
+- Adult hitbox: **1.75 × 3.25** blocks. Saddle sit **1.92 m** (`ChocoboEntity.SEAT_H`).
 - Chicobo: the adult mesh scaled to 25 / 50 / 75 % of player height (`ChocoboEntity.getAgeScale`).
 
 Do not use a hen silhouette (stubby legs, no neck at all, skull wider than the body).

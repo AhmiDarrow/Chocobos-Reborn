@@ -449,8 +449,11 @@ public final class SquareBuilder {
 		}
 	}
 
-	/** Sandstone archway over the course gates on the north edge; Esther stands beneath it. */
-	/** The gatehouse: two crenellated sandstone towers with quartz corners, the archway, gold trim, banners, signs and Esther's dais. */
+	/**
+	 * The gatehouse on the paddock's south edge ({@code ARCH_Z}, south of the return gate at the north end): two
+	 * crenellated sandstone towers with quartz corners, the archway over the course gates, gold trim, banners, signs
+	 * and Esther's dais beneath it.
+	 */
 	private static void arch(ServerLevel level, int y) {
 		int z = PADDOCK_Z1;
 		for (int sx : new int[]{-1, 1}) {

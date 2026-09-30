@@ -65,7 +65,6 @@ public final class RacePayloads {
 		}
 	}
 
-	/** Client -> server: rename one of the player's birds (by ledger id). */
 	/** Almanac: release a living bird (forget = false) or drop a passed bird's record (forget = true). */
 	public record ReleaseBird(UUID bird, boolean forget) implements CustomPacketPayload {
 		public static final Type<ReleaseBird> TYPE = new Type<>(
@@ -123,6 +122,7 @@ public final class RacePayloads {
 		}
 	}
 
+	/** Client -> server: rename one of the player's birds (by ledger id). */
 	public record RenameBird(UUID bird, String name) implements CustomPacketPayload {
 		public static final Type<RenameBird> TYPE = new Type<>(
 				ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "rename_bird"));

@@ -21,8 +21,13 @@ public final class Ff7Line {
 	private Ff7Line() {
 	}
 
+	/**
+	 * {@code winsQualify}: both parents have the first-place finishes this pairing needs
+	 * ({@link BreedingOdds#qualifies}). Without them the line cannot change at all, so a
+	 * Green + Blue pair on Carob hatches a parent's colour instead of White.
+	 */
 	public static Result resolve(Color first, Color second, int firstGrade, int secondGrade,
-	                             int nutStrength, int combinedWins, boolean mutationHits, boolean pickGreen) {
+	                             int nutStrength, boolean winsQualify, boolean mutationHits, boolean pickGreen) {
 		if (nutStrength >= ZEIO) {
 			if (isBlackAndWonderfulYellow(first, second, firstGrade, secondGrade) && mutationHits) {
 				return Result.GOLD;
@@ -31,6 +36,9 @@ public final class Ff7Line {
 		}
 		if (nutStrength >= CAROB) {
 			if (isPair(first, second, Color.GREEN, Color.BLUE)) {
+				if (!winsQualify) {
+					return Result.NONE;
+				}
 				return mutationHits ? Result.BLACK : Result.WHITE;
 			}
 			if (bothAtLeast(first, second, Color.YELLOW, firstGrade, secondGrade, GOOD) && mutationHits) {

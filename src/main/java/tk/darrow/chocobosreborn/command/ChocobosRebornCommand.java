@@ -15,7 +15,7 @@ import tk.darrow.chocobosreborn.race.Square;
 import tk.darrow.chocobosreborn.race.SquareBuilder;
 
 /**
- * /chocobosreborn square enter|leave|build <track>|race <track|0-5> [fun]
+ * /chocobosreborn square enter|leave|build <track>|race <track|0-11> [fun]
  * Operator helpers for Chocobo Square; the in-game way is Esther and the gates.
  */
 public final class ChocobosRebornCommand {
@@ -80,11 +80,11 @@ public final class ChocobosRebornCommand {
 			try {
 				n = Integer.parseInt(course);
 			} catch (NumberFormatException nfe) {
-				source.sendFailure(Component.literal("Unknown course. A track id (c_meadow) or 0–5 of the mounted class."));
+				source.sendFailure(Component.literal("Unknown course. A track id (c_meadow) or 0–11 of the mounted class."));
 				return 0;
 			}
-			if (n < 0 || n > 5) {
-				source.sendFailure(Component.literal("Course index must be 0–5 of the mounted class."));
+			if (n < 0 || n >= RaceTrack.MAX_COURSES_PER_CLASS) {
+				source.sendFailure(Component.literal("Course index must be 0–11 of the mounted class."));
 				return 0;
 			}
 			return RaceManager.startRace(player, n, ranked) ? 1 : 0;

@@ -574,7 +574,8 @@ public class AlmanacScreen extends Screen {
 		nameBox.setHint(Component.translatable("chocobosreborn.almanac.d.name_hint"));
 		pageWidgets.add(addRenderableWidget(nameBox));
 		Button rename = Button.builder(Component.translatable("chocobosreborn.almanac.d.rename"), b -> {
-			String n = nameBox == null ? "" : nameBox.getValue();
+			// the page shows what the server will store
+			String n = tk.darrow.chocobosreborn.ledger.ChocoboLedger.cleanName(nameBox == null ? "" : nameBox.getValue());
 			PacketDistributor.sendToServer(new RacePayloads.RenameBird(r.id(), n));
 			int i = birds.indexOf(r);
 			BirdRecord updated = new BirdRecord(r.id(), r.owner(), n, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),

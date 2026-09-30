@@ -14,7 +14,7 @@ public final class BreedingOdds {
 	 * combined wins.
 	 */
 	public static double chance(int winsA, int winsB, int minEach, int winsForGuarantee) {
-		if (winsA < minEach || winsB < minEach) {
+		if (!qualifies(winsA, winsB, minEach)) {
 			return 0.0D;
 		}
 		int combined = winsA + winsB;
@@ -23,6 +23,11 @@ public final class BreedingOdds {
 			return 1.0D;
 		}
 		return 0.25D + 0.75D * ((combined - floor) / (double) (winsForGuarantee - floor));
+	}
+
+	/** Both parents have at least {@code minEach} first-place finishes, so the line may change. */
+	public static boolean qualifies(int winsA, int winsB, int minEach) {
+		return winsA >= minEach && winsB >= minEach;
 	}
 
 	public static double chanceFromWins(int combinedWins, int winsForGuarantee) {

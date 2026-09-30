@@ -85,19 +85,38 @@ class BreedingOddsTest {
 		assertEquals(ChocoboColor.PURPLE, BreedRules.resolve(
 				ChocoboColor.PURPLE, ChocoboColor.PURPLE,
 				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
-				ChocoboNut.PEPIO, 0, true, true, ChocoboColor.PURPLE));
+				ChocoboNut.PEPIO, false, true, true, ChocoboColor.PURPLE));
 		assertEquals(ChocoboColor.PURPLE, BreedRules.resolve(
 				ChocoboColor.PURPLE, ChocoboColor.PURPLE,
 				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
-				ChocoboNut.CAROB, 8, true, true, ChocoboColor.PURPLE));
+				ChocoboNut.CAROB, true, true, true, ChocoboColor.PURPLE));
 		assertEquals(ChocoboColor.FLAME, BreedRules.resolve(
 				ChocoboColor.FLAME, ChocoboColor.FLAME,
 				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
-				ChocoboNut.CAROB, 8, true, false, ChocoboColor.FLAME));
+				ChocoboNut.CAROB, true, true, false, ChocoboColor.FLAME));
 		assertEquals(ChocoboColor.GREEN, BreedRules.resolve(
 				ChocoboColor.YELLOW, ChocoboColor.YELLOW,
 				ChocoboGrade.GOOD, ChocoboGrade.GOOD,
-				ChocoboNut.CAROB, 8, true, true, ChocoboColor.YELLOW));
+				ChocoboNut.CAROB, true, true, true, ChocoboColor.YELLOW));
+	}
+
+	@Test
+	void greenBlueCarobShortOfWinsHatchesAParentColour() {
+		int minEach = 2;
+		assertFalse(BreedingOdds.qualifies(0, 0, minEach));
+		assertFalse(BreedingOdds.qualifies(5, 1, minEach));
+		assertTrue(BreedingOdds.qualifies(2, 2, minEach));
+		for (ChocoboColor inherit : new ChocoboColor[]{ChocoboColor.GREEN, ChocoboColor.BLUE}) {
+			assertEquals(inherit, BreedRules.resolve(
+					ChocoboColor.GREEN, ChocoboColor.BLUE,
+					ChocoboGrade.GREAT, ChocoboGrade.GREAT,
+					ChocoboNut.CAROB, BreedingOdds.qualifies(5, 1, minEach), false, true, inherit));
+		}
+		// with the wins, a missed Black roll is still White
+		assertEquals(ChocoboColor.WHITE, BreedRules.resolve(
+				ChocoboColor.GREEN, ChocoboColor.BLUE,
+				ChocoboGrade.GREAT, ChocoboGrade.GREAT,
+				ChocoboNut.CAROB, BreedingOdds.qualifies(2, 2, minEach), false, true, ChocoboColor.GREEN));
 	}
 
 	@Test

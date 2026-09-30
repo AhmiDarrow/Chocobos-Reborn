@@ -97,10 +97,7 @@ public final class ChocoboLedger extends SavedData {
 		if (r == null || !player.getUUID().equals(r.owner())) {
 			return;
 		}
-		String clean = name.strip();
-		if (clean.length() > 24) {
-			clean = clean.substring(0, 24);
-		}
+		String clean = cleanName(name);
 		boolean found = false;
 		for (ServerLevel level : player.getServer().getAllLevels()) {
 			if (level.getEntity(id) instanceof ChocoboEntity bird) {
@@ -115,6 +112,15 @@ public final class ChocoboLedger extends SavedData {
 				r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop(), r.spark(), r.parentA(), r.parentB(),
 				r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), pending));
 		setDirty();
+	}
+
+	/**
+	 * A name as the anvil would take it: no section signs or control characters (a raw
+	 * NUL would read back as {@link BirdRecord#PENDING_CLEAR}), trimmed, at most 24 long.
+	 */
+	public static String cleanName(String raw) {
+		String clean = net.minecraft.util.StringUtil.filterText(raw).strip();
+		return clean.length() > 24 ? clean.substring(0, 24).strip() : clean;
 	}
 
 	/**

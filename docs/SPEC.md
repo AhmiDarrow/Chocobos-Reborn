@@ -24,7 +24,7 @@ Flame (Nether) are ours; Pink / Red and the saucer dyes were removed 2026-09-16.
 | Purple ("End Chocobo") | Void / End islands | 45 | 40 | 50 | end-stone flecked; climbs, any water, rider water breathing + slow falling (no flight) |
 | Flame ("Nether Chocobo") | Spark / Ember Wastes (Nether) | 40 | 10 | 50 | red with lava mottling; fire immune, walks on lava, rider fire resistance |
 
-Speeds are ×10 (0.20 land for Yellow). Purple spawns wild on end stone in the
+Speeds are ×100 (0.20 land for Yellow). Purple spawns wild on end stone in the
 End's outer biomes (`chocobo_end` biome modifier, `checkSpawn`) and breeds true by
 inheritance (a Purple parent passes Purple half the time; no nut changes it).
 `ChocoboColor` holds the table; `deepWater()` / `lavaWalk()` / `climb()` /
@@ -71,7 +71,7 @@ adds to max stamina, intelligence makes dashes cheaper; total training also lift
 the effective grade one step per 120 points (`gradeFromTraining`).
 
 Feeding (any green, owned bird): +stat points, +20 stamina, heals 3 if hurt, a
-chick grows faster (vanilla `ageUp`), and the owner sees an action-bar line with
+chicobo grows faster (vanilla `ageUp`), and the owner sees an action-bar line with
 the bird's totals and feeds left. Owned training feeds wait 5 minutes
 (`TRAIN_COOLDOWN_TICKS` 6000) between greens; satiety is a second gate (one feed
 of each kind back per in-game day). Creative/instabuild skips the wait. Wild
@@ -82,7 +82,7 @@ and tames.
 
 `ChocoboNut`: Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. A nut fed to
 an owned adult puts it in love; both parents need a nut and opposite sexes
-(`canMate`). Chick colour: `Ff7Line` / `BreedRules` / `BreedingOdds`:
+(`canMate`). Chicobo colour: `Ff7Line` / `BreedRules` / `BreedingOdds`:
 
 1. Two Good-or-better Yellows + Carob → Green or Blue (50/50).
 2. Green + Blue + Carob → Black on a hit, White on a miss.
@@ -95,15 +95,23 @@ roll is impossible. `BreedingOdds.chance(winsA, winsB, minEach, guarantee)` then
 climbs from 25 % at the minimum to certain at the combined guarantee
 (`guaranteeWins`: 4 / 9 / 12). Handing a Carob or Zeio to a bird that lacks the
 wins shows `chocobosreborn.nut.needs_wins`. A missed roll inherits a parent's
-colour at random.
+colour at random, except Green + Blue + Carob with the wins, which hatches White on a
+miss. A Green + Blue pair short of the wins changes nothing: a parent's colour, as for any
+other pair (`BreedingOdds.qualifies`, `Ff7Line.resolve`).
 
-Chick born grade = parents' born-grade average (+1 with Zeio). Chick talent = nut tier × 4
-training points + a sixth of the parents' training (intelligence / cooperation at
-half). Chick sex random; grows through three stages.
+Chicobo born grade = parents' born-grade average (+1 with Zeio). Born stats (`BreedGenes`):
+each parent offers its blood (born stat + a tenth of its greens, `blood`); the chicobo lands
+between the two (`childGene`: a lean toward the middle, a -12..+12 wobble, lifted to its
+grade floor), plus the nut's gift (tier 1 Pepio .. 6 Porov, 7 Carob, 8 Zeio, to speed and
+stamina; half, rounded down, to intelligence and cooperation). One chicobo in eight sparks one
+stat (+5, leaning toward the stronger parent); a born stat above 96 needs that spark and both
+parents offering 85 or more. Chicobo sex random; grows through three stages.
 
-**Old saves.** A bird saved before save format 2 converts once on load: old
-first-place marks become points of nine (1 -> 3, 2 -> 6, Class S -> 9) and a bird with
-no born stats rolls a wild bloodline from its birth grade (`ChocoboEntity.convertOldSave`).
+**Old saves.** `ChocoboEntity.SAVE_FORMAT` 3. A bird converts once on load
+(`RaceScoring.convertedClassPoints`): before format 2, old first-place marks become points
+of nine (1 -> 3, 2 -> 6, Class S -> 9) and a bird with no born stats rolls a wild bloodline
+from its birth grade; before format 3, points of nine are rescaled x4 onto the 36 ladder
+(Class S -> 36). The almanac ledger rescales a record saved without `"Ladder": 36`.
 
 ## Riding
 
@@ -126,7 +134,7 @@ Own dimension `chocobosreborn:square`: a void world. `SquareBuilder`, `VillagePl
 (`PADDOCK_VERSION` 13 rebuilds; every position is in `VillageLayout`): plaza and arrival
 medallion, chocobo fountain with a little gold saucer at the statue's feet, market stalls,
 eight cottages, the inn and bell tower, stable yard, windmill, race hall, the race arch
-with the overlook over the void, the winners' board, the ranch, the nest barn and chick
+with the overlook over the void, the winners' board, the ranch, the nest barn and chicobo
 nursery, the jockey lounge, a pond with a dock, an orchard, a gysahl bed by Sage Wynn,
 signposts, and a shrine islet. Ten townsfolk (`TownRole.RESIDENT_*`, `TownRoutineGoal`)
 keep a day (home, work, the fountain, the inn) and line the overlook to cheer when a heat
@@ -137,7 +145,7 @@ room for `MAX_COURSES_PER_CLASS` (12) a class, islands up to `MAX_ISLAND_RADIUS`
 spawns are cancelled (`RaceManager.onFinalizeSpawn`), blocks cannot be broken or placed by
 players (`onBreak` / `onPlace`, creative operators excepted), and untamable town birds
 (`ChocoboEntity.townBird`) live in three patches: the ranch flock, a saddled pair in the
-stable yard and chicks in the nursery that never grow. Nothing there hurts anyone: race birds and
+stable yard and chicobos in the nursery that never grow. Nothing there hurts anyone: race birds and
 town birds are invulnerable (`ChocoboEntity.isInvulnerableTo`) and so is a visiting player
 (`RaceManager.onInvulnerabilityCheck`, anything short of `BYPASSES_INVULNERABILITY`), a
 burning rider is put out, and a visitor who goes over the edge is set down in the paddock
@@ -158,8 +166,8 @@ Points by distance (`RaceScoring.winPoints`, `RaceTrack.winPoints`): a ranked wi
 round(4 x heat length / the class's shortest sprint), so every sprint is 4 and a grand prix
 scores by its heat; the first-place purse is the class base (6 / 12 / 24 / 48) x points / 4. Sprints are one long lap
 (1150-1620 blocks, >= 120 s at 9 b/s, longer up the classes); grands prix are 3, 4 or 5
-laps of a shorter circuit (600-1000 blocks, the most laps on the shortest lap, never under
-600). Since the swap, courses 0-2 of each class are grands prix (5 / 4 / 3 laps) and 3-5
+laps of a short circuit (298-610 blocks, the most laps on the shortest lap), a heat
+1.17-1.44x the class's shortest sprint, so 5 or 6 points. Since the swap, courses 0-2 of each class are grands prix (5 / 4 / 3 laps) and 3-5
 sprints; courses 6-8 are the new sprints and 9-11 the new grands prix (5 / 4 / 3). Kart style: a `Shape` template (straights, sweepers, hairpins, chicanes, hills) as a closed
 spline scaled to the lap length, dressed in a `Theme` (four per class: meadow /
 orchard / shore / farmland, canyon / river / snow / savanna, cavern / jungle / nether /
@@ -173,7 +181,7 @@ Features across the direct line: BOOST strips (every class; `boost_pad` block, +
 for 50 ticks; five on a sprint's long lap, three on a grand prix's short one, each on a corner exit), WATER
 (river birds walk it), RIDGE (3-5 blocks; climbers go over), LAVA (Nether bird and
 Gold), MUD bogs (everyone -55%), each terrain feature with a detour road outside
-(`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A two plus a bog,
+(`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A two (A_INFERNO three) plus a bog,
 S three or four. Where a feature sits decides what a colour is worth, so the spans are
 placed, not free-hand: `RaceTrack.detourCost` measures the blocks a detour-taker gives
 away (swing out, round, swing back) and every feature sits on a level stretch of a bend
@@ -263,7 +271,7 @@ cherry grove; `random_spread` 34/12.
 
 ## Advancements
 
-root (Wark!), tame, ride, hatch, green_or_blue, black, gold, lure, farm from
+root, tame (Wark!), ride, hatch, green_or_blue, black, gold, lure, farm from
 vanilla triggers; square / first_place / class_s impossible-triggers awarded in
 code (`tools/write_datapack.py`).
 
@@ -283,5 +291,5 @@ Bird: `tools/fresh_ship.py` (see HANDOFF.md), meshes `chocobo`, `chocobo_saddled
 `chocobo_armor_iron`, `chocobo_armor_diamond`, eight breed atlases each
 (`tools/repaint_atlases.py` re-derives them; End / Nether show feathers carry the
 vanilla end stone / lava textures inside `art/masks`). Kin: Tribal Power skins. Calls:
-synthesised (`tools/wark_candidates.py`). Music: Ahmi's Suno tracks. Items:
-`tools/meshy_icons.py`.
+synthesised (`tools/wark_candidates.py`). Music: Ahmi's Suno tracks. Items, blocks and the almanac GUI:
+`tools/pixel_items.py` (`meshy_icons.py` is legacy and refuses to run without `--legacy`).
