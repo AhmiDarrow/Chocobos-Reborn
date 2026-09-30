@@ -339,10 +339,11 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		// an entered rider's odds are the heat's class, which may be below their bird's (half purse, lower odds)
 		tk.darrow.chocobosreborn.race.RaceClass heatClass = s != null ? s.track().getRaceClass()
 				: tk.darrow.chocobosreborn.race.HeatSchedule.enteredClass(player.getUUID());
-		boolean teioh = heatClass != null ? heatClass.includesTeioh()
-				: player.getVehicle() instanceof ChocoboEntity b && b.raceClass().includesTeioh();
-		int classId = heatClass != null ? heatClass.getId()
-				: player.getVehicle() instanceof ChocoboEntity b2 ? b2.raceClass().getId() : 0;
+		if (heatClass == null && player.getVehicle() instanceof ChocoboEntity bird) {
+			heatClass = bird.raceClass();
+		}
+		boolean teioh = heatClass != null ? heatClass.includesTeioh() : true;
+		int classId = heatClass != null ? heatClass.getId() : 0;
 		ItemStack hand = player.getMainHandItem();
 		if (!hand.is(ModItems.GP.get())) {
 			hand = player.getOffhandItem();
@@ -364,7 +365,7 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 					: RaceScoring.odds(pick, classId, RaceScoring.expectedFieldBirds(1, teioh));
 			int cap = s != null ? s.maxStake(pick) : RaceScoring.maxStake(RaceScoring.basePurse(classId), odds);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.pick",
-					Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT)),
+					Component.translatable(RaceScoring.betLangKey(pick, heatClass)),
 					odds, cap), true);
 			return InteractionResult.CONSUME;
 		}
@@ -372,7 +373,7 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			int moved = RaceManager.settlePendingOnto(player, s);
 			if (moved > 0) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", moved,
-						Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT))), false);
+						Component.translatable(RaceScoring.betLangKey(pick, heatClass))), false);
 			}
 			return InteractionResult.CONSUME;
 		}
@@ -384,7 +385,7 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		if (RaceManager.placeBet(player, pick, stake)) {
 			hand.shrink(stake);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", stake,
-					Component.translatable("chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT))), false);
+					Component.translatable(RaceScoring.betLangKey(pick, heatClass))), false);
 			if (s == null) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.bet.no_heat"), false);
 			}

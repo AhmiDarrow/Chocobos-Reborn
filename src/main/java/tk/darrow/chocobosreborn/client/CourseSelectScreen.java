@@ -138,7 +138,7 @@ public class CourseSelectScreen extends Screen {
 		int purse = RaceScoring.purse(t);
 		Component win;
 		if (mode == 0) {
-			win = counts ? Component.translatable("chocobosreborn.select.win", t.winPoints(), RaceClass.POINTS_TO_PROMOTE, purse)
+			win = counts ? Component.translatable("chocobosreborn.select.win", t.winPoints(), t.getRaceClass().pointsToPromote(), purse)
 					: Component.translatable("chocobosreborn.select.win_gp", lower ? purse / 2 : purse);
 		} else {
 			win = Component.translatable("chocobosreborn.select.duel_stake", stakeFor(t), purse);

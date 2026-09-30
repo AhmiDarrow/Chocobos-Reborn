@@ -64,7 +64,7 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 		t.putInt("Class", raceClass);
 		t.putInt("Wins", wins);
 		t.putInt("ClassWins", classWins);
-		t.putInt("Ladder", tk.darrow.chocobosreborn.race.RaceClass.POINTS_TO_PROMOTE);
+		t.putInt("Ladder", tk.darrow.chocobosreborn.race.RaceClass.LADDER_MARK);
 		t.putInt("TrSpeed", trSpeed);
 		t.putInt("TrStamina", trStamina);
 		t.putInt("TrIntel", trIntel);
@@ -90,16 +90,19 @@ public record BirdRecord(UUID id, UUID owner, String name, int color, int bornGr
 	}
 
 	/**
-	 * Class points as the almanac shows them. A record written on the nine-point ladder
-	 * (no "Ladder") is rescaled to 36 like the bird itself (save format 3), so a bird in an
-	 * unloaded chunk does not show 6 of 36 until it next loads.
+	 * Class points as the almanac shows them. Older ladder marks are brought onto the
+	 * current per-class bars (C 36 / B 54 / A 72) the same way a loaded bird is.
 	 */
 	static int ladderPoints(CompoundTag t) {
 		int stored = t.getInt("ClassWins");
-		if (t.getInt("Ladder") == tk.darrow.chocobosreborn.race.RaceClass.POINTS_TO_PROMOTE) {
+		int ladder = t.getInt("Ladder");
+		if (ladder == tk.darrow.chocobosreborn.race.RaceClass.LADDER_MARK) {
 			return stored;
 		}
-		return tk.darrow.chocobosreborn.race.RaceScoring.rescaledClassPoints(t.getInt("Class"), stored);
+		if (ladder == tk.darrow.chocobosreborn.race.RaceClass.POINTS_TO_PROMOTE) {
+			return tk.darrow.chocobosreborn.race.RaceScoring.scaledToPerClass(t.getInt("Class"), stored);
+		}
+		return tk.darrow.chocobosreborn.race.RaceScoring.convertedClassPoints(2, t.getInt("Class"), stored);
 	}
 
 	public static BirdRecord load(CompoundTag t) {

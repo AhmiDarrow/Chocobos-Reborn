@@ -78,6 +78,8 @@ import tk.darrow.chocobosreborn.sound.ModSounds;
 
 public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumping, net.minecraft.world.entity.HasCustomInventoryScreen, net.minecraft.world.ContainerListener {
 	private static final EntityDataAccessor<Integer> DATA_COLOR = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	/** Optional display plumage override (-1 = use {@link #DATA_COLOR}). Race stats stay on color(). */
+	private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_GRADE = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_NUT = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_WINS = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
@@ -206,6 +208,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	protected void defineSynchedData(SynchedEntityData.Builder builder) {
 		super.defineSynchedData(builder);
 		builder.define(DATA_COLOR, 0);
+		builder.define(DATA_LOOK, -1);
 		builder.define(DATA_GRADE, 1);
 		builder.define(DATA_NUT, 0);
 		builder.define(DATA_WINS, 0);
@@ -306,9 +309,20 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return ChocoboColor.byId(this.entityData.get(DATA_COLOR));
 	}
 
+	/** Plumage drawn on the mesh; falls back to {@link #color()} when no look override is set. */
+	public ChocoboColor displayColor() {
+		int id = this.entityData.get(DATA_LOOK);
+		return id < 0 ? color() : ChocoboColor.byId(id);
+	}
+
 	public void setColor(ChocoboColor color) {
 		this.entityData.set(DATA_COLOR, color.getId());
 		applyColorStats(true);
+	}
+
+	/** Set a display-only plumage (Class C rivals). Pass null to clear. */
+	public void setLookColor(@org.jetbrains.annotations.Nullable ChocoboColor look) {
+		this.entityData.set(DATA_LOOK, look == null ? -1 : look.getId());
 	}
 
 	/** Born grade plus one step per 120 training points (SPEC: greens lift the effective grade). */
@@ -434,14 +448,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * Save format 3 (points by distance). A bird saved by an older version is brought onto
-	 * the current rules once, step by step ({@link RaceScoring#convertedClassPoints}):
-	 * format 1 -> 2, its first-place marks toward the old three-win promotion become
-	 * points of nine, and a bird from before bloodlines rolls born stats from its birth
-	 * grade, as a wild bird does; format 2 -> 3, points of nine become points of 36 (x4).
-	 * Training, wins, colour and grade stay.
+	 * Save format 4 (per-class promotion bars). A bird saved by an older version is brought
+	 * onto the current rules once, step by step ({@link RaceScoring#convertedClassPoints}):
+	 * format 1 -> 2 marks to points of nine; 2 -> 3 points of nine to 36; 3 -> 4 uniform 36
+	 * to C 36 / B 54 / A 72. Training, wins, colour and grade stay.
 	 */
-	static final int SAVE_FORMAT = 3;
+	static final int SAVE_FORMAT = 4;
 
 	private void convertOldSave(int format) {
 		this.entityData.set(DATA_CLASS_WINS, RaceScoring.convertedClassPoints(format, raceClass().getId(), classWins()));
@@ -948,7 +960,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	/**
 	 * First-place finish at Chocobo Square. Ranked wins count for the farm line and earn
 	 * {@code points} toward promotion ({@link RaceScoring#winPoints}: 4 a sprint, a grand
-	 * prix by its length; 36 promote). The class never drops. Returns the outcome, or
+	 * prix by its length; {@link RaceClass#pointsToPromote()} promote). The class never drops. Returns the outcome, or
 	 * null for an unranked finish.
 	 */
 	@org.jetbrains.annotations.Nullable
@@ -1129,6 +1141,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		super.addAdditionalSaveData(tag);
 		ledgerUpdate();
 		tag.putInt("Plumage", color().getId());
+		if (this.entityData.get(DATA_LOOK) >= 0) {
+			tag.putInt("LookPlumage", this.entityData.get(DATA_LOOK));
+		}
 		tag.putInt("Grade", bornGrade().getRank());
 		tag.putInt("Nut", fedNut().ordinal());
 		tag.putInt("RaceWins", raceWins());
@@ -1183,6 +1198,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public void readAdditionalSaveData(CompoundTag tag) {
 		super.readAdditionalSaveData(tag);
 		this.entityData.set(DATA_COLOR, ChocoboColor.byId(tag.getInt("Plumage")).getId());
+		this.entityData.set(DATA_LOOK, tag.contains("LookPlumage") ? tag.getInt("LookPlumage") : -1);
 		setGrade(ChocoboGrade.byRank(tag.getInt("Grade")));
 		this.entityData.set(DATA_NUT, tag.getInt("Nut"));
 		this.entityData.set(DATA_WINS, tag.getInt("RaceWins"));

@@ -30,6 +30,8 @@ public enum TownRole {
 	JOCKEY_CLAW("hunter", "claw", 0xb8512f),
 	JOCKEY_TEIYO("elder", "spindle", 0x62d1c9),  // the named rivals' jockeys
 	JOCKEY_JOLO("drummer", "swarm", 0xd7b23c),
+	JOCKEY_AHMI("ahmidarrow", "player", 0x6b3fa0),   // Class C: Ahmi (Ahmidarrow skin)
+	JOCKEY_RISIKA("rabidwraith", "player", 0x8b1a1a), // Class C: Risika (RabidWraith skin)
 	// Whiskerwind's townsfolk: they keep a day (home, work, the fountain, the inn) and
 	// line the overlook when a heat is called. They chat but never trade or teleport.
 	RESIDENT_RANCHER("hunter", "soil", 0x8b5a2b),
@@ -60,7 +62,13 @@ public enum TownRole {
 	/** Riders of the AI racers: never trade or teleport anyone. */
 	public boolean jockey() {
 		return this == JOCKEY_SWARM || this == JOCKEY_CLOCK || this == JOCKEY_SPINDLE || this == JOCKEY_SOIL
-				|| this == JOCKEY_CLAW || this == JOCKEY_TEIYO || this == JOCKEY_JOLO;
+				|| this == JOCKEY_CLAW || this == JOCKEY_TEIYO || this == JOCKEY_JOLO
+				|| playerJockey();
+	}
+
+	/** Class C named rivals: Minecraft player skins on a humanoid model. */
+	public boolean playerJockey() {
+		return this == JOCKEY_AHMI || this == JOCKEY_RISIKA;
 	}
 
 	/** Spectators: cheer, never trade or teleport anyone. */

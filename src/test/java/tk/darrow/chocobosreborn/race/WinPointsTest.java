@@ -95,30 +95,35 @@ class WinPointsTest {
 	}
 
 	@Test
-	void nineSprintWinsPromote() {
+	void sprintWinsPromoteAtTheClassBar() {
 		for (RaceClass rc : PROMOTING) {
 			RaceTrack sprint = RaceTrack.sprintsOf(rc).get(0);
+			int need = rc.pointsToPromote();
+			int sprintPts = sprint.winPoints();
+			int expectedWins = (need + sprintPts - 1) / sprintPts;
 			int points = 0;
-			for (int win = 1; win <= 8; win++) {
-				RaceScoring.Promotion p = RaceScoring.afterFirstPlace(rc, points, sprint.winPoints());
+			for (int win = 1; win < expectedWins; win++) {
+				RaceScoring.Promotion p = RaceScoring.afterFirstPlace(rc, points, sprintPts);
 				assertFalse(p.promoted(), rc + " sprint win " + win);
 				points = p.classWins();
 			}
-			assertEquals(32, points);
-			RaceScoring.Promotion ninth = RaceScoring.afterFirstPlace(rc, points, sprint.winPoints());
-			assertTrue(ninth.promoted(), rc.name());
-			assertEquals(rc.next(), ninth.raceClass());
+			assertEquals((expectedWins - 1) * sprintPts, points);
+			RaceScoring.Promotion last = RaceScoring.afterFirstPlace(rc, points, sprintPts);
+			assertTrue(last.promoted(), rc.name());
+			assertEquals(rc.next(), last.raceClass());
 		}
 	}
 
 	@Test
 	void grandsPrixPromoteInFewerWinsThanSprints() {
 		for (RaceClass rc : PROMOTING) {
+			int need = rc.pointsToPromote();
+			int sprintWins = need / 4;
 			for (RaceTrack t : RaceTrack.grandsPrixOf(rc)) {
 				int wins = winsToPromote(rc, t);
-				int expected = (RaceClass.POINTS_TO_PROMOTE + t.winPoints() - 1) / t.winPoints();
+				int expected = (need + t.winPoints() - 1) / t.winPoints();
 				assertEquals(expected, wins, t.name());
-				assertTrue(wins < 9, t.name() + " takes " + wins + " wins, no fewer than sprints");
+				assertTrue(wins < sprintWins, t.name() + " takes " + wins + " wins, no fewer than sprints");
 				assertTrue(wins >= 3, t.name() + " takes only " + wins + " wins");
 			}
 		}
@@ -127,10 +132,10 @@ class WinPointsTest {
 	@Test
 	void classSStaysAtTheTop() {
 		for (RaceTrack t : RaceTrack.ofClass(RaceClass.S)) {
-			RaceScoring.Promotion p = RaceScoring.afterFirstPlace(RaceClass.S, RaceClass.POINTS_TO_PROMOTE, t.winPoints());
+			RaceScoring.Promotion p = RaceScoring.afterFirstPlace(RaceClass.S, RaceClass.POINTS_A, t.winPoints());
 			assertEquals(RaceClass.S, p.raceClass());
 			assertFalse(p.promoted());
-			assertEquals(RaceClass.POINTS_TO_PROMOTE, p.classWins());
+			assertEquals(RaceClass.POINTS_A, p.classWins());
 		}
 	}
 
@@ -194,10 +199,11 @@ class WinPointsTest {
 	@Test
 	void writeTheTable() throws IOException {
 		List<String> out = new ArrayList<>();
-		out.add("Points by distance: points = round(4 x heat / shortest sprint of the class), 36 promote;");
-		out.add("purse = class base x points / 4 (2nd half, 3rd a quarter). secs = the class favourite at its best");
-		out.add("form (RaceSim), the pace a winner beats. GP/min = purse per minute of racing; marks = five-minute heat");
-		out.add("marks the heat ties up (13 s hold + heat + 30 s back to Esther + 10 s last call); GP/hr = purse x 12 / marks.");
+		out.add("Points by distance: points = round(4 x heat / shortest sprint of the class);");
+		out.add("promote at C 36 / B 54 / A 72. purse = class base x points / 4 (2nd half, 3rd a quarter).");
+		out.add("secs = the class favourite at its best form (RaceSim), the pace a winner beats.");
+		out.add("GP/min = purse per minute of racing; marks = five-minute heat marks the heat ties up");
+		out.add("(13 s hold + heat + 30 s back to Esther + 10 s last call); GP/hr = purse x 12 / marks.");
 		out.add("old = 1 / 3 points (9 promote) and base / 3x base purses.");
 		out.add("");
 		out.add(String.format(Locale.ROOT, "%-14s %-9s %6s %5s %4s %4s %5s %6s %6s %5s %6s %8s",
@@ -205,6 +211,7 @@ class WinPointsTest {
 		for (RaceClass rc : LADDER) {
 			double ref = RaceScoring.referenceLength(rc);
 			int base = RaceScoring.basePurse(rc);
+			int need = rc.pointsToPromote();
 			double[] perMin = new double[2], perHour = new double[2], oldPerMin = new double[2], secsPerBlock = new double[2];
 			int[] n = new int[2];
 			List<RaceTrack> order = new ArrayList<>(RaceTrack.sprintsOf(rc));
@@ -221,7 +228,7 @@ class WinPointsTest {
 				perHour[k] += purse * 12.0D / m;
 				secsPerBlock[k] += secs / t.raceLength();
 				n[k]++;
-				String wins = rc == RaceClass.S ? "-" : String.valueOf((RaceClass.POINTS_TO_PROMOTE + pts - 1) / pts);
+				String wins = rc == RaceClass.S ? "-" : String.valueOf((need + pts - 1) / pts);
 				String format = t.isSprint() ? "sprint" : t.getLaps() + " x " + Math.round(t.lapLength());
 				out.add(String.format(Locale.ROOT, "%-14s %-9s %6.0f %5.2f %4d %4s %5d %6d %6.0f %5.1f %6d %8.0f",
 						t.name(), format, t.raceLength(), t.raceLength() / ref, pts, wins, purse, old, secs,
@@ -233,7 +240,7 @@ class WinPointsTest {
 			double shortHeat = 1.3D * ref, shortSecs = shortHeat * secsPerBlock[1] / n[1];
 			int shortPts = RaceScoring.winPoints(shortHeat, ref), shortPurse = (int) Math.round(base * shortPts / 4.0D);
 			out.add(String.format(Locale.ROOT, "%s at 1.3x (short-lap rework, est.): %d pts, %d wins, purse %d, ~%.0f s, %.1f GP/min, %d mark(s), %.0f GP/hr",
-					rc, shortPts, (RaceClass.POINTS_TO_PROMOTE + shortPts - 1) / shortPts, shortPurse, shortSecs,
+					rc, shortPts, (need + shortPts - 1) / shortPts, shortPurse, shortSecs,
 					shortPurse / (shortSecs / 60.0D), marks(shortSecs), shortPurse * 12.0D / marks(shortSecs)));
 			out.add("");
 		}

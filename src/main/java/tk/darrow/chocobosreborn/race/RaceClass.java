@@ -5,7 +5,7 @@ import java.util.Locale;
 /**
  * Gold Saucer / Chocobo Square classes from Final Fantasy VII.
  * Ranked wins earn points by the heat's length ({@link RaceScoring#winPoints});
- * {@link #POINTS_TO_PROMOTE} of them promote a bird; class never drops.
+ * {@link #pointsToPromote()} of them promote a bird; class never drops.
  */
 public enum RaceClass {
 	C(0),
@@ -13,11 +13,17 @@ public enum RaceClass {
 	A(2),
 	S(3);
 
-	/**
-	 * Points to leave a class: nine sprint wins (4 each), or fewer grand prix wins (each
-	 * worth more, by the heat's length). See {@link RaceScoring#winPoints}.
-	 */
+	/** Class C bar (nine sprint wins). B and A scale up from here. */
 	public static final int POINTS_TO_PROMOTE = 36;
+	/** Class B bar: 1.5× Class C. */
+	public static final int POINTS_B = 54;
+	/** Class A bar (and Class S display): 2× Class C. */
+	public static final int POINTS_A = 72;
+	/**
+	 * Almanac / bird-record mark that class points are already on the per-class ladder
+	 * (format 4). Older saves used {@link #POINTS_TO_PROMOTE} (36) for the uniform ladder.
+	 */
+	public static final int LADDER_MARK = POINTS_A;
 
 	private final int id;
 
@@ -29,8 +35,29 @@ public enum RaceClass {
 		return id;
 	}
 
+	/**
+	 * Points needed to leave this class. Class S is the top: the almanac shows the
+	 * Class A bar and never promotes further.
+	 */
+	public int pointsToPromote() {
+		return switch (this) {
+			case C -> POINTS_TO_PROMOTE;
+			case B -> POINTS_B;
+			case A, S -> POINTS_A;
+		};
+	}
+
+	/**
+	 * Named rivals take two stalls on a ranked card: Ahmi and Risika in Class C,
+	 * Teiyo and Jolo from Class B up.
+	 */
 	public boolean includesTeioh() {
-		return this != C;
+		return true;
+	}
+
+	/** Class C's named pair (Ahmi / Risika) instead of Teiyo / Jolo. */
+	public boolean cClassRivals() {
+		return this == C;
 	}
 
 	public RaceClass next() {

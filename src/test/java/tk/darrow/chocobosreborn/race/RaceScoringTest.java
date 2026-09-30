@@ -1,6 +1,7 @@
 package tk.darrow.chocobosreborn.race;
 
 import org.junit.jupiter.api.Test;
+import tk.darrow.chocobosreborn.breed.ChocoboColor;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,12 +49,14 @@ class RaceScoringTest {
 
 	@Test
 	void sClassNeverDrops() {
-		RaceScoring.Promotion stay = RaceScoring.afterFirstPlace(RaceClass.S, 36, 4);
+		RaceScoring.Promotion stay = RaceScoring.afterFirstPlace(RaceClass.S, 72, 4);
 		assertEquals(RaceClass.S, stay.raceClass());
 		assertFalse(stay.promoted());
 		assertEquals(0, RaceScoring.winsUntilPromote(RaceClass.S, stay.classWins()));
 		assertEquals(36, RaceScoring.winsUntilPromote(RaceClass.C, 0));
 		assertEquals(28, RaceScoring.winsUntilPromote(RaceClass.C, 8));
+		assertEquals(54, RaceScoring.winsUntilPromote(RaceClass.B, 0));
+		assertEquals(72, RaceScoring.winsUntilPromote(RaceClass.A, 0));
 	}
 
 	@Test
@@ -62,8 +65,25 @@ class RaceScoringTest {
 		assertEquals(RaceClass.A, RaceClass.B.next());
 		assertEquals(RaceClass.S, RaceClass.A.next());
 		assertEquals(RaceClass.S, RaceClass.S.next());
+		assertEquals(36, RaceClass.C.pointsToPromote());
+		assertEquals(54, RaceClass.B.pointsToPromote());
+		assertEquals(72, RaceClass.A.pointsToPromote());
+		assertEquals(72, RaceClass.S.pointsToPromote());
+		assertTrue(RaceClass.C.includesTeioh());
+		assertTrue(RaceClass.C.cClassRivals());
 		assertTrue(RaceClass.B.includesTeioh());
-		assertFalse(RaceClass.C.includesTeioh());
+		assertFalse(RaceClass.B.cClassRivals());
+	}
+
+	@Test
+	void classCBetsNameAhmiAndRisika() {
+		// Risika is the Teiyo-pace pick (slightly faster); Ahmi is the Jolo-pace pick.
+		assertEquals("chocobosreborn.bet.risika", RaceScoring.betLangKey(RaceScoring.BetPick.TEIOH, RaceClass.C));
+		assertEquals("chocobosreborn.bet.ahmi", RaceScoring.betLangKey(RaceScoring.BetPick.JOE, RaceClass.C));
+		assertEquals("chocobosreborn.bet.teioh", RaceScoring.betLangKey(RaceScoring.BetPick.TEIOH, RaceClass.B));
+		assertEquals("chocobosreborn.bet.joe", RaceScoring.betLangKey(RaceScoring.BetPick.JOE, RaceClass.A));
+		assertEquals(ChocoboColor.FLAME, RaceScoring.cRivalLook(false));
+		assertEquals(ChocoboColor.PURPLE, RaceScoring.cRivalLook(true));
 	}
 
 	@Test
@@ -502,10 +522,17 @@ class RaceScoringTest {
 
 	@Test
 	void classBPromotesToAThenS() {
-		RaceScoring.Promotion toA = RaceScoring.afterFirstPlace(RaceClass.B, 26, 10);
+		RaceScoring.Promotion holdB = RaceScoring.afterFirstPlace(RaceClass.B, 26, 10);
+		assertEquals(RaceClass.B, holdB.raceClass());
+		assertFalse(holdB.promoted());
+		assertEquals(36, holdB.classWins());
+		RaceScoring.Promotion toA = RaceScoring.afterFirstPlace(RaceClass.B, 50, 4);
 		assertEquals(RaceClass.A, toA.raceClass());
 		assertTrue(toA.promoted());
-		RaceScoring.Promotion toS = RaceScoring.afterFirstPlace(RaceClass.A, 32, 4);
+		RaceScoring.Promotion holdA = RaceScoring.afterFirstPlace(RaceClass.A, 32, 4);
+		assertEquals(RaceClass.A, holdA.raceClass());
+		assertFalse(holdA.promoted());
+		RaceScoring.Promotion toS = RaceScoring.afterFirstPlace(RaceClass.A, 68, 4);
 		assertEquals(RaceClass.S, toS.raceClass());
 		assertTrue(toS.promoted());
 	}

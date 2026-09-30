@@ -82,7 +82,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	}
 
 	private static ResourceLocation texture(ChocoboEntity e, String mesh) {
-		int id = Math.min(e.color().getId(), SKINS.length - 1);
+		int id = Math.min(e.displayColor().getId(), SKINS.length - 1);
 		ResourceLocation[] set;
 		if (mesh.equals("chocobo_saddled")) {
 			set = SKINS_SADDLED;
@@ -184,7 +184,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		skinner.compose(bones, nb, pose.pose(), pose.normal());
 		boolean hurt = e.hurtTime > 0;
 		int overlay = OverlayTexture.pack(0, hurt);
-		int breed = Math.min(e.color().getId(), PLUMAGE.length - 1);
+		int breed = Math.min(e.displayColor().getId(), PLUMAGE.length - 1);
 		ResourceLocation tex = texture(e, mesh);
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();

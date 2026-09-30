@@ -2,8 +2,12 @@ package tk.darrow.chocobosreborn.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
+
 import net.minecraft.client.model.HierarchicalModel;
+import net.minecraft.client.model.PlayerModel;
 import net.minecraft.client.model.geom.ModelLayerLocation;
+import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -21,7 +25,7 @@ import tk.darrow.chocobosreborn.race.TownRole;
  * Tribal Power kin: the masked, hooded, cloaked humanoid from Tribal Power's
  * Blender roster (geometry in {@link ChocobosRebornClient#kinLayer}, 256x256 skins
  * per kin role) plus its eyes-glow layer and a tribe cloak overlay tinted with the
- * tribe colour. Same art as Tribal Power so the kin read as one people across both mods.
+ * tribe colour. Class C named rivals use classic 64x64 player skins on a player model.
  */
 public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinStewardRenderer.Model> {
 	public static final ModelLayerLocation LAYER = new ModelLayerLocation(
@@ -33,9 +37,15 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 	static {
 		for (TownRole role : TownRole.values()) {
 			int i = role.ordinal();
-			SKINS[i] = tex("kin_" + role.skin());
-			GLOW[i] = RenderType.eyes(tex("kin_" + role.skin() + "_glow"));
-			CLOAKS[i] = tex("kin_cloak_" + role.tribe());
+			if (role.playerJockey()) {
+				SKINS[i] = jockeyTex(role.skin());
+				GLOW[i] = null;
+				CLOAKS[i] = SKINS[i];
+			} else {
+				SKINS[i] = kinTex("kin_" + role.skin());
+				GLOW[i] = RenderType.eyes(kinTex("kin_" + role.skin() + "_glow"));
+				CLOAKS[i] = kinTex("kin_cloak_" + role.tribe());
+			}
 		}
 	}
 
@@ -49,17 +59,24 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 		return CLOAKS[role.ordinal()];
 	}
 
-	/** Eyes-layer glow of a kin role. */
+	/** Eyes-layer glow of a kin role; {@code null} for player-skin jockeys. */
 	public static RenderType glowType(TownRole role) {
 		return GLOW[role.ordinal()];
 	}
 
-	private static ResourceLocation tex(String name) {
+	private static ResourceLocation kinTex(String name) {
 		return ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "textures/entity/kin/" + name + ".png");
 	}
 
+	private static ResourceLocation jockeyTex(String name) {
+		return ResourceLocation.fromNamespaceAndPath(ChocobosReborn.MOD_ID, "textures/entity/jockey/" + name + ".png");
+	}
+
+	private final PlayerModel<KinStewardEntity> playerModel;
+
 	public KinStewardRenderer(EntityRendererProvider.Context context) {
 		super(context, new Model(context.bakeLayer(LAYER)), 0.4F);
+		this.playerModel = new PlayerModel<>(context.bakeLayer(ModelLayers.PLAYER), false);
 		addLayer(new GlowLayer(this));
 		addLayer(new CloakLayer(this));
 	}
@@ -67,6 +84,54 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 	@Override
 	public ResourceLocation getTextureLocation(KinStewardEntity entity) {
 		return SKINS[Math.min(entity.role().ordinal(), SKINS.length - 1)];
+	}
+
+	@Override
+	public void render(KinStewardEntity entity, float entityYaw, float partialTicks, PoseStack pose,
+			MultiBufferSource buffer, int packedLight) {
+		if (entity.role().playerJockey()) {
+			renderPlayerJockey(entity, entityYaw, partialTicks, pose, buffer, packedLight);
+			return;
+		}
+		super.render(entity, entityYaw, partialTicks, pose, buffer, packedLight);
+	}
+
+	/** Classic Steve-model jockey for Ahmi / Risika (64x64 skins under textures/entity/jockey/). */
+	private void renderPlayerJockey(KinStewardEntity entity, float entityYaw, float partialTicks, PoseStack pose,
+			MultiBufferSource buffer, int packedLight) {
+		pose.pushPose();
+		float bodyYaw = Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot);
+		float headYaw = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.yHeadRot);
+		float netHead = headYaw - bodyYaw;
+		float headPitch = Mth.lerp(partialTicks, entity.xRotO, entity.getXRot());
+		float limbSwing = entity.walkAnimation.position(partialTicks);
+		float limbAmount = entity.walkAnimation.speed(partialTicks);
+		float age = entity.tickCount + partialTicks;
+
+		playerModel.young = entity.isBaby();
+		playerModel.riding = entity.isPassenger();
+		playerModel.crouching = false;
+		playerModel.setupAnim(entity, limbSwing, limbAmount, age, netHead, headPitch);
+		if (entity.isPassenger()) {
+			// hands on the reins, matching the kin saddle pose
+			playerModel.rightArm.xRot = -0.85F;
+			playerModel.leftArm.xRot = -0.85F;
+			playerModel.rightArm.zRot = 0.1F;
+			playerModel.leftArm.zRot = -0.1F;
+		}
+
+		pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
+		pose.scale(-1.0F, -1.0F, 1.0F);
+		pose.translate(0.0F, -1.501F, 0.0F);
+
+		ResourceLocation tex = getTextureLocation(entity);
+		VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(tex));
+		playerModel.renderToBuffer(pose, consumer, packedLight, LivingEntityRenderer.getOverlayCoords(entity, 0), 0xFFFFFFFF);
+		pose.popPose();
+
+		if (this.shouldShowName(entity)) {
+			this.renderNameTag(entity, entity.getDisplayName(), pose, buffer, packedLight, partialTicks);
+		}
 	}
 
 	/** Eyes-layer glow from the thread marks on each kin skin. */
@@ -78,10 +143,14 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 		@Override
 		public void render(PoseStack pose, MultiBufferSource buffer, int light, KinStewardEntity entity, float limbSwing,
 				float limbAmount, float partial, float age, float yaw, float pitch) {
-			if (entity.isInvisible()) {
+			if (entity.isInvisible() || entity.role().playerJockey()) {
 				return;
 			}
-			VertexConsumer consumer = buffer.getBuffer(GLOW[Math.min(entity.role().ordinal(), GLOW.length - 1)]);
+			RenderType glow = GLOW[Math.min(entity.role().ordinal(), GLOW.length - 1)];
+			if (glow == null) {
+				return;
+			}
+			VertexConsumer consumer = buffer.getBuffer(glow);
 			getParentModel().renderToBuffer(pose, consumer, 15728880, LivingEntityRenderer.getOverlayCoords(entity, 0), 0xFFFFFFFF);
 		}
 	}
@@ -95,7 +164,7 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 		@Override
 		public void render(PoseStack pose, MultiBufferSource buffer, int light, KinStewardEntity entity, float limbSwing,
 				float limbAmount, float partial, float age, float yaw, float pitch) {
-			if (entity.isInvisible()) {
+			if (entity.isInvisible() || entity.role().playerJockey()) {
 				return;
 			}
 			TownRole role = entity.role();

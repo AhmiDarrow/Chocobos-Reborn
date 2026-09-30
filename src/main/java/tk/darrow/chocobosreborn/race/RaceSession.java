@@ -42,6 +42,8 @@ public class RaceSession {
 	private static final int RUN_CAP_TICKS = 12000;
 	static final String NAME_TEIYO = "Teiyo";
 	static final String NAME_JOLO = "Jolo";
+	static final String NAME_AHMI = "Ahmi";
+	static final String NAME_RISIKA = "Risika";
 	public static final int FIELD = 6;
 
 	private final class Racer {
@@ -213,11 +215,12 @@ public class RaceSession {
 	}
 
 	private boolean hasJolo() {
-		return racers.stream().anyMatch(r -> NAME_JOLO.equals(r.name));
+		// Class C: Ahmi takes the Jolo (slightly slower) slot; Risika takes Teiyo's.
+		return racers.stream().anyMatch(r -> NAME_JOLO.equals(r.name) || NAME_AHMI.equals(r.name));
 	}
 
 	private boolean hasTeiyo() {
-		return racers.stream().anyMatch(r -> NAME_TEIYO.equals(r.name));
+		return racers.stream().anyMatch(r -> NAME_TEIYO.equals(r.name) || NAME_RISIKA.equals(r.name));
 	}
 
 	private RaceScoring.BetPick legalLivePick(RaceScoring.BetPick pick, UUID bettor) {
@@ -340,8 +343,9 @@ public class RaceSession {
 	}
 
 	private void spawnField(int humans, RaceClass raceClass) {
-		boolean teioh = ranked && raceClass.includesTeioh();
-		int namedSlots = FIELD - humans - (teioh ? 2 : 0);
+		boolean rivals = ranked && raceClass.includesTeioh();
+		boolean cRivals = rivals && raceClass.cClassRivals();
+		int namedSlots = FIELD - humans - (rivals ? 2 : 0);
 		List<FieldRoster.Entry> card = FieldRoster.draw(raceClass, Math.max(0, namedSlots),
 				new java.util.Random(level.random.nextLong()));
 		int cardIdx = 0;
@@ -363,13 +367,16 @@ public class RaceSession {
 			if (npc == null) {
 				continue;
 			}
-			boolean isTeioh = teioh && i == FIELD - 2 && i >= humans;
-			boolean isJolo = teioh && i == FIELD - 1 && i >= humans;
+			boolean isTeioh = rivals && i == FIELD - 2 && i >= humans;
+			boolean isJolo = rivals && i == FIELD - 1 && i >= humans;
 			FieldRoster.Entry entry = null;
 			if (!isTeioh && !isJolo && cardIdx < card.size()) {
 				entry = card.get(cardIdx++);
 			}
-			String name = isTeioh ? NAME_TEIYO : isJolo ? NAME_JOLO : entry != null ? entry.name() : "Racer";
+			// Class C: Risika is the Teiyo-pace rival (slightly ahead of Ahmi); Ahmi is Jolo-pace.
+			String name = isTeioh ? (cRivals ? NAME_RISIKA : NAME_TEIYO)
+					: isJolo ? (cRivals ? NAME_AHMI : NAME_JOLO)
+					: entry != null ? entry.name() : "Racer";
 			announced.add(name);
 			RacePoint stall = track.stallPos(i, FIELD);
 			npc.moveTo(stall.x(), stall.y(), stall.z(), track.facingYaw(), 0.0F);
@@ -379,8 +386,17 @@ public class RaceSession {
 			npc.setRaceNpc(true);
 			npc.setPersistenceRequired();
 			npc.setRacing(true);
-			npc.setColor(isTeioh ? ChocoboColor.BLACK : isJolo ? RaceScoring.joloColor(raceClass)
-					: entry != null ? entry.color() : npcColor(raceClass, i));
+			// C rivals: Yellow race stats with Nether/End looks; B+ Teiyo Black, Jolo by class
+			if (isTeioh || isJolo) {
+				if (cRivals) {
+					npc.setColor(ChocoboColor.YELLOW);
+					npc.setLookColor(RaceScoring.cRivalLook(isTeioh));
+				} else {
+					npc.setColor(isTeioh ? ChocoboColor.BLACK : RaceScoring.joloColor(raceClass));
+				}
+			} else {
+				npc.setColor(entry != null ? entry.color() : npcColor(raceClass, i));
+			}
 			npc.setGrade(ChocoboGrade.byRank(Math.min(4, raceClass.getId() + 1)));
 			npc.setRaceClass(raceClass);
 			int train = RaceScoring.fieldTraining(raceClass.getId(), isTeioh || isJolo);
@@ -393,7 +409,10 @@ public class RaceSession {
 			npc.setCustomNameVisible(false);   // the jockey carries the name
 			npc.inventory().setItem(tk.darrow.chocobosreborn.menu.ChocoboInventoryMenu.SADDLE, new ItemStack(ModItems.SADDLE.get()));
 			level.addFreshEntity(npc);
-			mountJockey(npc, isTeioh ? TownRole.JOCKEY_TEIYO : isJolo ? TownRole.JOCKEY_JOLO : jockeyLook(i), stall, name);
+			TownRole jockey = isTeioh
+					? (cRivals ? TownRole.JOCKEY_RISIKA : TownRole.JOCKEY_TEIYO)
+					: isJolo ? (cRivals ? TownRole.JOCKEY_AHMI : TownRole.JOCKEY_JOLO) : jockeyLook(i);
+			mountJockey(npc, jockey, stall, name);
 			Racer r = new Racer(npc, null, name, RaceTrack.stallOffset(i, FIELD), track.progressAt(stall.x(), stall.z()));
 			RacerProfile.Role role = isTeioh ? RacerProfile.Role.TEIYO : isJolo ? RacerProfile.Role.JOLO : RacerProfile.Role.FIELD;
 			r.goal = new RacerGoal(npc, track, r.lane, RacerProfile.of(raceClass, role));
@@ -1030,7 +1049,7 @@ public class RaceSession {
 				} else {
 					// "+10 points (26 of 36), Class C"
 					player.displayClientMessage(Component.translatable("chocobosreborn.race.class",
-							earned, mine.classWins(), RaceClass.POINTS_TO_PROMOTE, cls), false);
+							earned, mine.classWins(), mine.raceClass().pointsToPromote(), cls), false);
 				}
 				SquareAdvancements.award(player, SquareAdvancements.FIRST_PLACE);
 				if (mine.raceClass() == RaceClass.S) {
@@ -1167,9 +1186,9 @@ public class RaceSession {
 				}
 				continue;
 			}
-			if (r.name.equals(NAME_TEIYO)) {
+			if (r.name.equals(NAME_TEIYO) || r.name.equals(NAME_RISIKA)) {
 				teiohFirst = true;
-			} else if (r.name.equals(NAME_JOLO)) {
+			} else if (r.name.equals(NAME_JOLO) || r.name.equals(NAME_AHMI)) {
 				joeFirst = true;
 			} else {
 				fieldFirst = true;
@@ -1239,7 +1258,8 @@ public class RaceSession {
 	/** AI racers that are neither Teiyo nor Jolo: the ones a FIELD bet backs. */
 	private int fieldBirds() {
 		return (int) racers.stream()
-				.filter(r -> !r.human() && !NAME_TEIYO.equals(r.name) && !NAME_JOLO.equals(r.name))
+				.filter(r -> !r.human() && !NAME_TEIYO.equals(r.name) && !NAME_JOLO.equals(r.name)
+						&& !NAME_AHMI.equals(r.name) && !NAME_RISIKA.equals(r.name))
 				.count();
 	}
 

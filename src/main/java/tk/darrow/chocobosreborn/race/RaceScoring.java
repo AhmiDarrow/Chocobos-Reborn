@@ -32,8 +32,8 @@ public final class RaceScoring {
 	 * Points for a ranked first place on {@code track}: 4 x heat length / the class's
 	 * shortest sprint, rounded. Every sprint is 4 (a class's sprints are within 12.5 % of
 	 * each other, so pinning them is only a guard); a grand prix scores by its heat, e.g.
-	 * a heat 2.5 times the shortest sprint is 10. {@link RaceClass#POINTS_TO_PROMOTE} (36)
-	 * is nine sprint wins. HANDOFF.md "Points by distance" has the table.
+	 * a heat 2.5 times the shortest sprint is 10. Class C promotes at 36 (nine sprint
+	 * wins); B at 54 and A at 72. HANDOFF.md "Points by distance" has the table.
 	 */
 	public static int winPoints(RaceTrack track) {
 		if (track.isSprint()) {
@@ -67,15 +67,16 @@ public final class RaceScoring {
 
 	/**
 	 * A ranked first place worth {@code earned} points ({@link #winPoints}).
-	 * {@link RaceClass#POINTS_TO_PROMOTE} promote; spare points do not carry over.
+	 * {@link RaceClass#pointsToPromote()} promote; spare points do not carry over.
 	 * Class S is the top: it shows the full ladder and earns nothing more.
 	 */
 	public static Promotion afterFirstPlace(RaceClass current, int classPoints, int earned) {
 		if (current == RaceClass.S) {
-			return new Promotion(RaceClass.S, RaceClass.POINTS_TO_PROMOTE, false);
+			return new Promotion(RaceClass.S, current.pointsToPromote(), false);
 		}
+		int need = current.pointsToPromote();
 		int points = Math.max(0, classPoints) + Math.max(0, earned);
-		if (points >= RaceClass.POINTS_TO_PROMOTE) {
+		if (points >= need) {
 			return new Promotion(current.next(), 0, true);
 		}
 		return new Promotion(current, points, false);
@@ -99,7 +100,7 @@ public final class RaceScoring {
 
 	/**
 	 * Save format 2 -> 3. Points of 9 become points of 36 (x4, the same share of the way
-	 * up: a sprint was 1 of 9 and is 4 of 36). Class S shows the full 36.
+	 * up: a sprint was 1 of 9 and is 4 of 36). Class S shows the full 36 on this step.
 	 */
 	public static int rescaledClassPoints(int classId, int stored) {
 		if (classId >= RaceClass.S.getId()) {
@@ -107,6 +108,22 @@ public final class RaceScoring {
 		}
 		int scale = RaceClass.POINTS_TO_PROMOTE / OLD_PROMOTE;
 		return Math.min(RaceClass.POINTS_TO_PROMOTE - 1, Math.max(0, stored) * scale);
+	}
+
+	/**
+	 * Save format 3 -> 4. Uniform points of 36 become the per-class bar (C 36, B 54, A 72),
+	 * keeping the same share of the way up. Class S shows the full Class A bar.
+	 */
+	public static int scaledToPerClass(int classId, int storedOn36) {
+		RaceClass rc = RaceClass.byId(classId);
+		int need = rc.pointsToPromote();
+		if (rc == RaceClass.S) {
+			return need;
+		}
+		if (need == RaceClass.POINTS_TO_PROMOTE) {
+			return Math.min(need - 1, Math.max(0, storedOn36));
+		}
+		return Math.min(need - 1, Math.max(0, storedOn36) * need / RaceClass.POINTS_TO_PROMOTE);
 	}
 
 	/** A bird's class points saved in {@code format}, brought up to the current ladder, one step at a time. */
@@ -118,6 +135,9 @@ public final class RaceScoring {
 		if (format < 3) {
 			points = rescaledClassPoints(classId, points);
 		}
+		if (format < 4) {
+			points = scaledToPerClass(classId, points);
+		}
 		return points;
 	}
 
@@ -126,7 +146,19 @@ public final class RaceScoring {
 		if (current == RaceClass.S) {
 			return 0;
 		}
-		return Math.max(0, RaceClass.POINTS_TO_PROMOTE - classWins);
+		return Math.max(0, current.pointsToPromote() - classWins);
+	}
+
+	/** Lang key for a bookie pick: Class C puts Risika in Teiyo's slot and Ahmi in Jolo's. */
+	public static String betLangKey(BetPick pick, RaceClass raceClass) {
+		if (raceClass != null && raceClass.cClassRivals()) {
+			return switch (pick) {
+				case JOE -> "chocobosreborn.bet.ahmi";
+				case TEIOH -> "chocobosreborn.bet.risika";
+				default -> "chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT);
+			};
+		}
+		return "chocobosreborn.bet." + pick.name().toLowerCase(java.util.Locale.ROOT);
 	}
 
 	/** A sprint's first-place GP in the class. */
@@ -378,6 +410,14 @@ public final class RaceScoring {
 			case A -> ChocoboColor.WHITE;
 			case S -> ChocoboColor.GOLD;
 		};
+	}
+
+	/**
+	 * Class C named rivals' display plumage: Ahmi a Flame (Nether) look, Risika a
+	 * Purple (End) look. Their race stats stay Yellow.
+	 */
+	public static ChocoboColor cRivalLook(boolean risika) {
+		return risika ? ChocoboColor.PURPLE : ChocoboColor.FLAME;
 	}
 
 	public static int fieldTraining(int classId, boolean rival) {
