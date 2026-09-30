@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.3 - Class Rivals
+Uploaded 2026-09-30: `chocobosreborn-1.1.3.jar` as file **9021519** ("Chocobos Reborn 1.1.3 - Class Rivals",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.3.md`) via
+`tools/upload_curseforge.py`. Class C seats Ahmi and Risika; promotion bars C36 / B54 / A72 with save-format-4 scale-up. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.3
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9021519
+SHA-256: `1ef2634090e6530cda9e6b67852624ce0ad69101f715dfea91665a7e07c2b622`.
+
 ## 1.1.2 - Chicobos
 Uploaded 2026-09-30: `chocobosreborn-1.1.2.jar` as file **9018068** ("Chocobos Reborn 1.1.2 - Chicobos",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.2.md`) via
