@@ -19,6 +19,11 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.2 - Chicobos
+Uploaded 2026-09-30: `chocobosreborn-1.1.2.jar` as file **9018068** ("Chocobos Reborn 1.1.2 - Chicobos",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.2.md`) via
+`tools/upload_curseforge.py`. Babies are chicobos everywhere; Green + Blue + Carob needs the wins for White too; duel picker capped at the purse; almanac and signs match 1.1.1; rename cleaning. Server and every rider need this jar.
+
 ## 1.1.1 - Fair Odds
 Uploaded 2026-09-28: `chocobosreborn-1.1.1.jar` as file **9004058** ("Chocobos Reborn 1.1.1 - Fair Odds",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.1.md`) via
