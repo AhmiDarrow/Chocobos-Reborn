@@ -141,6 +141,35 @@ public final class RaceScoring {
 		return points;
 	}
 
+	/**
+	 * The most ranked first places a bird can have won in {@code raceClass} before it moved
+	 * up: its bar in sprint wins, rounded up (C 9, B 14, A 18).
+	 */
+	public static int mostWinsInClass(RaceClass raceClass) {
+		return Math.ceilDiv(raceClass.pointsToPromote(), REFERENCE_POINTS);
+	}
+
+	/**
+	 * Save format 4 -> 5. Older birds kept only their lifetime first places. Share them over
+	 * the classes the bird has reached, lowest first, each class capped at
+	 * {@link #mostWinsInClass}; the rest go to its current class. Class S wins count toward
+	 * no stage, so a Class S bird keeps only what fits C, B and A. Returns {C, B, A}.
+	 */
+	public static int[] migratedWinsByClass(int classId, int lifetimeWins) {
+		RaceClass current = RaceClass.byId(classId);
+		int[] byClass = new int[RaceClass.S.getId()];
+		int left = Math.max(0, lifetimeWins);
+		for (RaceClass rc : new RaceClass[]{RaceClass.C, RaceClass.B, RaceClass.A}) {
+			if (rc.getId() > current.getId()) {
+				break;
+			}
+			int take = rc == current ? left : Math.min(left, mostWinsInClass(rc));
+			byClass[rc.getId()] = take;
+			left -= take;
+		}
+		return byClass;
+	}
+
 	/** Points still needed in this class. Class S is the top of the ladder. */
 	public static int winsUntilPromote(RaceClass current, int classWins) {
 		if (current == RaceClass.S) {

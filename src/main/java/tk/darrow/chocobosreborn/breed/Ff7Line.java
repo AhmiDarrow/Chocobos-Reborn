@@ -23,20 +23,22 @@ public final class Ff7Line {
 
 	/**
 	 * {@code winsQualify}: both parents have the first-place finishes this pairing needs
-	 * ({@link BreedingOdds#qualifies}). Without them the line cannot change at all, so a
-	 * Green + Blue pair on Carob hatches a parent's colour instead of White.
+	 * in its class ({@link BreedingOdds#qualifies}). Without them the line cannot change
+	 * at all, so a Green + Blue pair on Carob hatches a parent's colour instead of White.
+	 * The same goes for grade: Good Yellows for Green / Blue, a Great Green and a Great
+	 * Blue for Black, a Wonderful Black and a Wonderful Yellow for Gold.
 	 */
 	public static Result resolve(Color first, Color second, int firstGrade, int secondGrade,
 	                             int nutStrength, boolean winsQualify, boolean mutationHits, boolean pickGreen) {
 		if (nutStrength >= ZEIO) {
-			if (isBlackAndWonderfulYellow(first, second, firstGrade, secondGrade) && mutationHits) {
+			if (isWonderfulBlackAndYellow(first, second, firstGrade, secondGrade) && mutationHits) {
 				return Result.GOLD;
 			}
 			return Result.INHERIT;
 		}
 		if (nutStrength >= CAROB) {
 			if (isPair(first, second, Color.GREEN, Color.BLUE)) {
-				if (!winsQualify) {
+				if (!winsQualify || firstGrade < GREAT || secondGrade < GREAT) {
 					return Result.NONE;
 				}
 				return mutationHits ? Result.BLACK : Result.WHITE;
@@ -49,7 +51,7 @@ public final class Ff7Line {
 	}
 
 	public static boolean goldPair(Color first, Color second, int firstGrade, int secondGrade) {
-		return isBlackAndWonderfulYellow(first, second, firstGrade, secondGrade);
+		return isWonderfulBlackAndYellow(first, second, firstGrade, secondGrade);
 	}
 
 	public static boolean allowsGold(int nutStrength) {
@@ -63,9 +65,8 @@ public final class Ff7Line {
 		return child;
 	}
 
-	private static boolean isBlackAndWonderfulYellow(Color first, Color second, int firstGrade, int secondGrade) {
-		return (first == Color.BLACK && second == Color.YELLOW && secondGrade == WONDERFUL)
-				|| (second == Color.BLACK && first == Color.YELLOW && firstGrade == WONDERFUL);
+	private static boolean isWonderfulBlackAndYellow(Color first, Color second, int firstGrade, int secondGrade) {
+		return isPair(first, second, Color.BLACK, Color.YELLOW) && firstGrade >= WONDERFUL && secondGrade >= WONDERFUL;
 	}
 
 	private static boolean bothAtLeast(Color first, Color second, Color color, int firstGrade, int secondGrade, int minGrade) {

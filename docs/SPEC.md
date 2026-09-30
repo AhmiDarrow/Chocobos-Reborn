@@ -85,18 +85,29 @@ an owned adult puts it in love; both parents need a nut and opposite sexes
 (`canMate`). Chicobo colour: `Ff7Line` / `BreedRules` / `BreedingOdds`:
 
 1. Two Good-or-better Yellows + Carob → Green or Blue (50/50).
-2. Green + Blue + Carob → Black on a hit, White on a miss.
-3. Black + Wonderful Yellow + Zeio → Gold on a hit. Gold never without Zeio;
+2. Green + Blue + Carob, both Great or better → Black on a hit, White on a miss.
+3. Wonderful Black + Wonderful Yellow + Zeio → Gold on a hit. Gold never without Zeio;
    Gold without Zeio passes on Yellow.
 
-**Race wins are required (FF7).** `ChocoboEntity.minWinsEach`: each parent needs
-1 first-place finish for Green/Blue, 2 each for Black, 3 each for Gold, or the
-roll is impossible. `BreedingOdds.chance(winsA, winsB, minEach, guarantee)` then
-climbs from 25 % at the minimum to certain at the combined guarantee
-(`guaranteeWins`: 4 / 9 / 12). Handing a Carob or Zeio to a bird that lacks the
-wins shows `chocobosreborn.nut.needs_wins`. A missed roll inherits a parent's
-colour at random, except Green + Blue + Carob with the wins, which hatches White on a
-miss. A Green + Blue pair short of the wins changes nothing: a parent's colour, as for any
+**Race wins are required (FF7), counted per class.** Each stage counts only the ranked
+first places the parents won in its class (`BreedRules.stageClass`): Green / Blue
+Class C, Black Class B, Gold Class A. A win counts for the class the bird is in when it
+wins (`ChocoboEntity.recordFirstPlace`, the same win that earns promotion points; the
+promoting win counts for the class it leaves); below-class, unranked and duel wins never
+reach it, and Class S wins count toward no stage. `ChocoboEntity.winsInClass` (synced,
+saved as `WinsByClass` {C, B, A}); lifetime `raceWins` is kept as before.
+`BreedingOdds.minWinsEach(class)` = ceil(5 x bar / 36) per parent: C 5, B 8, A 10, or
+the roll is impossible. `BreedingOdds.chance(winsA, winsB, minEach, guarantee)` then
+climbs from 25 % at 2 x minEach to certain at `guaranteeWins(class)` = 2 x ceil(8 x
+bar / 36) combined: C 16, B 24, A 32 (8 per parent in Class C is one sprint short of
+promotion). The bases (`BASE_WINS_EACH` 5, `BASE_GUARANTEE_EACH` 8, `REFERENCE_BAR` =
+Class C's 36) live in `BreedingOdds`. Handing a Carob or Zeio to a bird that lacks the
+wins shows `chocobosreborn.nut.needs_wins` with the class and its wins there. Save
+format 5 shares an older bird's lifetime wins over the classes it has reached, lowest
+first, capped at C 9 / B 14 / A 18 (`RaceScoring.migratedWinsByClass`), the rest to its
+current class; old ledger records convert the same way. A missed roll inherits a parent's
+colour at random, except Green + Blue + Carob with the wins and grades, which hatches White on a
+miss. A Green + Blue pair short of the wins or below Great changes nothing: a parent's colour, as for any
 other pair (`BreedingOdds.qualifies`, `Ff7Line.resolve`).
 
 Chicobo born grade = parents' born-grade average (+1 with Zeio). Born stats (`BreedGenes`):
@@ -107,11 +118,14 @@ stamina; half, rounded down, to intelligence and cooperation). One chicobo in ei
 stat (+5, leaning toward the stronger parent); a born stat above 96 needs that spark and both
 parents offering 85 or more. Chicobo sex random; grows through three stages.
 
-**Old saves.** `ChocoboEntity.SAVE_FORMAT` 3. A bird converts once on load
+**Old saves.** `ChocoboEntity.SAVE_FORMAT` 5. A bird converts once on load
 (`RaceScoring.convertedClassPoints`): before format 2, old first-place marks become points
 of nine (1 -> 3, 2 -> 6, Class S -> 9) and a bird with no born stats rolls a wild bloodline
 from its birth grade; before format 3, points of nine are rescaled x4 onto the 36 ladder
-(Class S -> 36). The almanac ledger rescales a record saved without `"Ladder": 36`.
+(Class S -> 36); before format 4, points of 36 scale to the per-class bar (C 36 / B 54 /
+A 72); before format 5, lifetime wins are shared out per class
+(`RaceScoring.migratedWinsByClass`, see Nuts). The almanac ledger rescales a record saved
+without the current `Ladder` mark and shares out the wins of one saved without `WinsByClass`.
 
 ## Riding
 

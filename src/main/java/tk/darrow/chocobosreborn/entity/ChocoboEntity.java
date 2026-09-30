@@ -85,6 +85,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private static final EntityDataAccessor<Integer> DATA_WINS = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_CLASS = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Integer> DATA_CLASS_WINS = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	/** Ranked first places won while in Class C / B / A: the farm line counts each stage's own class. */
+	private static final EntityDataAccessor<Integer> DATA_WINS_C = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Integer> DATA_WINS_B = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
+	private static final EntityDataAccessor<Integer> DATA_WINS_A = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.INT);
 	private static final EntityDataAccessor<Boolean> DATA_MALE = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	private static final EntityDataAccessor<Boolean> DATA_SADDLED = SynchedEntityData.defineId(ChocoboEntity.class, EntityDataSerializers.BOOLEAN);
 	/** Worn armour tier ordinal, -1 for none (synced for the renderer's mesh choice). */
@@ -214,6 +218,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		builder.define(DATA_WINS, 0);
 		builder.define(DATA_CLASS, 0);
 		builder.define(DATA_CLASS_WINS, 0);
+		builder.define(DATA_WINS_C, 0);
+		builder.define(DATA_WINS_B, 0);
+		builder.define(DATA_WINS_A, 0);
 		builder.define(DATA_MALE, true);
 		builder.define(DATA_SADDLED, false);
 		builder.define(DATA_ARMOR, -1);
@@ -352,6 +359,37 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return RaceClass.byId(this.entityData.get(DATA_CLASS));
 	}
 
+	/**
+	 * Ranked first places won while this bird was in {@code raceClass} (the win that
+	 * promotes counts for the class it leaves). Class S wins count toward no stage: 0.
+	 */
+	public int winsInClass(RaceClass raceClass) {
+		EntityDataAccessor<Integer> key = winsKey(raceClass);
+		return key == null ? 0 : this.entityData.get(key);
+	}
+
+	public void setWinsInClass(RaceClass raceClass, int wins) {
+		EntityDataAccessor<Integer> key = winsKey(raceClass);
+		if (key != null) {
+			this.entityData.set(key, Math.max(0, wins));
+		}
+	}
+
+	/** Class C, B and A first places, in that order (ledger, save). */
+	public int[] winsByClass() {
+		return new int[]{winsInClass(RaceClass.C), winsInClass(RaceClass.B), winsInClass(RaceClass.A)};
+	}
+
+	@Nullable
+	private static EntityDataAccessor<Integer> winsKey(RaceClass raceClass) {
+		return switch (raceClass) {
+			case C -> DATA_WINS_C;
+			case B -> DATA_WINS_B;
+			case A -> DATA_WINS_A;
+			case S -> null;
+		};
+	}
+
 	public int classWins() {
 		return this.entityData.get(DATA_CLASS_WINS);
 	}
@@ -448,19 +486,29 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * Save format 4 (per-class promotion bars). A bird saved by an older version is brought
+	 * Save format 5 (first places per class). A bird saved by an older version is brought
 	 * onto the current rules once, step by step ({@link RaceScoring#convertedClassPoints}):
 	 * format 1 -> 2 marks to points of nine; 2 -> 3 points of nine to 36; 3 -> 4 uniform 36
-	 * to C 36 / B 54 / A 72. Training, wins, colour and grade stay.
+	 * to C 36 / B 54 / A 72; 4 -> 5 lifetime wins shared out over the classes it has
+	 * reached ({@link RaceScoring#migratedWinsByClass}). Training, wins, colour and grade stay.
 	 */
-	static final int SAVE_FORMAT = 4;
+	static final int SAVE_FORMAT = 5;
 
 	private void convertOldSave(int format) {
 		this.entityData.set(DATA_CLASS_WINS, RaceScoring.convertedClassPoints(format, raceClass().getId(), classWins()));
+		if (format < 5) {
+			setWinsByClass(RaceScoring.migratedWinsByClass(raceClass().getId(), raceWins()));
+		}
 		if (format < 2 && !raceNpc() && !townBird()
 				&& BreedGenes.blankLine(geneSpeed(), geneStamina(), geneIntelligence(), geneCooperation())) {
 			rollWildBlood();
 		}
+	}
+
+	private void setWinsByClass(int[] wins) {
+		setWinsInClass(RaceClass.C, wins.length > 0 ? wins[0] : 0);
+		setWinsInClass(RaceClass.B, wins.length > 1 ? wins[1] : 0);
+		setWinsInClass(RaceClass.A, wins.length > 2 ? wins[2] : 0);
 	}
 
 	/** A wild bird's bloodline, rolled from its grade so a wonderful stray starts ahead of a poor one. */
@@ -958,9 +1006,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	/**
-	 * First-place finish at Chocobo Square. Ranked wins count for the farm line and earn
-	 * {@code points} toward promotion ({@link RaceScoring#winPoints}: 4 a sprint, a grand
-	 * prix by its length; {@link RaceClass#pointsToPromote()} promote). The class never drops. Returns the outcome, or
+	 * First-place finish at Chocobo Square. Ranked wins count for the farm line in the class
+	 * the bird is in when it wins ({@link #winsInClass}) and earn {@code points} toward
+	 * promotion ({@link RaceScoring#winPoints}: 4 a sprint, a grand prix by its length;
+	 * {@link RaceClass#pointsToPromote()} promote). The class never drops. Returns the outcome, or
 	 * null for an unranked finish.
 	 */
 	@org.jetbrains.annotations.Nullable
@@ -969,6 +1018,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			return null;
 		}
 		this.entityData.set(DATA_WINS, raceWins() + 1);
+		setWinsInClass(raceClass(), winsInClass(raceClass()) + 1);
 		RaceScoring.Promotion p = RaceScoring.afterFirstPlace(raceClass(), classWins(), points);
 		this.entityData.set(DATA_CLASS, p.raceClass().getId());
 		this.entityData.set(DATA_CLASS_WINS, p.classWins());
@@ -1149,6 +1199,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		tag.putInt("RaceWins", raceWins());
 		tag.putInt("RaceClass", raceClass().getId());
 		tag.putInt("ClassWins", classWins());
+		tag.putIntArray("WinsByClass", winsByClass());
 		tag.putInt("SaveFormat", SAVE_FORMAT);
 		tag.putBoolean("Male", male());
 		tag.putBoolean("Saddled", saddled());
@@ -1204,6 +1255,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		this.entityData.set(DATA_WINS, tag.getInt("RaceWins"));
 		this.entityData.set(DATA_CLASS, tag.getInt("RaceClass"));
 		this.entityData.set(DATA_CLASS_WINS, tag.getInt("ClassWins"));
+		setWinsByClass(tag.getIntArray("WinsByClass"));
 		this.entityData.set(DATA_MALE, tag.getBoolean("Male"));
 		this.entityData.set(DATA_SADDLED, tag.getBoolean("Saddled"));
 		inventory.clearContent();
@@ -1361,13 +1413,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 					setOrderedToSit(false);
 					ChocoboNut fed = nutItem.nut();
 					if (fed == ChocoboNut.CAROB || fed == ChocoboNut.ZEIO) {
-						int need = minWinsEach(color(), color(), fed);
-						if (fed == ChocoboNut.CAROB && (color() == ChocoboColor.GREEN || color() == ChocoboColor.BLUE)) {
-							need = 2;
-						}
-						if (raceWins() < need) {
+						RaceClass stage = BreedRules.stageClass(color(), fed);
+						int need = BreedingOdds.minWinsEach(stage);
+						int have = winsInClass(stage);
+						if (have < need) {
 							player.displayClientMessage(Component.translatable("chocobosreborn.nut.needs_wins",
-									Component.translatable("chocobosreborn.nut." + fed.id()), need, raceWins()), true);
+									Component.translatable("chocobosreborn.nut." + fed.id()), need,
+									Component.translatable("chocobosreborn.class." + stage.id()), have), true);
 						}
 					}
 					if (!player.getAbilities().instabuild) {
@@ -1585,10 +1637,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			return null;
 		}
 		ChocoboNut nut = ChocoboNut.stronger(fedNut(), mate.fedNut());
-		int guarantee = guaranteeWins(color(), mate.color(), nut);
-		int minEach = minWinsEach(color(), mate.color(), nut);
-		boolean qualify = BreedingOdds.qualifies(raceWins(), mate.raceWins(), minEach);
-		boolean hit = random.nextDouble() < BreedingOdds.chance(raceWins(), mate.raceWins(), minEach, guarantee);
+		// each stage counts only the first places both parents won in its class
+		RaceClass stage = BreedRules.stageClass(color(), mate.color(), nut);
+		int guarantee = BreedingOdds.guaranteeWins(stage);
+		int minEach = BreedingOdds.minWinsEach(stage);
+		int winsHere = winsInClass(stage);
+		int winsThere = mate.winsInClass(stage);
+		boolean qualify = BreedingOdds.qualifies(winsHere, winsThere, minEach);
+		boolean hit = random.nextDouble() < BreedingOdds.chance(winsHere, winsThere, minEach, guarantee);
 		ChocoboColor inherit = random.nextBoolean() ? color() : mate.color();
 		ChocoboColor child = BreedRules.resolve(color(), mate.color(), grade(), mate.grade(), nut, qualify, hit,
 				random.nextBoolean(), inherit);
@@ -1862,26 +1918,6 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		} else if (!on && has) {
 			inst.removeModifier(id);
 		}
-	}
-
-	/** FF7: first-place finishes EACH parent needs before a Carob / Zeio can change the line. */
-	public static int minWinsEach(ChocoboColor a, ChocoboColor b, ChocoboNut nut) {
-		if (nut == ChocoboNut.ZEIO) {
-			return 3;
-		}
-		boolean greenBlue = (a == ChocoboColor.GREEN && b == ChocoboColor.BLUE)
-				|| (a == ChocoboColor.BLUE && b == ChocoboColor.GREEN);
-		return greenBlue ? 2 : 1;
-	}
-
-	/** Combined first-place wins that make the farm-line roll certain (README farm line). */
-	public static int guaranteeWins(ChocoboColor a, ChocoboColor b, ChocoboNut nut) {
-		if (nut == ChocoboNut.ZEIO) {
-			return 12;
-		}
-		boolean greenBlue = (a == ChocoboColor.GREEN && b == ChocoboColor.BLUE)
-				|| (a == ChocoboColor.BLUE && b == ChocoboColor.GREEN);
-		return greenBlue ? 9 : 4;
 	}
 
 	/** Turn this bird into a Square AI racer: only the racer goal and floating. */

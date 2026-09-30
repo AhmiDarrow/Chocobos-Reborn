@@ -2550,3 +2550,47 @@ and logs `FIELD-HEAT` lap times. The sweep's rescue now uses `RaceSession.setBac
   the steering branch that skips the opening.
 * In-game look still wanted: bump feel, the tightest short-GP corners, flared detour exits,
   climbers up a ridge's side, three boost strips on a ~300-block lap.
+
+## Breeding wins by class (2026-09-30, unreleased, not committed; Ahmi: wins must be earned in the stage's class, scaled from 5 Class C wins)
+
+### The rule (`BreedingOdds`, `BreedRules.stageClass`)
+
+* Each farm-line stage counts only ranked first places won **in its class**: Green / Blue (two Good Yellows +
+  Carob) Class C, Black (Green + Blue + Carob; White on a miss) Class B, Gold (Zeio) Class A. A win counts for
+  the class the bird is in when it wins (`ChocoboEntity.recordFirstPlace`, the same call that adds promotion
+  points, so the promoting win counts for the class it leaves). Below-class, unranked and duel wins never reach
+  `recordFirstPlace`; Class S wins raise lifetime `raceWins` only.
+* Per parent `minWinsEach(class)` = ceil(5 x bar / 36); combined guarantee `guaranteeWins(class)` =
+  2 x ceil(8 x bar / 36) (8 a parent in Class C is one sprint short of promotion). Bases `BASE_WINS_EACH` 5,
+  `BASE_GUARANTEE_EACH` 8, `REFERENCE_BAR` = `RaceClass.POINTS_TO_PROMOTE`. Chance unchanged in shape: 25 % at
+  2 x minEach combined, linear to 100 % at the guarantee.
+
+| stage | class | bar | each | 25 % at | certain at |
+|---|---|---|---|---|---|
+| Green / Blue | C | 36 | 5 | 10 | 16 |
+| Black | B | 54 | 8 | 16 | 24 |
+| Gold | A | 72 | 10 | 20 | 32 |
+
+* Grades (`Ff7Line.resolve`): Black now needs both parents Great or better (a Good pair with the wins keeps a
+  parent's colour, no White); Gold now needs a Wonderful Black as well as a Wonderful Yellow.
+
+### Save and sync
+
+* `DATA_WINS_C/B/A` (synced), saved as `WinsByClass` {C, B, A}; `SAVE_FORMAT` 5. A bird below format 5 shares
+  its lifetime wins out once (`RaceScoring.migratedWinsByClass`): lowest class first up to the class it is in,
+  capped at `mostWinsInClass` (C 9 / B 14 / A 18, the bar in sprint wins), the rest to its current class; a
+  Class S bird fills C / B / A to their caps and drops the rest. `BirdRecord` gains `winsC/winsB/winsA`
+  (`WinsByClass` tag); a record without it converts the same way.
+
+### Shown to the player
+
+`chocobosreborn.nut.needs_wins` names the class and the bird's wins there; almanac bird page adds "First places
+by class"; breeding hints (`almanac.h.*`) show need / have / certain for the stage's class; farm-line diagram
+boxes read "5 C / 8 B / 10 A wins each" from `BreedingOdds`; nuts page, tooltips, gossip, README, SPEC and
+`docs/public/store-description.*` updated.
+
+### Tests
+
+`BreedingOddsTest` (per-class numbers, chance endpoints, stage mapping), `Ff7LineTest` (Great Black parents,
+Wonderful Black for Gold), `OldSaveConversionTest` (share-out). GameTests `firstPlacesCountInTheClassTheyAreWon`,
+`oldBirdSharesItsWinsOutByClass`, `greenOrBlueNeedsClassCWins`, `blackNeedsGreatParentsAndClassBWins`.

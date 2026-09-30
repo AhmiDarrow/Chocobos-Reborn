@@ -1,5 +1,6 @@
 package tk.darrow.chocobosreborn.race;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,7 +12,7 @@ import tk.darrow.chocobosreborn.breed.BreedGenes;
 /**
  * Birds saved by older versions are brought onto the current rules once, one step at a
  * time: format 1 -> 2 (old marks to points of nine), 2 -> 3 (points of nine to points of 36),
- * 3 -> 4 (uniform 36 to per-class C 36 / B 54 / A 72).
+ * 3 -> 4 (uniform 36 to per-class C 36 / B 54 / A 72), 4 -> 5 (lifetime wins shared out per class).
  */
 class OldSaveConversionTest {
 	@Test
@@ -94,6 +95,31 @@ class OldSaveConversionTest {
 		assertEquals(26, RaceScoring.convertedClassPoints(4, RaceClass.C.getId(), 26));
 		assertEquals(40, RaceScoring.convertedClassPoints(4, RaceClass.B.getId(), 40));
 		assertEquals(2, RaceScoring.convertedClassPoints(4, RaceClass.C.getId(), 2));
+	}
+
+	@Test
+	void mostWinsInAClassIsItsBarInSprints() {
+		assertEquals(9, RaceScoring.mostWinsInClass(RaceClass.C));
+		assertEquals(14, RaceScoring.mostWinsInClass(RaceClass.B));
+		assertEquals(18, RaceScoring.mostWinsInClass(RaceClass.A));
+	}
+
+	@Test
+	void formatFourWinsShareOutLowestClassFirst() {
+		// format 4 -> 5: lifetime wins go to the classes reached, capped, the rest to the current class
+		assertArrayEquals(new int[]{0, 0, 0}, RaceScoring.migratedWinsByClass(RaceClass.C.getId(), 0));
+		assertArrayEquals(new int[]{4, 0, 0}, RaceScoring.migratedWinsByClass(RaceClass.C.getId(), 4));
+		// a Class C bird keeps everything in C, over the cap or not
+		assertArrayEquals(new int[]{12, 0, 0}, RaceScoring.migratedWinsByClass(RaceClass.C.getId(), 12));
+		assertArrayEquals(new int[]{5, 0, 0}, RaceScoring.migratedWinsByClass(RaceClass.B.getId(), 5));
+		assertArrayEquals(new int[]{9, 3, 0}, RaceScoring.migratedWinsByClass(RaceClass.B.getId(), 12));
+		assertArrayEquals(new int[]{9, 21, 0}, RaceScoring.migratedWinsByClass(RaceClass.B.getId(), 30));
+		assertArrayEquals(new int[]{9, 14, 7}, RaceScoring.migratedWinsByClass(RaceClass.A.getId(), 30));
+		assertArrayEquals(new int[]{9, 14, 27}, RaceScoring.migratedWinsByClass(RaceClass.A.getId(), 50));
+		// Class S wins count toward no stage: C, B and A fill to their caps, the rest is dropped
+		assertArrayEquals(new int[]{9, 14, 18}, RaceScoring.migratedWinsByClass(RaceClass.S.getId(), 60));
+		assertArrayEquals(new int[]{9, 6, 0}, RaceScoring.migratedWinsByClass(RaceClass.S.getId(), 15));
+		assertArrayEquals(new int[]{0, 0, 0}, RaceScoring.migratedWinsByClass(RaceClass.A.getId(), -3));
 	}
 
 	@Test

@@ -1,5 +1,7 @@
 package tk.darrow.chocobosreborn.breed;
 
+import tk.darrow.chocobosreborn.race.RaceClass;
+
 /**
  * Hatch-color helpers that sit on top of {@link Ff7Line} without Minecraft entities.
  */
@@ -12,6 +14,30 @@ public final class BreedRules {
 			return color;
 		}
 		return inherit == ChocoboColor.GOLD ? ChocoboColor.YELLOW : inherit;
+	}
+
+	/**
+	 * The class whose first places a pairing counts ({@link BreedingOdds}): Zeio (Gold) is
+	 * Class A, Carob on Green + Blue (Black) is Class B, any other Carob pairing (Yellows to
+	 * Green / Blue) is Class C.
+	 */
+	public static RaceClass stageClass(ChocoboColor a, ChocoboColor b, ChocoboNut nut) {
+		if (nut == ChocoboNut.ZEIO) {
+			return RaceClass.A;
+		}
+		boolean greenBlue = (a == ChocoboColor.GREEN && b == ChocoboColor.BLUE)
+				|| (a == ChocoboColor.BLUE && b == ChocoboColor.GREEN);
+		return greenBlue ? RaceClass.B : RaceClass.C;
+	}
+
+	/**
+	 * The stage a single bird fed {@code nut} is heading for: a Green or Blue on Carob is
+	 * after Black (Class B), so it is paired with the other colour.
+	 */
+	public static RaceClass stageClass(ChocoboColor bird, ChocoboNut nut) {
+		ChocoboColor mate = bird == ChocoboColor.GREEN ? ChocoboColor.BLUE
+				: bird == ChocoboColor.BLUE ? ChocoboColor.GREEN : bird;
+		return stageClass(bird, mate, nut);
 	}
 
 	/** End and Nether birds are not on the Yellow farm line; they still pass their own colour. */

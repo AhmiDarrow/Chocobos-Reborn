@@ -4,9 +4,9 @@
 
 # Chocobos Reborn
 
-Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.1.3**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
+Final Fantasy VII chocobos for **Minecraft 1.21.1 / NeoForge 21.1.249**. Version **1.1.4**. Catch a wild Yellow with Gysahl Greens, train it on the eight greens, mate it with the eight nuts, walk the farm line to Green, Blue, Black and Gold, then take it to Whiskerwind and race.
 
-[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [1.1.3 development notes](docs/RELEASE_1.1.3.md)
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn) · [1.1.4 development notes](docs/RELEASE_1.1.4.md)
 
 Original work. Original birds, original calls, original art, original music. A fan work, not affiliated with Square Enix.
 
@@ -35,10 +35,10 @@ Every green also heals a hurt bird a little, restores stamina, grows a chicobo f
 Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chicobo of the parents' colour. **Carob** and **Zeio** change the line:
 
 1. Two **Good**-or-better Yellows + Carob → **Green** (mountain) or **Blue** (river).
-2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
-3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
+2. **Great** Green + **Great** Blue + Carob → **Black**. A missed roll hatches **White**.
+3. **Wonderful** Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight. Race wins also pay Carob: 15% of the time at Class B, 40% at Class A, and first or second place in a ranked Class S heat, with a rare Zeio on a Class S win.
+As in FF7, colour breeding needs racers: both parents must have ranked first-place finishes in Whiskerwind, won in the step's own class, before a Carob or Zeio can change the line: 5 Class C wins each for Green or Blue, 8 Class B wins each for Black, 10 Class A wins each for Gold. More wins in that class make the roll surer until it is certain (16, 24 and 32 between the pair). The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight. Race wins also pay Carob: 15% of the time at Class B, 40% at Class A, and first or second place in a ranked Class S heat, with a rare Zeio on a Class S win.
 
 ## Riding and fighting
 

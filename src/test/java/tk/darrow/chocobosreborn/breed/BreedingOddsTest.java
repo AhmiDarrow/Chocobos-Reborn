@@ -1,6 +1,7 @@
 package tk.darrow.chocobosreborn.breed;
 
 import org.junit.jupiter.api.Test;
+import tk.darrow.chocobosreborn.race.RaceClass;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,6 +36,49 @@ class BreedingOddsTest {
 		assertEquals(0.25D, BreedingOdds.chance(3, 3, 3, 12), 1.0E-9);
 		assertEquals(1.0D, BreedingOdds.chance(6, 6, 3, 12), 1.0E-9);
 		assertEquals(1.0D, BreedingOdds.chance(9, 3, 3, 12), 1.0E-9);
+	}
+
+	@Test
+	void stageWinsScaleByTheClassBar() {
+		// per parent: ceil(5 x bar / 36); combined guarantee: 2 x ceil(8 x bar / 36)
+		assertEquals(5, BreedingOdds.minWinsEach(RaceClass.C));
+		assertEquals(8, BreedingOdds.minWinsEach(RaceClass.B));
+		assertEquals(10, BreedingOdds.minWinsEach(RaceClass.A));
+		assertEquals(16, BreedingOdds.guaranteeWins(RaceClass.C));
+		assertEquals(24, BreedingOdds.guaranteeWins(RaceClass.B));
+		assertEquals(32, BreedingOdds.guaranteeWins(RaceClass.A));
+		// eight Class C wins a parent is one sprint short of promotion
+		assertEquals(RaceClass.POINTS_TO_PROMOTE - 4, 4 * BreedingOdds.guaranteeWins(RaceClass.C) / 2);
+	}
+
+	@Test
+	void stageChanceRunsFromAQuarterToCertain() {
+		for (RaceClass rc : new RaceClass[]{RaceClass.C, RaceClass.B, RaceClass.A}) {
+			int min = BreedingOdds.minWinsEach(rc);
+			int sure = BreedingOdds.guaranteeWins(rc);
+			// one parent short: no roll at all, however many the other has
+			assertEquals(0.0D, BreedingOdds.chance(min - 1, sure, min, sure), 1.0E-9, rc.id());
+			assertEquals(0.25D, BreedingOdds.chance(min, min, min, sure), 1.0E-9, rc.id());
+			assertTrue(BreedingOdds.chance(min, sure - min - 1, min, sure) < 1.0D, rc.id());
+			assertEquals(1.0D, BreedingOdds.chance(sure / 2, sure / 2, min, sure), 1.0E-9, rc.id());
+			assertEquals(1.0D, BreedingOdds.chance(min, sure - min, min, sure), 1.0E-9, rc.id());
+		}
+		// halfway from 10 to 16 combined in Class C: 25 % + 75 % x 3 / 6
+		assertEquals(0.625D, BreedingOdds.chance(6, 7, 5, 16), 1.0E-9);
+	}
+
+	@Test
+	void eachStageCountsItsOwnClass() {
+		assertEquals(RaceClass.C, BreedRules.stageClass(ChocoboColor.YELLOW, ChocoboColor.YELLOW, ChocoboNut.CAROB));
+		assertEquals(RaceClass.B, BreedRules.stageClass(ChocoboColor.GREEN, ChocoboColor.BLUE, ChocoboNut.CAROB));
+		assertEquals(RaceClass.B, BreedRules.stageClass(ChocoboColor.BLUE, ChocoboColor.GREEN, ChocoboNut.CAROB));
+		assertEquals(RaceClass.A, BreedRules.stageClass(ChocoboColor.BLACK, ChocoboColor.YELLOW, ChocoboNut.ZEIO));
+		// one bird fed a nut: the stage it is heading for
+		assertEquals(RaceClass.C, BreedRules.stageClass(ChocoboColor.YELLOW, ChocoboNut.CAROB));
+		assertEquals(RaceClass.B, BreedRules.stageClass(ChocoboColor.GREEN, ChocoboNut.CAROB));
+		assertEquals(RaceClass.B, BreedRules.stageClass(ChocoboColor.BLUE, ChocoboNut.CAROB));
+		assertEquals(RaceClass.A, BreedRules.stageClass(ChocoboColor.YELLOW, ChocoboNut.ZEIO));
+		assertEquals(RaceClass.A, BreedRules.stageClass(ChocoboColor.BLACK, ChocoboNut.ZEIO));
 	}
 
 	@Test
@@ -102,21 +146,21 @@ class BreedingOddsTest {
 
 	@Test
 	void greenBlueCarobShortOfWinsHatchesAParentColour() {
-		int minEach = 2;
+		int minEach = BreedingOdds.minWinsEach(RaceClass.B);
 		assertFalse(BreedingOdds.qualifies(0, 0, minEach));
-		assertFalse(BreedingOdds.qualifies(5, 1, minEach));
-		assertTrue(BreedingOdds.qualifies(2, 2, minEach));
+		assertFalse(BreedingOdds.qualifies(20, 7, minEach));
+		assertTrue(BreedingOdds.qualifies(8, 8, minEach));
 		for (ChocoboColor inherit : new ChocoboColor[]{ChocoboColor.GREEN, ChocoboColor.BLUE}) {
 			assertEquals(inherit, BreedRules.resolve(
 					ChocoboColor.GREEN, ChocoboColor.BLUE,
 					ChocoboGrade.GREAT, ChocoboGrade.GREAT,
-					ChocoboNut.CAROB, BreedingOdds.qualifies(5, 1, minEach), false, true, inherit));
+					ChocoboNut.CAROB, BreedingOdds.qualifies(20, 7, minEach), false, true, inherit));
 		}
 		// with the wins, a missed Black roll is still White
 		assertEquals(ChocoboColor.WHITE, BreedRules.resolve(
 				ChocoboColor.GREEN, ChocoboColor.BLUE,
 				ChocoboGrade.GREAT, ChocoboGrade.GREAT,
-				ChocoboNut.CAROB, BreedingOdds.qualifies(2, 2, minEach), false, true, ChocoboColor.GREEN));
+				ChocoboNut.CAROB, BreedingOdds.qualifies(8, 8, minEach), false, true, ChocoboColor.GREEN));
 	}
 
 	@Test

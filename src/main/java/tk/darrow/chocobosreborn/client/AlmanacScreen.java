@@ -23,6 +23,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import tk.darrow.chocobosreborn.ChocobosReborn;
 import tk.darrow.chocobosreborn.breed.BreedGenes;
+import tk.darrow.chocobosreborn.breed.BreedingOdds;
 import tk.darrow.chocobosreborn.breed.ChocoboColor;
 import tk.darrow.chocobosreborn.breed.ChocoboGrade;
 import tk.darrow.chocobosreborn.breed.ChocoboNut;
@@ -373,17 +374,18 @@ public class AlmanacScreen extends Screen {
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
 				int col = Math.max(48, (w - 16) / 4);
+				// each step's wins are counted in its own class: C, then B, then A
 				box(g, x, y + 8, col - 8, "chocobosreborn.almanac.diagram.yy", 0xFFF5B812, "chocobosreborn:carob_nut",
-						"chocobosreborn.almanac.diagram.wins1");
+						Component.translatable("chocobosreborn.almanac.diagram.wins1", BreedingOdds.minWinsEach(RaceClass.C)));
 				arrow(g, x + col - 8, y + 28, x + col + 2);
 				box(g, x + col + 2, y + 8, col - 8, "chocobosreborn.almanac.diagram.gb", 0xFF4CB05A, "chocobosreborn:carob_nut",
-						"chocobosreborn.almanac.diagram.wins2");
+						Component.translatable("chocobosreborn.almanac.diagram.wins2", BreedingOdds.minWinsEach(RaceClass.B)));
 				arrow(g, x + 2 * col - 6, y + 28, x + 2 * col + 4);
 				box(g, x + 2 * col + 4, y + 8, col - 8, "chocobosreborn.almanac.diagram.bw", 0xFF2C2A32, "chocobosreborn:zeio_nut",
-						"chocobosreborn.almanac.diagram.wins3");
+						Component.translatable("chocobosreborn.almanac.diagram.wins3", BreedingOdds.minWinsEach(RaceClass.A)));
 				arrow(g, x + 3 * col - 4, y + 28, x + 3 * col + 6);
 				box(g, x + 3 * col + 6, y + 8, col - 8, "chocobosreborn.almanac.diagram.gold", 0xFFE8A416, null,
-						"chocobosreborn.almanac.diagram.wonderful");
+						Component.translatable("chocobosreborn.almanac.diagram.wonderful"));
 				int ny = y + 76;
 				for (FormattedCharSequence l : font.split(Component.translatable("chocobosreborn.almanac.diagram.note"),
 						Math.max(40, w))) {
@@ -394,7 +396,7 @@ public class AlmanacScreen extends Screen {
 		};
 	}
 
-	private void box(GuiGraphics g, int x, int y, int w, String titleKey, int colour, @Nullable String nut, String subKey) {
+	private void box(GuiGraphics g, int x, int y, int w, String titleKey, int colour, @Nullable String nut, Component sub) {
 		g.fill(x, y, x + w, y + 60, 0xFF202020);
 		g.fill(x, y, x + w, y + 3, colour | 0xFF000000);
 		List<FormattedCharSequence> t = font.split(Component.translatable(titleKey), w - 6);
@@ -409,7 +411,7 @@ public class AlmanacScreen extends Screen {
 		int subX = x + (nut != null ? 22 : 3);
 		int subW = Math.max(16, w - (nut != null ? 26 : 6));
 		int sy = y + 42;
-		for (FormattedCharSequence l : font.split(Component.translatable(subKey), subW)) {
+		for (FormattedCharSequence l : font.split(sub, subW)) {
 			g.drawString(font, l, subX, sy, 0xFFBBBBBB, false);
 			sy += LINE;
 		}
@@ -429,11 +431,12 @@ public class AlmanacScreen extends Screen {
 		Component genes = Component.literal(tr("chocobosreborn.almanac.d.genes", colorName(r.color()),
 				Component.translatable(r.male() ? "chocobosreborn.sex.male" : "chocobosreborn.sex.female"),
 				gradeName(r.bornGrade()), gradeName(r.grade())));
-		Component racing = Component.literal(more == 0
+		Component racing = Component.literal((more == 0
 				? tr("chocobosreborn.almanac.d.racing_top",
 				Component.translatable("chocobosreborn.class." + rc.id()), r.wins())
 				: tr("chocobosreborn.almanac.d.racing",
-				Component.translatable("chocobosreborn.class." + rc.id()), r.classWins(), more));
+				Component.translatable("chocobosreborn.class." + rc.id()), r.classWins(), more))
+				+ " " + tr("chocobosreborn.almanac.d.firsts", r.winsC(), r.winsB(), r.winsA()));
 		Component born = Component.literal(tr("chocobosreborn.almanac.d.born", r.bornDay()));
 		Component bornStats = Component.translatable("chocobosreborn.almanac.d.born_stats");
 		Component offers = Component.translatable("chocobosreborn.almanac.d.offers",
@@ -579,7 +582,7 @@ public class AlmanacScreen extends Screen {
 			PacketDistributor.sendToServer(new RacePayloads.RenameBird(r.id(), n));
 			int i = birds.indexOf(r);
 			BirdRecord updated = new BirdRecord(r.id(), r.owner(), n, r.color(), r.bornGrade(), r.grade(), r.male(), r.raceClass(),
-					r.wins(), r.classWins(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(),
+					r.wins(), r.classWins(), r.winsC(), r.winsB(), r.winsA(), r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop(),
 					r.geneSpeed(), r.geneStamina(), r.geneIntel(), r.geneCoop(), r.spark(), r.parentA(), r.parentB(),
 					r.parentColorA(), r.parentColorB(), r.nut(), r.bornDay(), r.alive(), n);
 			if (i >= 0) {
@@ -701,10 +704,21 @@ public class AlmanacScreen extends Screen {
 		return Component.translatable("chocobosreborn.almanac.unnamed", colorName(color < 0 ? 0 : color));
 	}
 
+	/**
+	 * What this bird can breed next. A farm-line hint names the stage's class and shows the
+	 * wins each parent needs there, this bird's wins in that class, and the combined wins
+	 * that make the roll certain ({@link BreedingOdds}).
+	 */
 	private static String breedingHint(BirdRecord r) {
 		ChocoboColor c = ChocoboColor.byId(r.color());
 		boolean good = r.grade() >= ChocoboGrade.GOOD.getRank();
 		boolean wonderful = r.grade() >= ChocoboGrade.WONDERFUL.getRank();
+		RaceClass stage = switch (c) {
+			case YELLOW -> wonderful ? RaceClass.A : good ? RaceClass.C : null;
+			case GREEN, BLUE -> RaceClass.B;
+			case BLACK -> RaceClass.A;
+			default -> null;
+		};
 		String key = switch (c) {
 			case YELLOW -> wonderful ? "chocobosreborn.almanac.h.yellow_wonderful" : good ? "chocobosreborn.almanac.h.yellow_good" : "chocobosreborn.almanac.h.yellow_poor";
 			case GREEN, BLUE -> "chocobosreborn.almanac.h.green_blue";
@@ -714,7 +728,10 @@ public class AlmanacScreen extends Screen {
 			case PURPLE -> "chocobosreborn.almanac.h.purple";
 			case FLAME -> "chocobosreborn.almanac.h.flame";
 		};
-		return tr(key, r.wins());
+		if (stage == null) {
+			return tr(key, r.wins());
+		}
+		return tr(key, BreedingOdds.minWinsEach(stage), r.winsIn(stage), BreedingOdds.guaranteeWins(stage));
 	}
 
 	private BirdRecord findRecord(java.util.UUID id) {

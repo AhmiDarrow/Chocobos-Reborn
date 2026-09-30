@@ -25,12 +25,12 @@ Gysahl, Krakka, Tantal, Pahsana, Curiel, Mimett, Reagan, Sylkis. Gysahl tames a 
 Pepio, Luchile, Saraha, Lasan, Pram, Porov, Carob, Zeio. Feed a nut to each of two owned adults of opposite sex and they mate. Plain nuts hatch a chicobo of the parents' colour. **Carob** and **Zeio** change the line:
 
 1. Two **Good**-or-better Yellows + Carob → **Green** (mountain) or **Blue** (river).
-2. Green + Blue + Carob → **Black**. A missed roll hatches **White**.
-3. Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
+2. **Great** Green + **Great** Blue + Carob → **Black**. A missed roll hatches **White**.
+3. **Wonderful** Black + **Wonderful** Yellow + **Zeio** → **Gold**. Gold never hatches without Zeio.
 
 **Bloodlines.** Every bird is born with stats of its own, and about a tenth of the training its parents were fed carries into the chicobo. A perfect bird is a long line: breed the blood down the middle and feed each chicobo full, and the line climbs clutch after clutch. The Almanac shows what a bird was born with and what you fed it. One chicobo in eight sparks a stat toward its stronger parent, and only a line that is already strong can reach the legendary top of a stat. Each nut adds a small gift to the chicobo, the rarer the nut the bigger.
 
-As in FF7, colour breeding needs racers: both parents must have first-place finishes in Whiskerwind before a Carob or Zeio can change the line, and more wins make the roll surer until it is certain. The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class B up pay out Carob, with a rare Zeio at Class S.
+As in FF7, colour breeding needs racers: both parents must have ranked first-place finishes in Whiskerwind, won in the step's own class, before a Carob or Zeio can change the line: 5 Class C wins each for Green or Blue, 8 Class B wins each for Black, 10 Class A wins each for Gold. More wins in that class make the roll surer until it is certain (16, 24 and 32 between the pair). The End and Nether birds breed true; no nut turns them into a farm-line colour. No nut is found in the wild: Bilo the Nutkeeper in Whiskerwind sells all eight, and races from Class B up pay out Carob, with a rare Zeio at Class S.
 
 ## Riding and fighting
 

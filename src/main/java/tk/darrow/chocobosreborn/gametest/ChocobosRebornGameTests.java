@@ -26,6 +26,7 @@ import tk.darrow.chocobosreborn.entity.ChocoboEntity;
 import tk.darrow.chocobosreborn.entity.ModEntities;
 import tk.darrow.chocobosreborn.item.ModItems;
 import tk.darrow.chocobosreborn.race.FollowAcross;
+import tk.darrow.chocobosreborn.race.RaceClass;
 import tk.darrow.chocobosreborn.race.RaceCourseLayout;
 import tk.darrow.chocobosreborn.race.RacePoint;
 import tk.darrow.chocobosreborn.race.RaceManager;
@@ -863,8 +864,8 @@ public class ChocobosRebornGameTests {
 
 	/**
 	 * A bird saved before the points ladder and bloodlines converts once on load, and only once
-	 * (format 1 -> 2 -> 3: two old marks are 6 of 9, then 24 of 36); a format-2 bird's points of
-	 * nine become points of 36 and its (blank) line is left alone.
+	 * (format 1 -> 2 -> 3 -> 4: two old marks are 6 of 9, then 24 of 36, then 36 of Class B's 54);
+	 * a format-2 bird's points of nine are carried the same way and its (blank) line is left alone.
 	 */
 	@GameTest(template = EMPTY, timeoutTicks = 40)
 	public static void oldSaveConvertsOnce(GameTestHelper helper) {
@@ -879,7 +880,7 @@ public class ChocobosRebornGameTests {
 		tag.putInt("ClassWins", 2);    // two of the old three
 		ChocoboEntity old = ModEntities.CHOCOBO.get().create(level);
 		old.load(tag);
-		helper.assertTrue(old.classWins() == 24, "two old marks became 24 points of 36: " + old.classWins());
+		helper.assertTrue(old.classWins() == 36, "two old marks became 36 points of Class B's 54: " + old.classWins());
 		int floor = tk.darrow.chocobosreborn.breed.BreedGenes.gradeFloor(3);
 		helper.assertTrue(old.geneSpeed() >= floor && old.geneStamina() >= floor && old.geneIntelligence() >= floor
 				&& old.geneCooperation() >= floor, "a blank line rolled wild blood from its grade");
@@ -887,7 +888,7 @@ public class ChocobosRebornGameTests {
 		old.saveWithoutId(again);
 		ChocoboEntity reloaded = ModEntities.CHOCOBO.get().create(level);
 		reloaded.load(again);
-		helper.assertTrue(reloaded.classWins() == 24, "converted once, not again: " + reloaded.classWins());
+		helper.assertTrue(reloaded.classWins() == 36, "converted once, not again: " + reloaded.classWins());
 		helper.assertTrue(reloaded.geneSpeed() == old.geneSpeed() && reloaded.geneCooperation() == old.geneCooperation(),
 				"blood kept on the next load");
 		net.minecraft.nbt.CompoundTag nine = new net.minecraft.nbt.CompoundTag();
@@ -896,8 +897,148 @@ public class ChocobosRebornGameTests {
 		nine.putInt("ClassWins", 5);
 		ChocoboEntity two = ModEntities.CHOCOBO.get().create(level);
 		two.load(nine);
-		helper.assertTrue(two.classWins() == 20, "five of nine became 20 of 36: " + two.classWins());
+		helper.assertTrue(two.classWins() == 30, "five of nine became 30 of Class B's 54: " + two.classWins());
 		helper.assertTrue(two.geneSpeed() == 0 && two.geneCooperation() == 0, "format 2 does not roll blood again");
+		helper.succeed();
+	}
+
+	/**
+	 * A ranked first place counts for the class the bird is in when it wins: nine Class C
+	 * sprints (the ninth promotes) are nine Class C wins, the next win is Class B's. Unranked
+	 * finishes count nowhere, Class S wins count toward no stage, and the tally survives a save.
+	 */
+	@GameTest(template = EMPTY, timeoutTicks = 40)
+	public static void firstPlacesCountInTheClassTheyAreWon(GameTestHelper helper) {
+		ServerLevel level = helper.getLevel();
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		helper.assertTrue(bird.recordFirstPlace(false, 4) == null && bird.raceWins() == 0
+				&& bird.winsInClass(RaceClass.C) == 0, "an unranked finish counts nowhere");
+		for (int i = 0; i < 9; i++) {
+			bird.recordFirstPlace(true, 4);
+		}
+		helper.assertTrue(bird.raceClass() == RaceClass.B, "nine sprints promote: " + bird.raceClass());
+		helper.assertTrue(bird.winsInClass(RaceClass.C) == 9 && bird.winsInClass(RaceClass.B) == 0,
+				"the promoting win counts for Class C: " + java.util.Arrays.toString(bird.winsByClass()));
+		bird.recordFirstPlace(true, 10);
+		helper.assertTrue(bird.winsInClass(RaceClass.B) == 1 && bird.winsInClass(RaceClass.C) == 9,
+				"the next win is Class B's: " + java.util.Arrays.toString(bird.winsByClass()));
+		bird.setRaceClass(RaceClass.S);
+		bird.recordFirstPlace(true, 4);
+		helper.assertTrue(bird.raceWins() == 11 && bird.winsInClass(RaceClass.S) == 0
+				&& java.util.Arrays.equals(bird.winsByClass(), new int[]{9, 1, 0}),
+				"a Class S win is lifetime only: " + java.util.Arrays.toString(bird.winsByClass()));
+		CompoundTag tag = new CompoundTag();
+		bird.saveWithoutId(tag);
+		ChocoboEntity reloaded = ModEntities.CHOCOBO.get().create(level);
+		reloaded.load(tag);
+		helper.assertTrue(java.util.Arrays.equals(reloaded.winsByClass(), new int[]{9, 1, 0}) && reloaded.raceWins() == 11,
+				"per-class wins saved and loaded: " + java.util.Arrays.toString(reloaded.winsByClass()));
+		helper.succeed();
+	}
+
+	/**
+	 * A format-4 bird (lifetime wins only) shares them out once: lowest class first, capped at
+	 * C 9 / B 14, the rest to its current class. A ledger record without per-class wins reads
+	 * the same way, and one with them keeps them.
+	 */
+	@GameTest(template = EMPTY, timeoutTicks = 40)
+	public static void oldBirdSharesItsWinsOutByClass(GameTestHelper helper) {
+		ServerLevel level = helper.getLevel();
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		bird.setGenes(40, 40, 40, 40);
+		bird.setRaceClass(RaceClass.A);
+		CompoundTag tag = new CompoundTag();
+		bird.saveWithoutId(tag);
+		tag.putInt("SaveFormat", 4);   // the per-class ladder, before per-class wins
+		tag.remove("WinsByClass");
+		tag.putInt("RaceWins", 30);
+		ChocoboEntity old = ModEntities.CHOCOBO.get().create(level);
+		old.load(tag);
+		helper.assertTrue(java.util.Arrays.equals(old.winsByClass(), new int[]{9, 14, 7}) && old.raceWins() == 30,
+				"30 lifetime wins in Class A share out 9 / 14 / 7: " + java.util.Arrays.toString(old.winsByClass()));
+		old.recordFirstPlace(true, 4);
+		CompoundTag again = new CompoundTag();
+		old.saveWithoutId(again);
+		ChocoboEntity reloaded = ModEntities.CHOCOBO.get().create(level);
+		reloaded.load(again);
+		helper.assertTrue(java.util.Arrays.equals(reloaded.winsByClass(), new int[]{9, 14, 8}) && reloaded.raceWins() == 31,
+				"converted once, not again: " + java.util.Arrays.toString(reloaded.winsByClass()));
+		CompoundTag record = tk.darrow.chocobosreborn.ledger.BirdRecord.of(reloaded, null, null, -1, -1, 0, 0L, true).save();
+		helper.assertTrue(tk.darrow.chocobosreborn.ledger.BirdRecord.load(record).winsIn(RaceClass.A) == 8,
+				"a current ledger record keeps its per-class wins");
+		record.remove("WinsByClass");
+		record.putInt("Wins", 12);
+		record.putInt("Class", RaceClass.B.getId());
+		tk.darrow.chocobosreborn.ledger.BirdRecord oldRecord = tk.darrow.chocobosreborn.ledger.BirdRecord.load(record);
+		helper.assertTrue(oldRecord.winsC() == 9 && oldRecord.winsB() == 3 && oldRecord.winsA() == 0,
+				"an old ledger record shares its wins out the same way");
+		helper.succeed();
+	}
+
+	/** Re-arm both birds with {@code nut} (a sneaking owner may swap a nut) and hatch one chicobo. */
+	private static ChocoboEntity hatch(GameTestHelper helper, Player p, ChocoboEntity a, ChocoboEntity b, ItemStack nut) {
+		p.setShiftKeyDown(true);
+		p.setItemInHand(InteractionHand.MAIN_HAND, nut.copy());
+		a.mobInteract(p, InteractionHand.MAIN_HAND);
+		p.setItemInHand(InteractionHand.MAIN_HAND, nut.copy());
+		b.mobInteract(p, InteractionHand.MAIN_HAND);
+		AgeableMob chick = a.getBreedOffspring(helper.getLevel(), b);
+		helper.assertTrue(chick instanceof ChocoboEntity, "chick created");
+		return (ChocoboEntity) chick;
+	}
+
+	/**
+	 * Green / Blue counts Class C wins only: a pair one Class C win short never turns, however
+	 * many Class B and A wins it has; at 16 combined Class C wins it always does.
+	 */
+	@GameTest(template = EMPTY)
+	public static void greenOrBlueNeedsClassCWins(GameTestHelper helper) {
+		ChocoboEntity a = spawnAdult(helper, new BlockPos(1, 1, 1), true, ChocoboColor.YELLOW);
+		ChocoboEntity b = spawnAdult(helper, new BlockPos(3, 1, 3), false, ChocoboColor.YELLOW);
+		Player p = owner(helper, a, b);
+		ItemStack carob = new ItemStack(ModItems.CAROB_NUT.get(), 2);
+		for (ChocoboEntity bird : new ChocoboEntity[]{a, b}) {
+			bird.setWinsInClass(RaceClass.C, 4);
+			bird.setWinsInClass(RaceClass.B, 30);
+			bird.setWinsInClass(RaceClass.A, 30);
+		}
+		for (int i = 0; i < 20; i++) {
+			ChocoboEntity c = hatch(helper, p, a, b, carob);
+			helper.assertTrue(c.color() == ChocoboColor.YELLOW, "4 Class C wins each is short: " + c.color());
+		}
+		a.setWinsInClass(RaceClass.C, 8);
+		b.setWinsInClass(RaceClass.C, 8);
+		for (int i = 0; i < 20; i++) {
+			ChocoboEntity c = hatch(helper, p, a, b, carob);
+			helper.assertTrue(c.color() == ChocoboColor.GREEN || c.color() == ChocoboColor.BLUE,
+					"16 Class C wins between them is certain: " + c.color());
+		}
+		helper.succeed();
+	}
+
+	/**
+	 * Black counts Class B wins and needs Great parents: Good parents with the wins keep a
+	 * parent's colour (not even White); Great parents with 24 combined Class B wins hatch Black.
+	 */
+	@GameTest(template = EMPTY)
+	public static void blackNeedsGreatParentsAndClassBWins(GameTestHelper helper) {
+		ChocoboEntity a = spawnAdult(helper, new BlockPos(1, 1, 1), true, ChocoboColor.GREEN);
+		ChocoboEntity b = spawnAdult(helper, new BlockPos(3, 1, 3), false, ChocoboColor.BLUE);
+		Player p = owner(helper, a, b);
+		ItemStack carob = new ItemStack(ModItems.CAROB_NUT.get(), 2);
+		a.setWinsInClass(RaceClass.B, 12);
+		b.setWinsInClass(RaceClass.B, 12);
+		for (int i = 0; i < 10; i++) {
+			ChocoboEntity c = hatch(helper, p, a, b, carob);
+			helper.assertTrue(c.color() == ChocoboColor.GREEN || c.color() == ChocoboColor.BLUE,
+					"Good parents keep the line: " + c.color());
+		}
+		a.setGrade(ChocoboGrade.GREAT);
+		b.setGrade(ChocoboGrade.GREAT);
+		for (int i = 0; i < 10; i++) {
+			ChocoboEntity c = hatch(helper, p, a, b, carob);
+			helper.assertTrue(c.color() == ChocoboColor.BLACK, "Great parents, 24 Class B wins: " + c.color());
+		}
 		helper.succeed();
 	}
 

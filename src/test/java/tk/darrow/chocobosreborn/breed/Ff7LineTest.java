@@ -63,18 +63,37 @@ class Ff7LineTest {
 	}
 
 	@Test
-	void goldNeedsZeioBlackAndWonderfulYellow() {
+	void goldNeedsZeioWonderfulBlackAndWonderfulYellow() {
 		assertEquals(Ff7Line.Result.GOLD, Ff7Line.resolve(
 				Ff7Line.Color.BLACK, Ff7Line.Color.YELLOW,
-				Ff7Line.GREAT, Ff7Line.WONDERFUL, Ff7Line.ZEIO, true, true, true));
+				Ff7Line.WONDERFUL, Ff7Line.WONDERFUL, Ff7Line.ZEIO, true, true, true));
 		assertEquals(Ff7Line.Result.INHERIT, Ff7Line.resolve(
 				Ff7Line.Color.BLACK, Ff7Line.Color.YELLOW,
-				Ff7Line.GREAT, Ff7Line.WONDERFUL, Ff7Line.ZEIO, true, false, true));
+				Ff7Line.WONDERFUL, Ff7Line.WONDERFUL, Ff7Line.ZEIO, true, false, true));
 		assertEquals(Ff7Line.Result.NONE, Ff7Line.resolve(
 				Ff7Line.Color.BLACK, Ff7Line.Color.YELLOW,
-				Ff7Line.GREAT, Ff7Line.WONDERFUL, Ff7Line.CAROB, true, true, true));
+				Ff7Line.WONDERFUL, Ff7Line.WONDERFUL, Ff7Line.CAROB, true, true, true));
+		// a Great Black is not enough any more
+		assertEquals(Ff7Line.Result.INHERIT, Ff7Line.resolve(
+				Ff7Line.Color.BLACK, Ff7Line.Color.YELLOW,
+				Ff7Line.GREAT, Ff7Line.WONDERFUL, Ff7Line.ZEIO, true, true, true));
 		assertFalse(Ff7Line.goldPair(Ff7Line.Color.BLACK, Ff7Line.Color.YELLOW, Ff7Line.GREAT, Ff7Line.GREAT));
-		assertTrue(Ff7Line.goldPair(Ff7Line.Color.YELLOW, Ff7Line.Color.BLACK, Ff7Line.WONDERFUL, Ff7Line.GREAT));
+		assertFalse(Ff7Line.goldPair(Ff7Line.Color.YELLOW, Ff7Line.Color.BLACK, Ff7Line.WONDERFUL, Ff7Line.GREAT));
+		assertTrue(Ff7Line.goldPair(Ff7Line.Color.YELLOW, Ff7Line.Color.BLACK, Ff7Line.WONDERFUL, Ff7Line.WONDERFUL));
+	}
+
+	@Test
+	void blackNeedsGreatGreenAndGreatBlue() {
+		// Good parents with the wins: the line does not move, not even to White
+		assertEquals(Ff7Line.Result.NONE, Ff7Line.resolve(
+				Ff7Line.Color.GREEN, Ff7Line.Color.BLUE,
+				Ff7Line.GOOD, Ff7Line.GREAT, Ff7Line.CAROB, true, true, true));
+		assertEquals(Ff7Line.Result.NONE, Ff7Line.resolve(
+				Ff7Line.Color.BLUE, Ff7Line.Color.GREEN,
+				Ff7Line.GREAT, Ff7Line.GOOD, Ff7Line.CAROB, true, false, true));
+		assertEquals(Ff7Line.Result.BLACK, Ff7Line.resolve(
+				Ff7Line.Color.BLUE, Ff7Line.Color.GREEN,
+				Ff7Line.WONDERFUL, Ff7Line.GREAT, Ff7Line.CAROB, true, true, true));
 	}
 
 	@Test
