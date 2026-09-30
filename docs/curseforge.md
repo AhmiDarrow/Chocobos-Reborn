@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.4 - Earned in Class
+Uploaded 2026-09-30: `chocobosreborn-1.1.4.jar` as file **9022598** ("Chocobos Reborn 1.1.4 - Earned in Class",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.4.md`) via
+`tools/upload_curseforge.py`. Colour breeding counts wins in the stage's class: C5 / B8 / A10 each, certain at 16 / 24 / 32; Great parents for Black, Wonderful Black for Gold; save format 5. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.4
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9022598
+SHA-256: `cf8a17b010b7cdd5b2a25232bbdacc0abaaeedad078db25d62a40b4354e3107d`.
+
 ## 1.1.3 - Class Rivals
 Uploaded 2026-09-30: `chocobosreborn-1.1.3.jar` as file **9021519** ("Chocobos Reborn 1.1.3 - Class Rivals",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.3.md`) via
