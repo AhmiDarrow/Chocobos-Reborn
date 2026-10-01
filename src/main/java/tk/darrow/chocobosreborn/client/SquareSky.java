@@ -33,6 +33,9 @@ public final class SquareSky extends DimensionSpecialEffects {
 	private static final ResourceLocation MOON = ResourceLocation.withDefaultNamespace("textures/environment/moon_phases.png");
 	private static final int SEGMENTS = 96, RINGS = 48;
 	private static final float[] MESH = mesh();
+	/** MESH positions through this frame's sky matrix, shared by both layers (render thread only). */
+	private static final float[] VIEW = new float[MESH.length / 5 * 3];
+	private static final org.joml.Vector3f SCRATCH = new org.joml.Vector3f();
 	private static ShaderInstance panoramaShader;
 
 	public SquareSky() {
@@ -97,6 +100,7 @@ public final class SquareSky extends DimensionSpecialEffects {
 		RenderSystem.setShaderColor(1, 1, 1, 1);
 		try {
 			float sum = 0;
+			boolean transformed = false;
 			for (int layer = 0; layer < LAYERS.length; layer++) {
 				float weight = Math.clamp(weights[layer], 0F, 1F);
 				if (weight < .001F) {
@@ -105,9 +109,20 @@ public final class SquareSky extends DimensionSpecialEffects {
 				sum += weight;
 				float alpha = weight / sum;   // exact weighted cross-fade
 				RenderSystem.setShaderTexture(0, LAYERS[layer]);
+				if (!transformed) {
+					// the same transform addVertex(matrix, ...) does, once a frame for both layers and
+					// without its new Vector3f per vertex (18k vertices a layer)
+					for (int i = 0, k = 0; i < MESH.length; i += 5, k += 3) {
+						matrix.transformPosition(MESH[i], MESH[i + 1], MESH[i + 2], SCRATCH);
+						VIEW[k] = SCRATCH.x();
+						VIEW[k + 1] = SCRATCH.y();
+						VIEW[k + 2] = SCRATCH.z();
+					}
+					transformed = true;
+				}
 				var buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-				for (int i = 0; i < MESH.length; i += 5) {
-					buffer.addVertex(matrix, MESH[i], MESH[i + 1], MESH[i + 2])
+				for (int i = 0, k = 0; i < MESH.length; i += 5, k += 3) {
+					buffer.addVertex(VIEW[k], VIEW[k + 1], VIEW[k + 2])
 							.setUv(MESH[i + 3], MESH[i + 4]).setColor(light, light, light, alpha);
 				}
 				BufferUploader.drawWithShader(buffer.buildOrThrow());

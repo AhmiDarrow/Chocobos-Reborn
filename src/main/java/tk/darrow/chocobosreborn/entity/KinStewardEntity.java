@@ -133,6 +133,74 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		}
 	}
 
+	@Override
+	protected net.minecraft.world.entity.ai.navigation.PathNavigation createNavigation(Level level) {
+		return new TownNavigation(this, level);
+	}
+
+	/** Path searches run by this kin's navigation (GameTests read it). */
+	public long pathSearches() {
+		return getNavigation() instanceof TownNavigation town ? town.searches : 0L;
+	}
+
+	/** Time this kin's navigation spent in path searches, in nanoseconds (GameTests read it). */
+	public long pathSearchNanos() {
+		return getNavigation() instanceof TownNavigation town ? town.searchNanos : 0L;
+	}
+
+	/** GameTests compare a kin that re-plans on every door like vanilla against one that does not. */
+	public void setDoorReplans(boolean on) {
+		if (getNavigation() instanceof TownNavigation town) {
+			town.doorReplans = on;
+		}
+	}
+
+	/**
+	 * Ground navigation that does not re-plan when a door it can open swings. A block change
+	 * near a mob's path makes vanilla re-plan it (at most once a second, the rest deferred);
+	 * every door a resident opens and closes did that to every resident walking near it, the
+	 * one at the door included, and their next doors did it back. For a mob that opens wooden
+	 * doors, an open door and a closed one cost the same in its path search, so the path it is
+	 * on stays good: it walks up, opens the door and goes through as before. Other changes near
+	 * the path (a door broken or put up, a wall, a gate) still re-plan as vanilla does.
+	 */
+	static final class TownNavigation extends net.minecraft.world.entity.ai.navigation.GroundPathNavigation {
+		private long searches, searchNanos;
+		private boolean doorReplans;
+
+		TownNavigation(net.minecraft.world.entity.Mob mob, Level level) {
+			super(mob, level);
+		}
+
+		@Override
+		protected net.minecraft.world.level.pathfinder.PathFinder createPathFinder(int maxVisitedNodes) {
+			this.nodeEvaluator = new net.minecraft.world.level.pathfinder.WalkNodeEvaluator();
+			this.nodeEvaluator.setCanPassDoors(true);
+			return new net.minecraft.world.level.pathfinder.PathFinder(this.nodeEvaluator, maxVisitedNodes) {
+				@Override
+				public net.minecraft.world.level.pathfinder.@Nullable Path findPath(
+						net.minecraft.world.level.PathNavigationRegion region, net.minecraft.world.entity.Mob mob,
+						java.util.Set<net.minecraft.core.BlockPos> targets, float maxRange, int accuracy, float searchDepth) {
+					searches++;
+					long t0 = System.nanoTime();
+					try {
+						return super.findPath(region, mob, targets, maxRange, accuracy, searchDepth);
+					} finally {
+						searchNanos += System.nanoTime() - t0;
+					}
+				}
+			};
+		}
+
+		@Override
+		public boolean shouldRecomputePath(net.minecraft.core.BlockPos pos) {
+			if (!doorReplans && canOpenDoors() && net.minecraft.world.level.block.DoorBlock.isWoodenDoor(level, pos)) {
+				return false;
+			}
+			return super.shouldRecomputePath(pos);
+		}
+	}
+
 	/** Townsfolk: open doors, walk the day, glance at passers-by. */
 	private void installResident() {
 		int index = TownRoutineGoal.indexOf(role());

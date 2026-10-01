@@ -46,8 +46,10 @@ public enum ChocoboNut {
 		return a.tier >= b.tier ? a : b;
 	}
 
+	private static final ChocoboNut[] VALUES = values();
+
 	public static ChocoboNut byId(int id) {
-		ChocoboNut[] values = values();
+		ChocoboNut[] values = VALUES;
 		if (id < 0 || id >= values.length) {
 			return NONE;
 		}

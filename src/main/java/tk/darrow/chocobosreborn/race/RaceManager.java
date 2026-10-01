@@ -640,6 +640,9 @@ public final class RaceManager {
 		for (ServerPlayer p : event.getServer().getPlayerList().getPlayers()) {
 			payOwedGp(p);
 		}
+		// statics outlive a singleplayer world: another world's player must not be paid or held back by this one
+		OWED_GP.clear();
+		FollowAcross.reset();
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
 		TownLife.reset();

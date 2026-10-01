@@ -183,6 +183,8 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 		private final ModelPart leftArm;
 		private final ModelPart rightLeg;
 		private final ModelPart leftLeg;
+		/** Every part, flattened once: getAllParts() builds a tree of streams on each call (per kin per frame). */
+		private final ModelPart[] allParts;
 
 		public Model(ModelPart root) {
 			this.root = root;
@@ -193,6 +195,7 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 			this.leftArm = root.getChild("arm1");
 			this.rightLeg = root.getChild("leg0");
 			this.leftLeg = root.getChild("leg1");
+			this.allParts = root.getAllParts().toArray(ModelPart[]::new);
 		}
 
 		@Override
@@ -202,7 +205,9 @@ public class KinStewardRenderer extends MobRenderer<KinStewardEntity, KinSteward
 
 		@Override
 		public void setupAnim(KinStewardEntity entity, float limbSwing, float limbAmount, float age, float yaw, float pitch) {
-			root.getAllParts().forEach(ModelPart::resetPose);
+			for (ModelPart part : allParts) {
+				part.resetPose();
+			}
 			head.yRot = yaw * Mth.DEG_TO_RAD;
 			head.xRot = pitch * Mth.DEG_TO_RAD;
 			float swing = Mth.cos(limbSwing * 0.6662F) * 1.2F * limbAmount;

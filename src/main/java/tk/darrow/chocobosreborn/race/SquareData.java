@@ -266,8 +266,10 @@ public class SquareData extends SavedData {
 	}
 
 	public void setKeepersSpawned(boolean v) {
-		keepersSpawned = v;
-		setDirty();
+		if (keepersSpawned != v) {   // every completed keeper sync sets it: rewrite the file only on a change
+			keepersSpawned = v;
+			setDirty();
+		}
 	}
 
 	public void putReturn(UUID player, ReturnPoint rp) {

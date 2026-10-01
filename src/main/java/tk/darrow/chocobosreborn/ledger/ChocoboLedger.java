@@ -207,44 +207,44 @@ public final class ChocoboLedger extends SavedData {
 		return birds.get(id);
 	}
 
-	/** The player's birds, plus the parents / children of those birds for the family pages. */
+	/**
+	 * The player's birds, plus the parents / children of those birds for the family pages.
+	 * Membership goes by bird id in sets: a list scan per record made every almanac open
+	 * quadratic in a ledger that only grows.
+	 */
 	public List<BirdRecord> forOwner(UUID owner) {
 		List<BirdRecord> mine = new ArrayList<>();
+		java.util.Set<UUID> mineIds = new java.util.HashSet<>();
 		for (BirdRecord r : birds.values()) {
 			if (owner.equals(r.owner())) {
 				mine.add(r);
+				mineIds.add(r.id());
 			}
 		}
 		List<BirdRecord> out = new ArrayList<>(mine);
+		java.util.Set<UUID> outIds = new java.util.HashSet<>(mineIds);
 		for (BirdRecord r : mine) {
-			addIfKnown(out, r.parentA());
-			addIfKnown(out, r.parentB());
+			addIfKnown(out, outIds, r.parentA());
+			addIfKnown(out, outIds, r.parentB());
 		}
 		for (BirdRecord r : birds.values()) {
-			if (!out.contains(r) && (isIn(mine, r.parentA()) || isIn(mine, r.parentB()))) {
+			if (!outIds.contains(r.id()) && (isIn(mineIds, r.parentA()) || isIn(mineIds, r.parentB()))) {
 				out.add(r);
+				outIds.add(r.id());
 			}
 		}
 		return out;
 	}
 
-	private void addIfKnown(List<BirdRecord> out, @Nullable UUID id) {
+	private void addIfKnown(List<BirdRecord> out, java.util.Set<UUID> outIds, @Nullable UUID id) {
 		BirdRecord r = id == null ? null : birds.get(id);
-		if (r != null && !out.contains(r)) {
+		if (r != null && outIds.add(r.id())) {
 			out.add(r);
 		}
 	}
 
-	private static boolean isIn(List<BirdRecord> list, @Nullable UUID id) {
-		if (id == null) {
-			return false;
-		}
-		for (BirdRecord r : list) {
-			if (r.id().equals(id)) {
-				return true;
-			}
-		}
-		return false;
+	private static boolean isIn(java.util.Set<UUID> ids, @Nullable UUID id) {
+		return id != null && ids.contains(id);
 	}
 
 	private static long day(long gameTime) {

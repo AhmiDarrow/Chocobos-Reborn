@@ -32,8 +32,10 @@ public enum ChocoboGrade {
 		return byRank(next);
 	}
 
+	private static final ChocoboGrade[] VALUES = values();
+
 	public static ChocoboGrade byRank(int rank) {
-		ChocoboGrade[] values = values();
+		ChocoboGrade[] values = VALUES;
 		if (rank < 0) {
 			return POOR;
 		}

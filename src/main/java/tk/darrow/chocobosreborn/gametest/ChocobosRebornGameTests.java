@@ -1249,4 +1249,40 @@ public class ChocobosRebornGameTests {
 			helper.succeed();
 		});
 	}
+
+	/** The almanac's family pages ({@code ChocoboLedger#forOwner}): own birds, then their parents, then their chicks, each once, in ledger order. */
+	@GameTest(template = EMPTY)
+	@SuppressWarnings("unchecked")
+	public static void ledgerFamilyListsEachRelativeOnce(GameTestHelper helper) {
+		java.util.UUID me = new java.util.UUID(1L, 1L), other = new java.util.UUID(2L, 2L);
+		tk.darrow.chocobosreborn.ledger.BirdRecord sire = record(1, other, null, null);
+		tk.darrow.chocobosreborn.ledger.BirdRecord dam = record(2, other, null, null);
+		tk.darrow.chocobosreborn.ledger.BirdRecord stranger = record(3, other, null, null);
+		tk.darrow.chocobosreborn.ledger.BirdRecord mineA = record(4, me, sire.id(), dam.id());
+		tk.darrow.chocobosreborn.ledger.BirdRecord mineB = record(5, me, sire.id(), mineA.id());   // a parent that is mine too: listed once
+		tk.darrow.chocobosreborn.ledger.BirdRecord chick = record(6, other, mineA.id(), stranger.id());
+		tk.darrow.chocobosreborn.ledger.BirdRecord lost = record(7, me, new java.util.UUID(9L, 99L), null);   // parent not in the ledger
+		tk.darrow.chocobosreborn.ledger.BirdRecord orphan = record(8, other, null, null);
+		tk.darrow.chocobosreborn.ledger.ChocoboLedger ledger = new tk.darrow.chocobosreborn.ledger.ChocoboLedger();
+		java.util.Map<java.util.UUID, tk.darrow.chocobosreborn.ledger.BirdRecord> birds;
+		try {
+			var field = tk.darrow.chocobosreborn.ledger.ChocoboLedger.class.getDeclaredField("birds");
+			field.setAccessible(true);
+			birds = (java.util.Map<java.util.UUID, tk.darrow.chocobosreborn.ledger.BirdRecord>) field.get(ledger);
+		} catch (ReflectiveOperationException e) {
+			throw new IllegalStateException(e);
+		}
+		for (var r : java.util.List.of(sire, dam, stranger, mineA, mineB, chick, lost, orphan)) {
+			birds.put(r.id(), r);
+		}
+		helper.assertTrue(java.util.List.of(mineA, mineB, lost, sire, dam, chick).equals(ledger.forOwner(me)),
+				"family pages: " + ledger.forOwner(me));
+		helper.assertTrue(ledger.forOwner(new java.util.UUID(3L, 3L)).isEmpty(), "a stranger has no pages");
+		helper.succeed();
+	}
+
+	private static tk.darrow.chocobosreborn.ledger.BirdRecord record(long id, java.util.UUID owner, java.util.UUID parentA, java.util.UUID parentB) {
+		return new tk.darrow.chocobosreborn.ledger.BirdRecord(new java.util.UUID(9L, id), owner, "b" + id, 0, 0, 0, false, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, parentA, parentB, -1, -1, 0, 0L, true, "");
+	}
 }

@@ -501,8 +501,11 @@ public enum RaceTrack {
 		return 0.5D + ROW_Z0 + raceClass.getId() * ROW_DZ;
 	}
 
+	/** values() clones 48 entries on every call; byId runs every tick for every racer. */
+	private static final RaceTrack[] VALUES = values();
+
 	public static RaceTrack byId(int id) {
-		RaceTrack[] values = values();
+		RaceTrack[] values = VALUES;
 		if (id < 0 || id >= values.length) {
 			return C_MEADOW;
 		}

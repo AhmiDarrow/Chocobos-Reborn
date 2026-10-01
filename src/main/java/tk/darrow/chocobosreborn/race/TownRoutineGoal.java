@@ -12,11 +12,14 @@ import tk.darrow.chocobosreborn.entity.KinStewardEntity;
  * A resident's day ({@link VillageLayout#activity}): home at night, work in the
  * morning, the fountain in the afternoon, the inn in the evening, and the overlook
  * rail whenever a heat is called. Thinks once a second; paths only when the
- * target changes or a walk ends short; potters within two blocks once there.
+ * target changes or a walk ends short (backing off while short walks get no nearer);
+ * potters within two blocks once there.
  */
 public class TownRoutineGoal extends Goal {
 	private static final double SPEED = 0.55D;
 	private static final int STUCK_THINKS = 45;
+	/** Longest wait, in thinks, between walks that end short at the same spot. */
+	private static final int MAX_RETRY_THINKS = 8;
 
 	private final KinStewardEntity kin;
 	private final int index;
@@ -26,6 +29,9 @@ public class TownRoutineGoal extends Goal {
 	private int idle;
 	private int stuck;
 	private boolean arrived;
+	/** Thinks until the next walk after one ended short, the current wait, and where the last walk started. */
+	private int retry, retryWait = 1;
+	private double walkFrom = Double.MAX_VALUE;
 
 	public TownRoutineGoal(KinStewardEntity kin, int index) {
 		this.kin = kin;
@@ -66,6 +72,9 @@ public class TownRoutineGoal extends Goal {
 				tz = spot[1];
 				arrived = false;
 				stuck = 0;
+				retry = 0;
+				retryWait = 1;
+				walkFrom = Math.sqrt(kin.distanceToSqr(tx, kin.getY(), tz));
 				walk(tx, tz);
 			} else if (!arrived) {
 				if (kin.distanceToSqr(tx, kin.getY(), tz) <= 2.25D) {
@@ -77,7 +86,14 @@ public class TownRoutineGoal extends Goal {
 						// a walk that never gets there, out of sight: step onto the spot
 						kin.moveTo(tx, SquareBuilder.GROUND_Y + 1, tz, kin.getYRot(), 0.0F);
 						arrived = true;
-					} else {
+					} else if (--retry <= 0) {
+						// A walk that ends short and leaves the kin no nearer is a path search that
+						// lands on the same spot again: wait 1, 2, 4, then 8 thinks between tries
+						// while that lasts. Any progress goes back to trying every think.
+						double d = Math.sqrt(kin.distanceToSqr(tx, kin.getY(), tz));
+						retryWait = d < walkFrom - 1.0D ? 1 : Math.min(MAX_RETRY_THINKS, retryWait * 2);
+						retry = retryWait;
+						walkFrom = d;
 						walk(tx, tz);
 					}
 				}

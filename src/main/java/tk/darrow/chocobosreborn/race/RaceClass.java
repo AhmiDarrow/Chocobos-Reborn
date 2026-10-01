@@ -64,8 +64,10 @@ public enum RaceClass {
 		return byId(Math.min(S.id, this.id + 1));
 	}
 
+	private static final RaceClass[] VALUES = values();
+
 	public static RaceClass byId(int id) {
-		RaceClass[] values = values();
+		RaceClass[] values = VALUES;
 		if (id < 0) {
 			return C;
 		}

@@ -70,6 +70,8 @@ public final class CourseCrowdRenderer {
 
 	private static final Map<RaceTrack, Crowd> CROWDS = new EnumMap<>(RaceTrack.class);
 	private static final Map<RaceTrack, CompletableFuture<Crowd>> PENDING = new EnumMap<>(RaceTrack.class);
+	/** Plans that threw: the plan is deterministic, so retrying every frame only re-ran the job and the warning. */
+	private static final java.util.Set<RaceTrack> FAILED = java.util.EnumSet.noneOf(RaceTrack.class);
 
 	private static RenderType[] skinTypes, cloakTypes, glowTypes;
 	private static int[] cloakColours;
@@ -89,6 +91,12 @@ public final class CourseCrowdRenderer {
 	private static final Vector3f NRM = new Vector3f();
 	private static final float[] XR = new float[PARTS.length], YR = new float[PARTS.length], ZR = new float[PARTS.length];
 	private static final BlockPos.MutableBlockPos PROBE = new BlockPos.MutableBlockPos();
+	/**
+	 * Each drawn fan's vertices as the skin pass transformed them (x y z nx ny nz), indexed by fan:
+	 * the cloak and glow passes draw the same posed geometry with another texture, so they reuse it.
+	 */
+	private static float[] fanVerts = new float[0];
+	private static int fanStride;
 
 	private CourseCrowdRenderer() {
 	}
@@ -216,6 +224,9 @@ public final class CourseCrowdRenderer {
 		}
 		CompletableFuture<Crowd> f = PENDING.get(track);
 		if (f == null) {
+			if (FAILED.contains(track)) {
+				return null;
+			}
 			PENDING.put(track, CompletableFuture.supplyAsync(() -> new Crowd(track, CourseStands.of(track)), Util.backgroundExecutor()));
 			return null;
 		}
@@ -229,6 +240,7 @@ public final class CourseCrowdRenderer {
 			return c;
 		} catch (RuntimeException e) {
 			ChocobosReborn.LOGGER.warn("Crowd for {} failed to plan", track, e);
+			FAILED.add(track);
 			return null;
 		}
 	}
@@ -273,6 +285,14 @@ public final class CourseCrowdRenderer {
 			}
 		}
 		float age = (float) (gameTime % 24000L) + partial;
+		int perFan = 0;
+		for (float[] m : mesh) {
+			perFan += m.length / 8 * 6;
+		}
+		fanStride = perFan;
+		if (fanVerts.length < c.fans * perFan) {
+			fanVerts = new float[c.fans * perFan];
+		}
 		// skins, then cloaks (not the far ones), then eye glow (near ones only): one render type at a time
 		for (int pass = 0; pass < 3; pass++) {
 			for (int lk = 0; lk < LOOKS.length; lk++) {
@@ -292,7 +312,11 @@ public final class CourseCrowdRenderer {
 					}
 					int light = pass == 2 ? FULL_BRIGHT : c.standLight[c.fanStand[i]];
 					int colour = pass == 1 ? cloakColours[lk] : 0xFFFFFFFF;
-					emitFan(c, i, vc, light, colour, c.standCheer[c.fanStand[i]], age, cx, cy, cz);
+					if (pass == 0) {
+						emitFan(c, i, vc, light, colour, c.standCheer[c.fanStand[i]], age, cx, cy, cz);
+					} else {
+						emitCached(i, vc, light, colour);
+					}
 				}
 			}
 		}
@@ -338,6 +362,7 @@ public final class CourseCrowdRenderer {
 				.translate(0.0F, -1.501F, 0.0F);
 		FAN_N.identity().rotateY(c.yawRad[i]).scale(-1.0F, -1.0F, 1.0F);
 		int far = cheer ? 1 : 0;
+		int o = i * fanStride;
 		for (int p = 0; p < PARTS.length; p++) {
 			if (near) {
 				PartPose r = rest[p];
@@ -352,6 +377,27 @@ public final class CourseCrowdRenderer {
 				PART.transformPosition(m[v], m[v + 1], m[v + 2], POS);
 				PART_N.transform(m[v + 5], m[v + 6], m[v + 7], NRM);
 				vc.addVertex(POS.x, POS.y, POS.z, colour, m[v + 3], m[v + 4], OverlayTexture.NO_OVERLAY, light, NRM.x, NRM.y, NRM.z);
+				fanVerts[o] = POS.x;
+				fanVerts[o + 1] = POS.y;
+				fanVerts[o + 2] = POS.z;
+				fanVerts[o + 3] = NRM.x;
+				fanVerts[o + 4] = NRM.y;
+				fanVerts[o + 5] = NRM.z;
+				o += 6;
+			}
+		}
+	}
+
+	/** A fan the skin pass already posed this frame: the same vertices again, in this pass's colour and light. */
+	private static void emitCached(int i, VertexConsumer vc, int light, int colour) {
+		final float[] f = fanVerts;
+		int o = i * fanStride;
+		for (int p = 0; p < PARTS.length; p++) {
+			float[] m = mesh[p];
+			for (int v = 0; v < m.length; v += 8) {
+				vc.addVertex(f[o], f[o + 1], f[o + 2], colour, m[v + 3], m[v + 4], OverlayTexture.NO_OVERLAY, light,
+						f[o + 3], f[o + 4], f[o + 5]);
+				o += 6;
 			}
 		}
 	}

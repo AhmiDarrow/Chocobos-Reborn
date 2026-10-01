@@ -34,11 +34,24 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private static final Map<ResourceLocation, ResourceLocation> BLINK_SKINS = new HashMap<>();
 	private static final Map<String, ResourceLocation> EYELIDS = new HashMap<>();
 
+	/** chocobo_armor_&lt;mesh&gt; per armour tier (null: no visual), so the per-frame lookup builds no strings. */
+	private static final String[] ARMOR_MESH = armorMeshIds();
+
+	private static String[] armorMeshIds() {
+		var tiers = tk.darrow.chocobosreborn.item.ChocoboArmorItem.Tier.values();
+		String[] out = new String[tiers.length];
+		for (int i = 0; i < tiers.length; i++) {
+			out[i] = tiers[i].mesh() == null ? null : "chocobo_armor_" + tiers[i].mesh();
+		}
+		return out;
+	}
+
 	/** Mesh id for this bird's outfit: armour tier mesh if it has one, else saddled, else plain. */
 	private static String meshId(ChocoboEntity e) {
 		var tier = e.armor();
-		if (tier != null && tier.mesh() != null && WhiskerMesh.get("chocobo_armor_" + tier.mesh()) != null) {
-			return "chocobo_armor_" + tier.mesh();
+		String armorMesh = tier == null ? null : ARMOR_MESH[tier.ordinal()];
+		if (armorMesh != null && WhiskerMesh.get(armorMesh) != null) {
+			return armorMesh;
 		}
 		if (e.saddled() && WhiskerMesh.get("chocobo_saddled") != null) {
 			return "chocobo_saddled";
@@ -91,7 +104,7 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		} else {
 			set = SKINS;
 		}
-		boolean derived = ChocoboColor.values()[id].derivedAtlas();
+		boolean derived = ChocoboColor.byId(id).derivedAtlas();
 		if (e.isAddedToLevel() && EyeBlink.closed(e.tickCount, e.getId())) {
 			ResourceLocation closed = BLINK_SKINS.computeIfAbsent(set[id], key -> ResourceLocation.fromNamespaceAndPath(
 					key.getNamespace(), key.getPath().replace(".png", "_blink.png")));
@@ -340,12 +353,10 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	private void vertex(VertexConsumer vc, WhiskerMesh.Part p, int v, int color, int light, int overlay) {
 		final float[] pos = skinner.pos, nrm = skinner.nrm;
 		int u = p.posIndex[v] * 3;
-		vc.addVertex(pos[u], pos[u + 1], pos[u + 2])
-				.setColor(color)
-				.setUv(p.uv[v * 2], p.uv[v * 2 + 1])
-				.setOverlay(overlay)
-				.setLight(light)
-				.setNormal(nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
+		// the one-call vertex: a BufferBuilder in the entity format writes it straight through (the same
+		// bytes the chained setters write, without six interface calls and element bookkeeping per vertex)
+		vc.addVertex(pos[u], pos[u + 1], pos[u + 2], color, p.uv[v * 2], p.uv[v * 2 + 1], overlay, light,
+				nrm[v * 3], nrm[v * 3 + 1], nrm[v * 3 + 2]);
 	}
 
 	private static boolean isPlumage(int r, int g, int b) {

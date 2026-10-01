@@ -37,8 +37,10 @@ public class ChocoboArmorItem extends Item {
 			return name().toLowerCase(Locale.ROOT);
 		}
 
+		private static final Tier[] VALUES = values();
+
 		public static Tier byId(int id) {
-			Tier[] v = values();
+			Tier[] v = VALUES;
 			return id < 0 || id >= v.length ? LEATHER : v[id];
 		}
 	}

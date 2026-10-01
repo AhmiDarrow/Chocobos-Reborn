@@ -141,8 +141,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	public enum Command {
 		FOLLOW, STAY, WANDER;
 
+		private static final Command[] VALUES = values();
+
 		public static Command byId(int id) {
-			return id >= 0 && id < values().length ? values()[id] : FOLLOW;
+			return id >= 0 && id < VALUES.length ? VALUES[id] : FOLLOW;
 		}
 
 		public String id() {
@@ -2165,7 +2167,182 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				setOnGround(ground);
 			}
 		}
+		if (type != net.minecraft.world.entity.MoverType.SELF) {
+			restBox = null;
+			super.move(type, movement);
+			return;
+		}
+		if (replayRest(movement)) {
+			return;
+		}
+		double x = getX(), y = getY(), z = getZ();
+		float fly = flyDist, walk = walkDist, stepDist = moveDist;
 		super.move(type, movement);
+		noteRest(movement, x, y, z, fly, walk, stepDist);
+	}
+
+	// ------------------------------------------------------------ resting move
+
+	/*
+	 * A bird standing on the ground (penned, sitting, waiting for its owner) still moves every
+	 * tick: gravity asks for 0.08 down and the full collision pass (every collision shape round a
+	 * 1.75 x 3.25 box, then the supporting-block search) answers "nothing moves". When a full move
+	 * from this exact box, with this exact request, ended where it began, on the ground, and the
+	 * blocks it could have hit since are the very same states, the answer is known: the replay
+	 * sets what that move sets and keeps every block hook it fires (landing, stepping on, standing
+	 * inside, fire). A push, a rider, water, a broken floor or anything else that differs takes
+	 * the full move again. Every twentieth tick takes it regardless.
+	 */
+
+	/** Full moves taken at least this often, whatever the replay would say. */
+	private static final int REST_REFRESH_TICKS = 20;
+	/** Box, request and support-layer states of the last full move that ended at rest; null if it did not. */
+	private @Nullable net.minecraft.world.phys.AABB restBox;
+	private double restDy;
+	private net.minecraft.world.level.block.state.BlockState[] restStates = new net.minecraft.world.level.block.state.BlockState[0];
+	private boolean restReplayEnabled = true;
+	/** Moves answered by the replay (GameTests read it). */
+	private long restReplays;
+
+	/** GameTests compare the replay against the full move by turning it off on one bird. */
+	public void setRestReplay(boolean on) {
+		restReplayEnabled = on;
+		restBox = null;
+	}
+
+	public long restReplays() {
+		return restReplays;
+	}
+
+	/** Only an unridden, out-of-race bird asking to go straight down while it stands on the ground. */
+	private boolean mayRest(Vec3 movement) {
+		return restReplayEnabled && !level().isClientSide && !noPhysics
+				&& movement.x == 0.0D && movement.z == 0.0D && movement.y < 0.0D
+				&& onGround() && fallDistance == 0.0F && stuckSpeedMultiplier.lengthSqr() <= 1.0E-7D
+				&& !isPassenger() && !isVehicle() && !racing() && !raceNpc() && raceTrack() < 0
+				&& !isInWater() && !isInLava() && !isInFluidType() && !isInPowderSnow;
+	}
+
+	/** After a full move: remember it if it ended exactly where it began, on the ground. */
+	private void noteRest(Vec3 movement, double x, double y, double z, float fly, float walk, float stepDist) {
+		restBox = null;
+		if (isRemoved() || !mayRest(movement) || getX() != x || getY() != y || getZ() != z
+				|| flyDist != fly || walkDist != walk || moveDist != stepDist
+				|| !verticalCollisionBelow || horizontalCollision) {
+			return;
+		}
+		net.minecraft.world.phys.AABB box = getBoundingBox();
+		if (!restNeighboursClear(box, movement) || !supportStates(box, movement.y, true)) {
+			return;
+		}
+		restBox = box;
+		restDy = movement.y;
+	}
+
+	/** Nothing but blocks could stop the bird: no boat, minecart or shell under it, no world border at hand. */
+	private boolean restNeighboursClear(net.minecraft.world.phys.AABB box, Vec3 movement) {
+		net.minecraft.world.phys.AABB swept = box.expandTowards(movement);
+		return !level().getWorldBorder().isInsideCloseToBorder(this, swept)
+				&& level().getEntityCollisions(this, swept).isEmpty();
+	}
+
+	/**
+	 * The cells whose collision shapes a straight-down move (and the supporting-block search)
+	 * can meet: the collision scan's columns, from its lowest layer up to the layer holding the
+	 * box's floor. Shapes higher up start at or above the floor and never stop a fall. With
+	 * {@code record} the states are stored (refused if one has a block entity or a shape that
+	 * is not fixed by its state, or is a liquid this breed can stand on); otherwise compared.
+	 */
+	private boolean supportStates(net.minecraft.world.phys.AABB box, double dy, boolean record) {
+		int x0 = Mth.floor(box.minX - 1.0E-7D) - 1, x1 = Mth.floor(box.maxX + 1.0E-7D) + 1;
+		int z0 = Mth.floor(box.minZ - 1.0E-7D) - 1, z1 = Mth.floor(box.maxZ + 1.0E-7D) + 1;
+		int y0 = Mth.floor(box.minY + dy - 1.0E-7D) - 1, y1 = Mth.floor(box.minY + 1.0E-7D);
+		int n = (x1 - x0 + 1) * (z1 - z0 + 1) * (y1 - y0 + 1);
+		if (record && restStates.length < n) {
+			restStates = new net.minecraft.world.level.block.state.BlockState[n];
+		}
+		ChocoboColor c = record ? color() : null;
+		boolean standsOnLiquid = c != null && (c.waterWalk() || c.lavaWalk());
+		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+		int i = 0;
+		for (int x = x0; x <= x1; x++) {
+			for (int z = z0; z <= z1; z++) {
+				net.minecraft.world.level.BlockGetter chunk = level().getChunkForCollisions(x >> 4, z >> 4);
+				for (int y = y0; y <= y1; y++, i++) {
+					net.minecraft.world.level.block.state.BlockState st = chunk == null ? null : chunk.getBlockState(pos.set(x, y, z));
+					if (record) {
+						if (st != null && (st.hasBlockEntity() || st.getBlock().hasDynamicShape()
+								|| (standsOnLiquid && st.getBlock() instanceof net.minecraft.world.level.block.LiquidBlock))) {
+							return false;
+						}
+						restStates[i] = st;
+					} else if (restStates[i] != st) {
+						return false;
+					}
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * The full move's answer, when it is known: see the note above. Mirrors {@code Entity.move}
+	 * for a request the collision pass cuts to nothing on the ground.
+	 */
+	private boolean replayRest(Vec3 movement) {
+		net.minecraft.world.phys.AABB box = restBox;
+		if (box == null || movement.y != restDy || (tickCount + getId()) % REST_REFRESH_TICKS == 0 || !mayRest(movement)) {
+			return false;
+		}
+		net.minecraft.world.phys.AABB now = getBoundingBox();
+		if ((now != box && !now.equals(box)) || !supportStates(box, movement.y, false) || !restNeighboursClear(box, movement)) {
+			return false;
+		}
+		restReplays++;
+		wasOnFire = isOnFire();
+		// the request was straight down and met the floor at once
+		horizontalCollision = false;
+		minorHorizontalCollision = false;
+		verticalCollision = true;
+		verticalCollisionBelow = true;
+		// on the ground already, on the same supporting block (same states, same box)
+		BlockPos on = getOnPosLegacy();
+		net.minecraft.world.level.block.state.BlockState state = level().getBlockState(on);
+		checkFallDamage(0.0D, true, state, on);
+		if (isRemoved()) {
+			return true;
+		}
+		net.minecraft.world.level.block.Block block = state.getBlock();
+		block.updateEntityAfterFallOn(level(), this);
+		if (onGround()) {
+			block.stepOn(level(), on, state, this);
+		}
+		// no distance walked: no step sound, no step vibration (the full move that set this up
+		// already moved the next step past the distance walked)
+		tryCheckInsideBlocks();
+		float f = getBlockSpeedFactor();
+		setDeltaMovement(getDeltaMovement().multiply(f, 1.0D, f));
+		if (getRemainingFireTicks() != -getFireImmuneTicks() || wasOnFire || isOnFire()) {
+			restFireTail();
+		}
+		return true;
+	}
+
+	/** {@code Entity.move}'s closing fire bookkeeping, for a bird that is or was alight. */
+	private void restFireTail() {
+		boolean wet = isInPowderSnow || isInWaterRainOrBubble() || isInFluidType((type, height) -> canFluidExtinguish(type));
+		if (level().getBlockStatesIfLoaded(getBoundingBox().deflate(1.0E-6D))
+				.noneMatch(s -> s.is(BlockTags.FIRE) || s.is(Blocks.LAVA))) {
+			if (getRemainingFireTicks() <= 0) {
+				setRemainingFireTicks(-getFireImmuneTicks());
+			}
+			if (wasOnFire && wet) {
+				playEntityOnFireExtinguishedSound();
+			}
+		}
+		if (isOnFire() && wet) {
+			setRemainingFireTicks(-getFireImmuneTicks());
+		}
 	}
 
 	/** Something solid (or water a water bird stands on) within {@link RaceScoring#FOOTING_PROBE} under the feet. */

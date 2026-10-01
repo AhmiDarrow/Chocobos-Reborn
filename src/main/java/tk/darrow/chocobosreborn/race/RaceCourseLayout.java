@@ -46,7 +46,11 @@ public final class RaceCourseLayout {
 	public record BoardPost(int x, int y, int z, String facing) {
 	}
 
-	private static final Map<RaceTrack, RaceCourseLayout> CACHE = new EnumMap<>(RaceTrack.class);
+	/**
+	 * Plans held only while memory allows: all 48 courses' plans come to ~9M cells (~760 MB), and a
+	 * plan is rebuilt the same from the track alone. A live heat holds its own plan strongly.
+	 */
+	private static final Map<RaceTrack, java.lang.ref.SoftReference<RaceCourseLayout>> CACHE = new EnumMap<>(RaceTrack.class);
 	private static final double MARGIN = 10.0D;        // ground either side of the kerbs
 	/** Lane step of the ground stamp: finer than a block so the island has no gaps. */
 	private static final double LANE_STEP = 0.25D;
@@ -100,7 +104,13 @@ public final class RaceCourseLayout {
 	private final Set<Cell> surfaceCells = new HashSet<>();
 
 	public static synchronized RaceCourseLayout of(RaceTrack track) {
-		return CACHE.computeIfAbsent(track, RaceCourseLayout::new);
+		java.lang.ref.SoftReference<RaceCourseLayout> ref = CACHE.get(track);
+		RaceCourseLayout layout = ref == null ? null : ref.get();
+		if (layout == null) {
+			layout = new RaceCourseLayout(track);
+			CACHE.put(track, new java.lang.ref.SoftReference<>(layout));
+		}
+		return layout;
 	}
 
 	/**

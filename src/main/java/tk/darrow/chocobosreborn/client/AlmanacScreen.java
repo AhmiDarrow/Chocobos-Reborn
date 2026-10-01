@@ -287,16 +287,39 @@ public class AlmanacScreen extends Screen {
 		return yy;
 	}
 
+	/**
+	 * Wrapped lines of one text, re-split only when the width changes: render asks a block's
+	 * height up to three times a frame and draws it once.
+	 */
+	private final class Wrap {
+		private final Component text;
+		private int width = -1;
+		private List<FormattedCharSequence> lines;
+
+		Wrap(Component text) {
+			this.text = text;
+		}
+
+		List<FormattedCharSequence> at(int w) {
+			if (w != width) {
+				lines = font.split(text, w);
+				width = w;
+			}
+			return lines;
+		}
+	}
+
 	private Block heading(String s) {
+		Wrap wrap = new Wrap(Component.literal(s));
 		return new Block() {
 			public int height() {
-				int lines = Math.max(1, font.split(Component.literal(s), Math.max(40, pageW())).size());
+				int lines = Math.max(1, wrap.at(Math.max(40, pageW())).size());
 				return 8 + lines * LINE;
 			}
 
 			public void draw(GuiGraphics g, int x, int y, int w, int mx, int my) {
 				int yy = y + 4;
-				for (FormattedCharSequence l : font.split(Component.literal(s), Math.max(40, w))) {
+				for (FormattedCharSequence l : wrap.at(Math.max(40, w))) {
 					g.drawString(font, l, x, yy, 0xFFE8A416, true);
 					yy += LINE;
 				}
@@ -365,10 +388,10 @@ public class AlmanacScreen extends Screen {
 
 	/** Yellow + Yellow + Carob -> Green / Blue -> + Carob -> Black (White) -> + Wonderful Yellow + Zeio -> Gold. */
 	private Block breedingDiagram() {
+		Wrap note = new Wrap(Component.translatable("chocobosreborn.almanac.diagram.note"));
 		return new Block() {
 			public int height() {
-				int extra = Math.max(0, font.split(Component.translatable("chocobosreborn.almanac.diagram.note"),
-						Math.max(40, pageW())).size() - 1);
+				int extra = Math.max(0, note.at(Math.max(40, pageW())).size() - 1);
 				return 96 + extra * LINE;
 			}
 
@@ -387,14 +410,16 @@ public class AlmanacScreen extends Screen {
 				box(g, x + 3 * col + 6, y + 8, col - 8, "chocobosreborn.almanac.diagram.gold", 0xFFE8A416, null,
 						Component.translatable("chocobosreborn.almanac.diagram.wonderful"));
 				int ny = y + 76;
-				for (FormattedCharSequence l : font.split(Component.translatable("chocobosreborn.almanac.diagram.note"),
-						Math.max(40, w))) {
+				for (FormattedCharSequence l : note.at(Math.max(40, w))) {
 					g.drawString(font, l, x, ny, 0xFFAAAAAA, false);
 					ny += LINE;
 				}
 			}
 		};
 	}
+
+	/** The diagram's nut icons, looked up once instead of a parse and a registry lookup per frame. */
+	private final java.util.Map<String, ItemStack> nutStacks = new java.util.HashMap<>();
 
 	private void box(GuiGraphics g, int x, int y, int w, String titleKey, int colour, @Nullable String nut, Component sub) {
 		g.fill(x, y, x + w, y + 60, 0xFF202020);
@@ -406,7 +431,8 @@ public class AlmanacScreen extends Screen {
 			yy += LINE;
 		}
 		if (nut != null) {
-			g.renderItem(new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(nut))), x + 3, y + 38);
+			g.renderItem(nutStacks.computeIfAbsent(nut, id -> new ItemStack(BuiltInRegistries.ITEM.get(ResourceLocation.parse(id)))),
+					x + 3, y + 38);
 		}
 		int subX = x + (nut != null ? 22 : 3);
 		int subW = Math.max(16, w - (nut != null ? 26 : 6));

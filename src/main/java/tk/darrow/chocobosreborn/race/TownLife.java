@@ -30,6 +30,7 @@ public final class TownLife {
 	/** A heat this close (or running) sends the townsfolk to the overlook. */
 	private static final int WATCH_LEAD_SECONDS = 90;
 	private static final int[] CALLS = {120, 60, 0};
+	private static final RaceClass[] CLASSES = RaceClass.values(), NONE = new RaceClass[0];
 
 	private static long liveTick = Long.MIN_VALUE;
 	private static boolean live;
@@ -70,7 +71,7 @@ public final class TownLife {
 		liveTick = now / 20L;
 		boolean running = RaceManager.anyRunning();
 		boolean soon = false, close = false;
-		for (RaceClass rc : RaceClass.values()) {
+		for (RaceClass rc : HeatSchedule.anyPending() ? CLASSES : NONE) {
 			HeatSchedule.Heat heat = HeatSchedule.pending(rc);
 			if (heat != null) {
 				int s = HeatSchedule.secondsLeft(heat, now);
@@ -88,7 +89,13 @@ public final class TownLife {
 			return;
 		}
 		long now = square.getGameTime();
-		for (RaceClass rc : RaceClass.values()) {
+		if (!HeatSchedule.anyPending()) {
+			RUNG.clear();   // what the per-class pass below does with nothing on the timetable
+			if (strokes <= 0) {
+				return;
+			}
+		}
+		for (RaceClass rc : HeatSchedule.anyPending() ? CLASSES : NONE) {
 			HeatSchedule.Heat heat = HeatSchedule.pending(rc);
 			if (heat == null) {
 				RUNG.remove(rc);

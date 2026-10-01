@@ -78,6 +78,11 @@ public final class HeatSchedule {
 		}
 	}
 
+	/** Any heat on the timetable at all; the Square's idle ticks skip their per-class checks when not. */
+	public static boolean anyPending() {
+		return !HEATS.isEmpty();
+	}
+
 	public static @Nullable Heat pending(RaceClass raceClass) {
 		return HEATS.get(raceClass);
 	}
@@ -270,21 +275,20 @@ public final class HeatSchedule {
 		for (RaceClass rc : new ArrayList<>(HEATS.keySet())) {
 			Heat heat = HEATS.get(rc);
 			long left = heat.startTick - now;
-			Component course = Component.translatable("chocobosreborn.track." + heat.track.id());
 			if (left <= NOTICE_2MIN && left > NOTICE_1MIN && heat.lastCall < 2) {
 				heat.lastCall = 2;
-				announce(square, Component.translatable("chocobosreborn.heat.notice", course, rc.name(),
+				announce(square, Component.translatable("chocobosreborn.heat.notice", courseName(heat), rc.name(),
 						2, heat.entrants.size(), RaceSession.FIELD));
 			} else if (left <= NOTICE_1MIN && left > NOTICE_10S && heat.lastCall < 1) {
 				heat.lastCall = 1;
-				announce(square, Component.translatable("chocobosreborn.heat.notice", course, rc.name(),
+				announce(square, Component.translatable("chocobosreborn.heat.notice", courseName(heat), rc.name(),
 						1, heat.entrants.size(), RaceSession.FIELD));
 			} else if (left > NOTICE_10S && left % 20 == 0) {
 				// the queue sees its timer ticking on the action bar
 				for (UUID id : heat.entrants.keySet()) {
 					ServerPlayer p = square.getServer().getPlayerList().getPlayer(id);
 					if (p != null && p.level() == square) {   // Esther is only heard in Whiskerwind
-						p.displayClientMessage(Component.translatable("chocobosreborn.heat.queue", course,
+						p.displayClientMessage(Component.translatable("chocobosreborn.heat.queue", courseName(heat),
 								clock((int) (left / 20)), heat.entrants.size(), RaceSession.FIELD), true);
 					}
 				}
@@ -293,7 +297,7 @@ public final class HeatSchedule {
 				if (s != heat.lastNotice) {
 					heat.lastNotice = s;
 					for (ServerPlayer p : square.players()) {
-						p.displayClientMessage(Component.translatable("chocobosreborn.heat.countdown", course, s), true);
+						p.displayClientMessage(Component.translatable("chocobosreborn.heat.countdown", courseName(heat), s), true);
 					}
 				}
 			} else if (left <= 0) {
@@ -313,6 +317,11 @@ public final class HeatSchedule {
 		if (dirty) {
 			persist(square);
 		}
+	}
+
+	/** Built only on the ticks that say it (a notice, the queue timer, the countdown), not every tick. */
+	private static Component courseName(Heat heat) {
+		return Component.translatable("chocobosreborn.track." + heat.track.id());
 	}
 
 	private static void ensureLoaded(ServerLevel square) {

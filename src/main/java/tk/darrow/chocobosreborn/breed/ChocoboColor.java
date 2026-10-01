@@ -135,8 +135,11 @@ public enum ChocoboColor {
 		return waterWalk;
 	}
 
+	/** values() clones the array on every call; byId runs many times a tick per bird. */
+	private static final ChocoboColor[] VALUES = values();
+
 	public static ChocoboColor byId(int id) {
-		ChocoboColor[] values = values();
+		ChocoboColor[] values = VALUES;
 		if (id < 0 || id >= values.length) {
 			return YELLOW;
 		}

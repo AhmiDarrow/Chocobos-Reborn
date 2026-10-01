@@ -33,6 +33,11 @@ public final class FollowAcross {
 	private FollowAcross() {
 	}
 
+	/** Server stop: retry waits belong to that server's tick count. */
+	static void reset() {
+		WAIT.clear();
+	}
+
 	public static void onChanged(PlayerEvent.PlayerChangedDimensionEvent event) {
 		if (event.getEntity() instanceof ServerPlayer player) {
 			bringLoaded(player);

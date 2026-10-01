@@ -117,8 +117,10 @@ public enum TownRole {
 		return colour;
 	}
 
+	private static final TownRole[] VALUES = values();
+
 	public static TownRole byId(int id) {
-		TownRole[] values = values();
+		TownRole[] values = VALUES;
 		if (id < 0 || id >= values.length) {
 			return STEWARD;
 		}

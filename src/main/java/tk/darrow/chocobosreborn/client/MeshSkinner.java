@@ -20,7 +20,8 @@ final class MeshSkinner {
 	/** True for a vertex owned by a hidden bone; triangles touching it are skipped. */
 	boolean[] hidden = new boolean[0];
 	private boolean[] slotHidden = new boolean[0];
-	private float[] slotScale = new float[0];
+	/** Per slot: its bones' normal matrices blended by its weights (row-major 3x3). */
+	private float[] slotNrm = new float[0];
 	private int bones;
 
 	private final float[] poseRows = new float[12], normalRows = new float[9];
@@ -69,6 +70,12 @@ final class MeshSkinner {
 	 * vertex normal. {@code hiddenBone} marks bones whose geometry is not drawn (tack, the
 	 * male crest); pass {@code anyHidden} false to take the fast path (weights are
 	 * normalised at load, so no rescale).
+	 *
+	 * <p>The mesh is flat shaded: about six vertices share each slot (and its weights) but
+	 * each has its own face normal. The slot pass blends the slot's bone normal matrices
+	 * once, so a vertex normal is one 3x3 transform instead of one per influence. That is
+	 * the same sum taken in another order (normals agree to float rounding, far below the
+	 * one-in-127 step the vertex format stores them in); positions are computed as before.
 	 */
 	void skin(WhiskerMesh.Part p, boolean[] hiddenBone, boolean anyHidden) {
 		int nv = p.vertexCount, nu = p.uniqueCount;
@@ -83,9 +90,11 @@ final class MeshSkinner {
 		}
 		if (slotHidden.length < nu) {
 			slotHidden = new boolean[nu];
-			slotScale = new float[nu];
 		}
-		final float[] pm = posMat, nm = nrmMat, src = p.upos, srcN = p.normal, wt = p.uweight;
+		if (slotNrm.length < nu * 9) {
+			slotNrm = new float[nu * 9];
+		}
+		final float[] pm = posMat, nm = nrmMat, src = p.upos, srcN = p.normal, wt = p.uweight, sn = slotNrm;
 		final short[] bn = p.ubone;
 		final byte[] cnt = p.ucount;
 		final int[] slot = p.posIndex;
@@ -114,7 +123,6 @@ final class MeshSkinner {
 				rescale = hide ? 1.0F : 1.0F / visible;
 			}
 			slotHidden[u] = hide;
-			slotScale[u] = rescale;
 			if (hide) {
 				pos[u * 3] = x;
 				pos[u * 3 + 1] = y;
@@ -122,6 +130,7 @@ final class MeshSkinner {
 				continue;
 			}
 			float px = 0, py = 0, pz = 0;
+			float m0 = 0, m1 = 0, m2 = 0, m3 = 0, m4 = 0, m5 = 0, m6 = 0, m7 = 0, m8 = 0;
 			for (int k = 0, kn = cnt[u]; k < kn; k++) {
 				float w = wt[u * 4 + k];
 				int b = bn[u * 4 + k];
@@ -133,10 +142,30 @@ final class MeshSkinner {
 				px += w * (pm[o] * x + pm[o + 1] * y + pm[o + 2] * z + pm[o + 3]);
 				py += w * (pm[o + 4] * x + pm[o + 5] * y + pm[o + 6] * z + pm[o + 7]);
 				pz += w * (pm[o + 8] * x + pm[o + 9] * y + pm[o + 10] * z + pm[o + 11]);
+				int n = b * 9;
+				m0 += w * nm[n];
+				m1 += w * nm[n + 1];
+				m2 += w * nm[n + 2];
+				m3 += w * nm[n + 3];
+				m4 += w * nm[n + 4];
+				m5 += w * nm[n + 5];
+				m6 += w * nm[n + 6];
+				m7 += w * nm[n + 7];
+				m8 += w * nm[n + 8];
 			}
 			pos[u * 3] = px;
 			pos[u * 3 + 1] = py;
 			pos[u * 3 + 2] = pz;
+			int s = u * 9;
+			sn[s] = m0;
+			sn[s + 1] = m1;
+			sn[s + 2] = m2;
+			sn[s + 3] = m3;
+			sn[s + 4] = m4;
+			sn[s + 5] = m5;
+			sn[s + 6] = m6;
+			sn[s + 7] = m7;
+			sn[s + 8] = m8;
 		}
 		for (int v = 0; v < nv; v++) {
 			int u = slot[v];
@@ -149,20 +178,10 @@ final class MeshSkinner {
 				nrm[v * 3 + 2] = nz;
 				continue;
 			}
-			float rescale = slotScale[u];
-			float qx = 0, qy = 0, qz = 0;
-			for (int k = 0, kn = cnt[u]; k < kn; k++) {
-				float w = wt[u * 4 + k];
-				int b = bn[u * 4 + k];
-				if (b >= nb || (anyHidden && b < hiddenBone.length && hiddenBone[b])) {
-					continue;
-				}
-				w *= rescale;
-				int n = b * 9;
-				qx += w * (nm[n] * nx + nm[n + 1] * ny + nm[n + 2] * nz);
-				qy += w * (nm[n + 3] * nx + nm[n + 4] * ny + nm[n + 5] * nz);
-				qz += w * (nm[n + 6] * nx + nm[n + 7] * ny + nm[n + 8] * nz);
-			}
+			int s = u * 9;
+			float qx = sn[s] * nx + sn[s + 1] * ny + sn[s + 2] * nz;
+			float qy = sn[s + 3] * nx + sn[s + 4] * ny + sn[s + 5] * nz;
+			float qz = sn[s + 6] * nx + sn[s + 7] * ny + sn[s + 8] * nz;
 			float l2 = qx * qx + qy * qy + qz * qz;
 			if (l2 < 1e-12F) {
 				qx = 0;
