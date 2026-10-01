@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.5 - Light on the Feet
+Uploaded 2026-10-01: `chocobosreborn-1.1.5.jar` as file **9025422** ("Chocobos Reborn 1.1.5 - Light on the Feet",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.5.md`) via
+`tools/upload_curseforge.py`. Profile-driven performance (resting-bird move replay, steward door re-plans, soft course plans, faster skinning); GP/follow maps cleared on stop. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.5
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9025422
+SHA-256: `f1c5b4f7cc0817641880db4a35a37e7c70294f9acc766134d82dc899ac51cdfa`.
+
 ## 1.1.4 - Earned in Class
 Uploaded 2026-09-30: `chocobosreborn-1.1.4.jar` as file **9022598** ("Chocobos Reborn 1.1.4 - Earned in Class",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.4.md`) via
