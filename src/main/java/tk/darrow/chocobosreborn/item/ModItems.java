@@ -17,7 +17,7 @@ import tk.darrow.chocobosreborn.entity.ModEntities;
 
 /**
  * Final Fantasy VII chocobo economy: the eight greens, the eight nuts, the
- * Chocobo Lure, GP for Chocobo Square, a saddle, the Almanac, the Pocketwatch, and the
+ * Chocobo Lure, GP for Chocobo Square, a saddle, the Almanac, the Pocketwatch, the Whistle, and the
  * Spawn eggs per colour.
  */
 public final class ModItems {
@@ -57,6 +57,8 @@ public final class ModItems {
 			() -> new ChocoboAlmanacItem(new Item.Properties().stacksTo(1)));
 	public static final DeferredItem<Item> POCKETWATCH = ITEMS.register("chocobo_pocketwatch",
 			() -> new ChocoboPocketwatchItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON)));
+	public static final DeferredItem<Item> WHISTLE = ITEMS.register("chocobo_whistle",
+			() -> new ChocoboWhistleItem(new Item.Properties().stacksTo(1).rarity(Rarity.UNCOMMON)));
 	public static final DeferredItem<Item> GP = ITEMS.registerSimpleItem("gp");
 	public static final DeferredItem<Item> SADDLEBAGS = ITEMS.register("saddlebags",
 			() -> new SaddlebagsItem(new Item.Properties().stacksTo(1)));

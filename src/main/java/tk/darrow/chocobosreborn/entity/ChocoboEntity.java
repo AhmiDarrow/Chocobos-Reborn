@@ -1320,6 +1320,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		if (level() instanceof ServerLevel sl) {
 			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
 			ledgerUpdate();
+			tk.darrow.chocobosreborn.race.ChocoboWhistle.onAdded(this);
 			if (townBird() && Square.isSquare(level())) {
 				if (townHome != null) {
 					restrictTo(new BlockPos(townHome[0], tk.darrow.chocobosreborn.race.SquareBuilder.GROUND_Y, townHome[1]), townHome[2]);

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -26,8 +27,14 @@ public final class ChocoboLedger extends SavedData {
 	private static final Factory<ChocoboLedger> FACTORY = new Factory<>(ChocoboLedger::new, ChocoboLedger::load, null);
 
 	private final Map<UUID, BirdRecord> birds = new LinkedHashMap<>();
+	/** Last saved dimension and block, so a whistle can load a bird whose chunk is not in memory. */
+	private final Map<UUID, Where> where = new LinkedHashMap<>();
 	/** Released from the almanac while unloaded: untamed the next time they are seen. */
 	private final java.util.Set<UUID> pendingRelease = new java.util.HashSet<>();
+
+	/** Dimension location string plus the block the bird last saved at. */
+	public record Where(String dim, int x, int y, int z) {
+	}
 
 	public static ChocoboLedger get(MinecraftServer server) {
 		return server.overworld().getDataStorage().computeIfAbsent(FACTORY, NAME);
@@ -42,6 +49,13 @@ public final class ChocoboLedger extends SavedData {
 		for (Tag t : tag.getList("Birds", Tag.TAG_COMPOUND)) {
 			BirdRecord r = BirdRecord.load((CompoundTag) t);
 			ledger.birds.put(r.id(), r);
+		}
+		for (Tag t : tag.getList("Where", Tag.TAG_COMPOUND)) {
+			if (!(t instanceof CompoundTag compound) || !compound.hasUUID("Id")) {
+				continue;
+			}
+			ledger.where.put(compound.getUUID("Id"), new Where(compound.getString("Dim"),
+					compound.getInt("X"), compound.getInt("Y"), compound.getInt("Z")));
 		}
 		for (net.minecraft.nbt.Tag t : tag.getList("PendingRelease", Tag.TAG_INT_ARRAY)) {
 			ledger.pendingRelease.add(net.minecraft.nbt.NbtUtils.loadUUID(t));
@@ -61,6 +75,17 @@ public final class ChocoboLedger extends SavedData {
 			list.add(r.save());
 		}
 		tag.put("Birds", list);
+		ListTag places = new ListTag();
+		for (Map.Entry<UUID, Where> entry : where.entrySet()) {
+			CompoundTag compound = new CompoundTag();
+			compound.putUUID("Id", entry.getKey());
+			compound.putString("Dim", entry.getValue().dim());
+			compound.putInt("X", entry.getValue().x());
+			compound.putInt("Y", entry.getValue().y());
+			compound.putInt("Z", entry.getValue().z());
+			places.add(compound);
+		}
+		tag.put("Where", places);
 		return tag;
 	}
 
@@ -72,6 +97,7 @@ public final class ChocoboLedger extends SavedData {
 		if (!bird.isTame() || bird.getOwnerUUID() == null || bird.raceNpc()) {
 			return;
 		}
+		noteWhere(bird);
 		BirdRecord old = birds.get(bird.getUUID());
 		BirdRecord now = old == null
 				? BirdRecord.of(bird, null, null, -1, -1, 0, day(bird.level().getGameTime()), true)
@@ -80,6 +106,24 @@ public final class ChocoboLedger extends SavedData {
 			return;   // runs on every chunk save of every tame bird: rewrite the ledger only on a change
 		}
 		birds.put(bird.getUUID(), now);
+		setDirty();
+	}
+
+	/** Whereabouts are written even when the stats already match. Dirty only when the block changed. */
+	private void noteWhere(ChocoboEntity bird) {
+		if (!(bird.level() instanceof ServerLevel level)) {
+			return;
+		}
+		BlockPos pos = bird.blockPosition();
+		rememberWhere(bird.getUUID(), level.dimension().location().toString(), pos.getX(), pos.getY(), pos.getZ());
+	}
+
+	private void rememberWhere(UUID id, String dim, int x, int y, int z) {
+		Where next = new Where(dim, x, y, z);
+		if (next.equals(where.get(id))) {
+			return;
+		}
+		where.put(id, next);
 		setDirty();
 	}
 
@@ -154,6 +198,7 @@ public final class ChocoboLedger extends SavedData {
 			pendingRelease.add(id);
 		}
 		birds.remove(id);
+		where.remove(id);
 		setDirty();
 		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
 				"chocobosreborn.almanac.d.released"), false);
@@ -167,6 +212,7 @@ public final class ChocoboLedger extends SavedData {
 			return;
 		}
 		birds.remove(id);
+		where.remove(id);
 		setDirty();
 		tk.darrow.chocobosreborn.item.ChocoboAlmanacItem.send(player);
 	}
@@ -178,6 +224,7 @@ public final class ChocoboLedger extends SavedData {
 		}
 		setWild(bird);
 		birds.remove(bird.getUUID());
+		where.remove(bird.getUUID());
 		setDirty();
 		return true;
 	}
@@ -205,6 +252,22 @@ public final class ChocoboLedger extends SavedData {
 	@Nullable
 	public BirdRecord find(UUID id) {
 		return birds.get(id);
+	}
+
+	@Nullable
+	public Where findWhere(UUID id) {
+		return where.get(id);
+	}
+
+	/** This player's own birds, in ledger order. Family pages stay on {@link #forOwner}. */
+	public List<BirdRecord> owned(UUID owner) {
+		List<BirdRecord> mine = new ArrayList<>();
+		for (BirdRecord r : birds.values()) {
+			if (owner.equals(r.owner())) {
+				mine.add(r);
+			}
+		}
+		return mine;
 	}
 
 	/**

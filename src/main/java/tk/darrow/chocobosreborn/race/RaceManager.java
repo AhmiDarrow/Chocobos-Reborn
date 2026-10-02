@@ -472,6 +472,7 @@ public final class RaceManager {
 
 	@SubscribeEvent
 	public static void onServerTick(ServerTickEvent.Post event) {
+		ChocoboWhistle.tick(event.getServer());
 		tk.darrow.chocobosreborn.net.RaceLatency.tick(event.getServer());
 		ServerLevel square = testLevel != null ? testLevel : Square.level(event.getServer());
 		if (square != null) {
@@ -643,6 +644,7 @@ public final class RaceManager {
 		// statics outlive a singleplayer world: another world's player must not be paid or held back by this one
 		OWED_GP.clear();
 		FollowAcross.reset();
+		ChocoboWhistle.reset();
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
 		TownLife.reset();
