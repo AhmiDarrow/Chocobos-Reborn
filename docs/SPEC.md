@@ -240,8 +240,8 @@ transport, a settle period and a five-second title countdown precede GO). The fi
 an AI racer's stall (six in all). Esther announces to the whole Square at two minutes
 and one minute and counts the last ten seconds; riders not in the saddle at the mark
 are dropped. The field is filled with AI (`RacerProfile` by class, driven by
-`RacerMoveControl` at rider scale, each with a kin jockey in the saddle; in half the ranked
-heats (`RaceClass.RIVAL_CHANCE`, rolled when the heat is posted and saved with it; a stake on a
+`RacerMoveControl` at rider scale, each with a kin jockey in the saddle; in two ranked
+heats in three (`RaceClass.RIVAL_CHANCE`, rolled when the heat is posted and saved with it; a stake on a
 rival who sits out goes back) a named pair: Risika and Ahmi in C, Teiyo (Black) and
 Jolo (Blue in B, White in A, Gold in S) from B, paced off the best rider's own bird, land
 speed included, by `RaceScoring.rivalPaceAbs`; field birds run their class's land speed and

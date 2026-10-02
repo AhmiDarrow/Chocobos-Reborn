@@ -8,11 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RivalRollTest {
 	@Test
-	void theNamedRivalsRunAboutHalfTheHeatsInEveryClass() {
-		assertEquals(0.5D, RaceClass.RIVAL_CHANCE);
+	void theNamedRivalsRunAboutTwoHeatsInThreeInEveryClass() {
+		assertEquals(2.0D / 3.0D, RaceClass.RIVAL_CHANCE);
 		for (RaceClass rc : RaceClass.values()) {
 			assertTrue(rc.rollRivals(0.0D), rc + " can field its rivals");
-			assertFalse(rc.rollRivals(0.5D), rc + " sits them out above the line");
+			assertFalse(rc.rollRivals(0.67D), rc + " sits them out above the line");
 			java.util.Random random = new java.util.Random(42L + rc.ordinal());
 			int runs = 0;
 			int heats = 4000;
@@ -22,7 +22,7 @@ class RivalRollTest {
 				}
 			}
 			double share = runs / (double) heats;
-			assertTrue(share > 0.46D && share < 0.54D, rc + " rivals ran " + share + " of heats");
+			assertTrue(share > 0.63D && share < 0.70D, rc + " rivals ran " + share + " of heats");
 		}
 	}
 }

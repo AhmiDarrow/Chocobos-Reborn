@@ -56,8 +56,8 @@ public enum RaceClass {
 		return true;
 	}
 
-	/** The share of ranked heats the named pair runs in (Ahmi: half of them). */
-	public static final double RIVAL_CHANCE = 0.5D;
+	/** The share of ranked heats the named pair runs in (Ahmi: two in three; half was too rare). */
+	public static final double RIVAL_CHANCE = 2.0D / 3.0D;
 
 	/** One heat's roll ({@code roll} uniform in [0, 1)): do this class's named rivals run it? */
 	public boolean rollRivals(double roll) {
