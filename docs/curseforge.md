@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.8 - Two Heats in Three
+Uploaded 2026-10-02: `chocobosreborn-1.1.8.jar` as file **9038410** ("Chocobos Reborn 1.1.8 - Two Heats in Three",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.8.md`) via
+`tools/upload_curseforge.py`. The named rivals run about two ranked heats in three (`RaceClass.RIVAL_CHANCE` = 2/3, up from 1/2).
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.8
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9038410
+SHA-256: `bf7b089e677e219411bda2bee3b821436e4e37bc5bc4b87c96fed75a21a4ce81`.
+
 ## 1.1.7 - Every Other Heat
 Uploaded 2026-10-01: `chocobosreborn-1.1.7.jar` as file **9034590** ("Chocobos Reborn 1.1.7 - Every Other Heat",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.7.md`) via
