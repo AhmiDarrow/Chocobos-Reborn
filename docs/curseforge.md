@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.7 - Every Other Heat
+Uploaded 2026-10-01: `chocobosreborn-1.1.7.jar` as file **9034590** ("Chocobos Reborn 1.1.7 - Every Other Heat",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.7.md`) via
+`tools/upload_curseforge.py`. The named rivals (Ahmi and Risika in C, Teiyo and Jolo from B) run about half the ranked heats, rolled when the heat is posted; a waiting stake on an absent rival is refunded.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.7
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9034590
+SHA-256: `0da6b8e21c30c20acff47a3d4e8012bc71b411534b6d65b1e2468f030244e53d`.
+
 ## 1.1.6 - The Whistle
 Uploaded 2026-10-01: `chocobosreborn-1.1.6.jar` as file **9034121** ("Chocobos Reborn 1.1.6 - The Whistle",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.6.md`) via
