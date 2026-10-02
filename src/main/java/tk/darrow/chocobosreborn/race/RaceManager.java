@@ -445,6 +445,12 @@ public final class RaceManager {
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
 			return 0;
 		}
+		if (legal != pending && (pending == RaceScoring.BetPick.JOE || pending == RaceScoring.BetPick.TEIOH)) {
+			// the named rivals sit this heat out: a stake on one goes back rather than onto the field
+			DuelDesk.giveGp(player, n);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.rival_out", n), false);
+			return 0;
+		}
 		int cap = s.maxStake(legal);
 		if (n > cap) {
 			DuelDesk.giveGp(player, n - cap);

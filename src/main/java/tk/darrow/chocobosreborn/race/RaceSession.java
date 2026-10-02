@@ -238,16 +238,22 @@ public class RaceSession {
 
 	/** Ranked heat, or a friendly against the field: one human. */
 	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, ServerPlayer player, ChocoboEntity bird) {
-		this(level, track, ranked, List.of(player), List.of(bird), false, 0);
+		this(level, track, ranked, List.of(player), List.of(bird), false, 0,
+				track.getRaceClass().rollRivals(level.random.nextDouble()));
+	}
+
+	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, List<ServerPlayer> players,
+	                   List<ChocoboEntity> birds, boolean duel, int duelStake) {
+		this(level, track, ranked, players, birds, duel, duelStake, track.getRaceClass().rollRivals(level.random.nextDouble()));
 	}
 
 	/**
 	 * A heat with one or more humans. A {@code duel} is those riders alone on the two
 	 * centre stalls, no AI field, and pays only the pot; {@code duelStake} > 0 means both
-	 * put GP up (already taken).
+	 * put GP up (already taken). {@code rivals}: the named pair runs this heat (ranked only).
 	 */
 	public RaceSession(ServerLevel level, RaceTrack track, boolean ranked, List<ServerPlayer> players,
-	                   List<ChocoboEntity> birds, boolean duel, int duelStake) {
+	                   List<ChocoboEntity> birds, boolean duel, int duelStake, boolean rivals) {
 		this.level = level;
 		this.track = track;
 		this.ranked = ranked;
@@ -273,7 +279,7 @@ public class RaceSession {
 			birds.get(i).setOrderedToSit(false);
 		}
 		if (!duel) {
-			spawnField(players.size(), track.getRaceClass());
+			spawnField(players.size(), track.getRaceClass(), rivals);
 		}
 		for (Racer r : racers) {
 			ChocoboEntity e = r.entity();
@@ -342,8 +348,8 @@ public class RaceSession {
 		}
 	}
 
-	private void spawnField(int humans, RaceClass raceClass) {
-		boolean rivals = ranked && raceClass.includesTeioh();
+	private void spawnField(int humans, RaceClass raceClass, boolean rivalsRun) {
+		boolean rivals = ranked && rivalsRun;
 		boolean cRivals = rivals && raceClass.cClassRivals();
 		int namedSlots = FIELD - humans - (rivals ? 2 : 0);
 		List<FieldRoster.Entry> card = FieldRoster.draw(raceClass, Math.max(0, namedSlots),

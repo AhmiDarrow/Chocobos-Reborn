@@ -29,17 +29,24 @@ public final class HeatSchedule {
 	public static final int MIN_LEAD = 200;
 	private static final int NOTICE_2MIN = 2400, NOTICE_1MIN = 1200, NOTICE_10S = 200;
 
-	/** One scheduled heat: its course and who has entered (player -> bird). */
+	/** One scheduled heat: its course, whether the named rivals run it, and who has entered (player -> bird). */
 	public static final class Heat {
 		final RaceTrack track;
 		final long startTick;
+		/** Rolled once when the heat is posted, so Rook's card knows before the off. */
+		final boolean rivals;
 		final Map<UUID, UUID> entrants = new LinkedHashMap<>();
 		private int lastNotice = -1;   // seconds shown in the countdown
 		private int lastCall;          // 2 = two-minute call, 1 = one-minute call
 
-		Heat(RaceTrack track, long startTick) {
+		Heat(RaceTrack track, long startTick, boolean rivals) {
 			this.track = track;
 			this.startTick = startTick;
+			this.rivals = rivals;
+		}
+
+		public boolean rivals() {
+			return rivals;
 		}
 
 		public RaceTrack track() {
@@ -205,7 +212,7 @@ public final class HeatSchedule {
 		boolean created = false;
 		if (heat == null) {
 			long now = player.level().getGameTime();
-			heat = new Heat(track, nextMark(now));
+			heat = new Heat(track, nextMark(now), rc.rollRivals(player.level().random.nextDouble()));
 			created = true;
 		} else if (heat.track != track) {
 			player.displayClientMessage(Component.translatable("chocobosreborn.heat.join_existing",
@@ -220,6 +227,12 @@ public final class HeatSchedule {
 			announce(player.serverLevel(), Component.translatable("chocobosreborn.heat.scheduled",
 					Component.translatable("chocobosreborn.track." + track.id()), rc.name(),
 					clock(secondsLeft(heat, now))));
+			if (heat.rivals) {
+				// the named pair is on this card: Rook's board offers them
+				boolean c = rc.cClassRivals();
+				announce(player.serverLevel(), Component.translatable("chocobosreborn.heat.rivals",
+						c ? RaceSession.NAME_RISIKA : RaceSession.NAME_TEIYO, c ? RaceSession.NAME_AHMI : RaceSession.NAME_JOLO));
+			}
 			if (player.level() instanceof ServerLevel square && Square.isSquare(square)) {
 				SquareBuilder.buildTrack(square, track);
 			}
@@ -302,7 +315,7 @@ public final class HeatSchedule {
 				}
 			} else if (left <= 0) {
 				if (RaceManager.trackBusy(heat.track)) {
-					Heat next = new Heat(heat.track, nextMark(now));
+					Heat next = new Heat(heat.track, nextMark(now), heat.rivals);
 					next.entrants.putAll(heat.entrants);
 					HEATS.put(rc, next);
 					announce(square, Component.translatable("chocobosreborn.race.occupied"));
@@ -345,6 +358,7 @@ public final class HeatSchedule {
 			net.minecraft.nbt.CompoundTag t = new net.minecraft.nbt.CompoundTag();
 			t.putInt("Track", heat.track.ordinal());
 			t.putLong("Start", heat.startTick);
+			t.putBoolean("Rivals", heat.rivals);
 			net.minecraft.nbt.ListTag people = new net.minecraft.nbt.ListTag();
 			for (Map.Entry<UUID, UUID> e : heat.entrants.entrySet()) {
 				net.minecraft.nbt.CompoundTag row = new net.minecraft.nbt.CompoundTag();
@@ -370,7 +384,8 @@ public final class HeatSchedule {
 			if (start != t.getLong("Start")) {
 				dirty = true;
 			}
-			Heat heat = new Heat(track, start);
+			// a heat saved before the roll existed keeps its rivals, as it was posted
+			Heat heat = new Heat(track, start, !t.contains("Rivals") || t.getBoolean("Rivals"));
 			for (net.minecraft.nbt.Tag rowRaw : t.getList("Entrants", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
 				net.minecraft.nbt.CompoundTag row = (net.minecraft.nbt.CompoundTag) rowRaw;
 				if (row.hasUUID("P") && row.hasUUID("B")) {
@@ -419,7 +434,7 @@ public final class HeatSchedule {
 			return;
 		}
 		if (RaceManager.trackBusy(heat.track)) {
-			Heat next = new Heat(heat.track, nextMark(square.getGameTime()));
+			Heat next = new Heat(heat.track, nextMark(square.getGameTime()), heat.rivals);
 			next.entrants.putAll(heat.entrants);
 			HEATS.put(rc, next);
 			announce(square, Component.translatable("chocobosreborn.race.occupied"));
@@ -429,7 +444,7 @@ public final class HeatSchedule {
 		for (ServerPlayer p : players) {
 			Titles.show(p, Component.translatable("chocobosreborn.heat.transport"), course, 5, 40, 10);
 		}
-		RaceManager.addSession(new RaceSession(square, heat.track, true, players, birds, false, 0));
+		RaceManager.addSession(new RaceSession(square, heat.track, true, players, birds, false, 0, heat.rivals));
 	}
 
 	/** Esther's voice to everyone in Whiskerwind (ServerLevel.players() is only that dimension's players). */

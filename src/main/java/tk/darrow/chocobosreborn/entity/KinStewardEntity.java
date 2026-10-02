@@ -410,7 +410,10 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 		if (heatClass == null && player.getVehicle() instanceof ChocoboEntity bird) {
 			heatClass = bird.raceClass();
 		}
-		boolean teioh = heatClass != null ? heatClass.includesTeioh() : true;
+		// a posted heat already knows whether the named rivals run; with none posted yet they may
+		tk.darrow.chocobosreborn.race.HeatSchedule.Heat posted = heatClass != null
+				? tk.darrow.chocobosreborn.race.HeatSchedule.pending(heatClass) : null;
+		boolean teioh = posted != null ? posted.rivals() : heatClass == null || heatClass.includesTeioh();
 		int classId = heatClass != null ? heatClass.getId() : 0;
 		ItemStack hand = player.getMainHandItem();
 		if (!hand.is(ModItems.GP.get())) {

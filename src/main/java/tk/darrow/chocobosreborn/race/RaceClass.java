@@ -48,11 +48,20 @@ public enum RaceClass {
 	}
 
 	/**
-	 * Named rivals take two stalls on a ranked card: Ahmi and Risika in Class C,
-	 * Teiyo and Jolo from Class B up.
+	 * Named rivals can take two stalls on a ranked card: Ahmi and Risika in Class C,
+	 * Teiyo and Jolo from Class B up. Whether they run is rolled per heat
+	 * ({@link #rollRivals}), not fixed by the class.
 	 */
 	public boolean includesTeioh() {
 		return true;
+	}
+
+	/** The share of ranked heats the named pair runs in (Ahmi: half of them). */
+	public static final double RIVAL_CHANCE = 0.5D;
+
+	/** One heat's roll ({@code roll} uniform in [0, 1)): do this class's named rivals run it? */
+	public boolean rollRivals(double roll) {
+		return includesTeioh() && roll < RIVAL_CHANCE;
 	}
 
 	/** Class C's named pair (Ahmi / Risika) instead of Teiyo / Jolo. */
