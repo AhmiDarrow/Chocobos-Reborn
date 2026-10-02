@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.6 - The Whistle
+Uploaded 2026-10-01: `chocobosreborn-1.1.6.jar` as file **9034121** ("Chocobos Reborn 1.1.6 - The Whistle",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.6.md`) via
+`tools/upload_curseforge.py`. Gold and a feather call your own tame chocobos from any distance, including another dimension, up to eight, Stay and Wander included. A bird in a heat stays, a bird you are riding stays, and a bird the whistle has never been near may need you to see it once. Server and every rider need this jar.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.6
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9034121
+SHA-256: `50d065f9bc8093a5bc81e6dc820d3cb478e16fec18e188ec5e00a96bd7d7d4dd`.
+
 ## 1.1.5 - Light on the Feet
 Uploaded 2026-10-01: `chocobosreborn-1.1.5.jar` as file **9025422** ("Chocobos Reborn 1.1.5 - Light on the Feet",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.5.md`) via
