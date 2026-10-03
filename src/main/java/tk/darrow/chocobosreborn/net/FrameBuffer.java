@@ -21,6 +21,15 @@ public final class FrameBuffer {
 	public static final double TELEPORT = 16.0D;
 	/** Frames older than this many ticks behind the shown tick are dropped (one is always kept). */
 	public static final double KEEP_BEHIND = 20.0D;
+	/**
+	 * A bird climbs a block edge in one tick (Minecraft's step-up); shown as it happens, that is a pop.
+	 * A rise between two consecutive frames of more than {@link #STEP_MIN} and at most
+	 * {@link #STEP_MAX} blocks is eased over {@link #STEP_EASE} ticks instead.
+	 */
+	public static final double STEP_MIN = 0.3D;
+	/** 2.6: a racing climber goes up its ridge face 2.4 blocks a tick (RaceScoring.ridgeClimbRate, 1.1.9). */
+	public static final double STEP_MAX = 2.6D;
+	public static final double STEP_EASE = 3.0D;
 
 	public record Snap(int tick, double x, double y, double z, float yRot, float bodyRot, boolean onGround) {}
 
@@ -69,7 +78,7 @@ public final class FrameBuffer {
 					return a;
 				}
 				double f = (t - a.tick()) / (double) (s.tick() - a.tick());
-				return lerp(a, s, f);
+				return eased(lerp(a, s, f), t);
 			}
 			prev = before;
 			before = s;
@@ -82,8 +91,31 @@ public final class FrameBuffer {
 		double over = Math.min(t - last.tick(), MAX_EXTRAPOLATE);
 		double span = last.tick() - prev.tick();
 		double k = over / span;
-		return new Snap(last.tick(), last.x() + (last.x() - prev.x()) * k, last.y() + (last.y() - prev.y()) * k,
-				last.z() + (last.z() - prev.z()) * k, last.yRot(), last.bodyRot(), last.onGround());
+		// never carry a climb on upward: a step is over in its tick
+		double dy = last.y() - prev.y();
+		double vy = dy > STEP_MIN ? 0.0D : dy;
+		return eased(new Snap(last.tick(), last.x() + (last.x() - prev.x()) * k, last.y() + vy * k,
+				last.z() + (last.z() - prev.z()) * k, last.yRot(), last.bodyRot(), last.onGround()), t);
+	}
+
+	/**
+	 * Lower {@code s} by what is left of any step-up in the last {@link #STEP_EASE} ticks: the rise
+	 * the frames make in one tick is shown spread linearly over three.
+	 */
+	private Snap eased(Snap s, double t) {
+		double lower = 0.0D;
+		Snap before = null;
+		for (Snap f : snaps) {
+			if (before != null && f.tick() - before.tick() == 1 && t > before.tick() && t < before.tick() + STEP_EASE) {
+				double rise = f.y() - before.y();
+				if (rise > STEP_MIN && rise <= STEP_MAX) {
+					double since = t - before.tick();
+					lower += rise * (Math.min(1.0D, since) - since / STEP_EASE);
+				}
+			}
+			before = f;
+		}
+		return lower <= 0.0D ? s : new Snap(s.tick(), s.x(), s.y() - lower, s.z(), s.yRot(), s.bodyRot(), s.onGround());
 	}
 
 	/** Drop frames well behind {@code t}, keeping the newest one at or before it. */

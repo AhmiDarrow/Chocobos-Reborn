@@ -51,6 +51,28 @@ class FrameBufferTest {
 	}
 
 	@Test
+	void aStepUpIsEasedOverThreeTicksNotPopped() {
+		FrameBuffer b = new FrameBuffer();
+		for (int t = 0; t <= 10; t++) {
+			b.add(new FrameBuffer.Snap(t, t * 0.4D, 64.0D, 0.0D, 0.0F, 0.0F, true));
+		}
+		for (int t = 11; t <= 20; t++) {
+			b.add(new FrameBuffer.Snap(t, t * 0.4D, 65.0D, 0.0D, 0.0F, 0.0F, true));
+		}
+		assertEquals(64.0D, b.sample(10.0D).y(), 1.0E-9, "still below the step at its start");
+		assertEquals(64.0D + 1.0D / 3.0D, b.sample(11.0D).y(), 1.0E-9, "a third of the way up one tick later, not all of it");
+		assertEquals(64.0D + 2.0D / 3.0D, b.sample(12.0D).y(), 1.0E-9);
+		assertEquals(65.0D, b.sample(13.0D).y(), 1.0E-9, "on the step after three ticks");
+		double previous = b.sample(9.5D).y();
+		for (double t = 9.6D; t < 14.0D; t += 0.1D) {
+			double y = b.sample(t).y();
+			assertTrue(y >= previous - 1.0E-9 && y - previous <= 0.34D / 10.0D * 10.0D, "climbs steadily, never jumps: " + y);
+			previous = y;
+		}
+		assertEquals(4.4D, b.sample(11.0D).x(), 1.0E-9, "the step never delays the bird along the road");
+	}
+
+	@Test
 	void repeatedOrOlderTicksAreIgnoredAndOldFramesDropped() {
 		FrameBuffer b = new FrameBuffer();
 		b.add(at(5, 0.0D, 0.0F));
