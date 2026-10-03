@@ -253,6 +253,13 @@ public class RacerGoal extends Goal {
 			// way back is the opening behind, not through the rail post ahead
 			aimT = behind;
 			lane = RaceTrack.DETOUR_WAIT;
+		} else if (mode == RacerRecovery.Mode.RACE && bird.horizontalCollision && !bird.onClimbable()) {
+			// pressed on a rail or post: hold the lane it should be on here, not the one the
+			// lookahead gives. Just before a detour's opening that lane is already swinging out,
+			// so the aim ran through the rail post at the opening, and a bird alongside kept it
+			// pinned there for 110 ticks (S_KEEP's lava, the AI sweep). Along the rail it runs on
+			// into the opening.
+			lane = track.steerLaneAt(t, directLane, color, bogSavvy);
 		} else if (mode == RacerRecovery.Mode.REAIM) {
 			aimT = t + RacerRecovery.REAIM_BLOCKS / lap;
 			lane = track.steerLaneAt(t + 4.0D / lap, 0.0D, color, bogSavvy);

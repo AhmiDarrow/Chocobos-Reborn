@@ -357,12 +357,16 @@ public class RaceSession {
 		int cardIdx = 0;
 		List<String> announced = new ArrayList<>();
 		// the rivals key off the best rider's own bird, as FF7's Teioh does: its land
-		// speed x grade x speed training, the pace the rider actually cruises at
+		// speed x grade x speed training, the pace the rider actually cruises at; the field
+		// keeps a smaller share of it as its floor, and of the best rider's training
 		double riderPace = 0.0D;
+		int riderTraining = 0;
 		for (Racer h : racers) {
 			ChocoboEntity b = h.entity();
 			if (h.human() && b != null) {
 				riderPace = Math.max(riderPace, b.color().landSpeed() * b.speedMul());
+				riderTraining = Math.max(riderTraining,
+						(b.trainedSpeed() + b.trainedStamina() + b.trainedIntelligence() + b.trainedCooperation()) / 4);
 			}
 		}
 		if (riderPace <= 0.0D) {
@@ -405,7 +409,7 @@ public class RaceSession {
 			}
 			npc.setGrade(ChocoboGrade.byRank(Math.min(4, raceClass.getId() + 1)));
 			npc.setRaceClass(raceClass);
-			int train = RaceScoring.fieldTraining(raceClass.getId(), isTeioh || isJolo);
+			int train = RaceScoring.fieldTraining(raceClass.getId(), isTeioh || isJolo, riderTraining);
 			if (!isTeioh && !isJolo) {
 				train = net.minecraft.util.Mth.clamp(train + level.random.nextInt(9) - 4, 0, 100);
 			}
@@ -429,8 +433,11 @@ public class RaceSession {
 				double own = npc.color().landSpeed() * r.goal.profile.cruise() * npc.speedMul();
 				r.goal.paceScale = RaceScoring.rivalPaceAbs(raceClass, isJolo, riderPace) / Math.max(0.01D, own);
 			} else {
-				// a field bird runs its class's land speed, keeping a quarter of its colour's edge
-				r.goal.paceScale = RaceScoring.fieldLandSpeed(npc.color(), raceClass) / Math.max(0.05D, npc.color().landSpeed());
+				// a field bird runs its class's land speed, keeping a quarter of its colour's edge,
+				// and never under its share of the best rider's cruise (RaceScoring.fieldRiderShare)
+				double own = npc.color().landSpeed() * r.goal.profile.cruise() * npc.speedMul();
+				double classOwn = RaceScoring.fieldLandSpeed(npc.color(), raceClass) * r.goal.profile.cruise() * npc.speedMul();
+				r.goal.paceScale = RaceScoring.fieldCruiseAbs(npc.color(), raceClass, classOwn, riderPace) / Math.max(0.01D, own);
 			}
 			npc.installRacer(r.goal);
 			racers.add(r);

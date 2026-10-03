@@ -327,9 +327,12 @@ public final class RaceScoring {
 
 	/**
 	 * How many ticks a remote chocobo may take to reach a newly received position.
-	 * A steady gallop is about 1.35 blocks a tick, so an on-time packet keeps its own
-	 * step count. A late packet glides instead of popping. A jump past 24 blocks is a
-	 * real teleport and keeps the packet's steps.
+	 * {@code distanceSquared} is how far the server's bird moved since the position before
+	 * (ChocoboEntity#lerpTo), never measured from the drawn bird, which trails by the glide
+	 * and would feed it. One tick of a gallop is under 1.35 blocks a tick x the packet's
+	 * steps, so an on-time packet keeps its own step count. A late packet (several ticks of
+	 * motion at once) glides instead of popping. A jump past 24 blocks is a real teleport
+	 * and keeps the packet's steps.
 	 */
 	public static int remoteGlideSteps(int packetSteps, double distanceSquared) {
 		int steps = Math.max(1, packetSteps);
@@ -447,6 +450,21 @@ public final class RaceScoring {
 	 */
 	public static ChocoboColor cRivalLook(boolean risika) {
 		return risika ? ChocoboColor.PURPLE : ChocoboColor.FLAME;
+	}
+
+	/** Share of the best rider's training (points a stat, averaged) a field bird trains to, at the least. */
+	public static final double FIELD_TRAIN_SHARE = 0.9D;
+
+	/**
+	 * A field bird's training a stat on a card whose best rider has {@code riderTraining} points
+	 * a stat: its class's ({@link #fieldTraining(int, boolean)}) or {@link #FIELD_TRAIN_SHARE} of
+	 * the rider's, whichever is more. The stamina and intelligence are what let a bird dash; a
+	 * class-trained field could not keep up with a trained rider's dash at any pace. The rivals
+	 * stay at 100.
+	 */
+	public static int fieldTraining(int classId, boolean rival, int riderTraining) {
+		int base = fieldTraining(classId, rival);
+		return rival ? base : Math.max(base, (int) Math.round(FIELD_TRAIN_SHARE * Math.max(0, Math.min(100, riderTraining))));
 	}
 
 	public static int fieldTraining(int classId, boolean rival) {
@@ -855,6 +873,52 @@ public final class RaceScoring {
 		return colourClimbs && againstWall && (!racing || onRidge);
 	}
 
+	/**
+	 * Upward speed a racing climber is given each tick on its ridge face, in place of
+	 * vanilla's ladder 0.2. Gravity takes 0.08 and air drag 2 % before the next move, so it
+	 * goes up {@code (lift - 0.08) x 0.98} a tick: 2.4 blocks, a B ridge in 2 ticks and an S
+	 * one in 3 (the ladder rate was 0.118, 26 and 43 ticks). ShortcutGameTests times it.
+	 */
+	public static final double RIDGE_CLIMB_LIFT = 2.53D;
+
+	/**
+	 * This tick's lift for a climber {@code toTop} blocks under the ridge's top: full
+	 * {@link #RIDGE_CLIMB_LIFT}, but the last push only carries it a hair over the top, so it
+	 * lands there running instead of flying on. Unknown height (NaN), or a bird still pressed on
+	 * a face at or over the reckoned top (a ridge on a rising road steps up with it): full lift.
+	 */
+	public static double ridgeLift(double toTop) {
+		if (!Double.isFinite(toTop) || toTop <= 0.0D) {
+			return RIDGE_CLIMB_LIFT;
+		}
+		double rise = Math.max(0.1D, toTop + 0.05D);
+		return Math.min(RIDGE_CLIMB_LIFT, rise / 0.98D + 0.08D);
+	}
+
+	/**
+	 * Pace multiplier for a racer on the direct line of a feature its colour suits (a Green on
+	 * the ridge, a Blue on the water, a Gold on the lava): Ahmi, 2026-10-02, the shortcuts must
+	 * "do all the work". Without it a climb's few ticks, and courses whose detour is hardly
+	 * longer than the direct line, left the suited bird even or behind (ShortcutGameTests).
+	 */
+	public static final double SUITED_FEATURE_PACE = 1.30D;
+
+	/** A ridge's own share on top: the climb and the drop off the far end still cost ticks the water and lava do not. */
+	public static final double SUITED_RIDGE_PACE = 1.40D;
+
+	/** {@link #SUITED_FEATURE_PACE}, or {@link #SUITED_RIDGE_PACE} on a ridge. */
+	public static double suitedPace(RaceTrack.Feature.Type type) {
+		return type == RaceTrack.Feature.Type.RIDGE ? SUITED_RIDGE_PACE : SUITED_FEATURE_PACE;
+	}
+
+	/** Most ticks a climber carries its pace over a ridge after leaving the face (the longest top is ~50 blocks). */
+	public static final int RIDGE_CARRY_TICKS = 160;
+
+	/** Blocks a tick a racing climber goes up its ridge face. */
+	public static double ridgeClimbRate() {
+		return (RIDGE_CLIMB_LIFT - 0.08D) * 0.98D;
+	}
+
 	/** Highest step in a race: the road's hill steps are one block; a rail stands 1.5, a pool wall one above the road. */
 	public static final float RACE_STEP = 1.1F;
 
@@ -1185,6 +1249,33 @@ public final class RaceScoring {
 	/** The class field's cruise in movement-speed units, before its +-5 % form. */
 	public static double fieldPaceAbs(RaceClass rc) {
 		return classLandSpeed(rc) * fieldPace(rc);
+	}
+
+	/**
+	 * The least a field bird cruises at, as a share of the best rider's own cruise. Under
+	 * Jolo's (C/B 0.92 x 0.96 = 0.883, A 0.96, S 1.04) and with the field's own class
+	 * discipline and short of the rivals' 100 training, so the named rivals stay the hardest
+	 * birds on the card; but a trained bird no longer laps a field that only ever ran its
+	 * class's training (Ahmi, 2026-10-02: the non-rival racers are "too easy overall, should
+	 * not be rival skill level but better"). Set once at the grid, like the rivals' pace.
+	 */
+	public static double fieldRiderShare(RaceClass rc) {
+		return switch (rc) {
+			case C, B -> 0.88D;
+			case A -> 0.94D;
+			case S -> 0.98D;
+		};
+	}
+
+	/**
+	 * A field bird's cruise in movement-speed units: {@code ownAbs} (its class land speed x
+	 * profile cruise x its own grade and training), or {@link #fieldRiderShare} of the best
+	 * rider's cruise, whichever is faster. The share keeps the colour's edge over the class
+	 * ({@link #fieldLandSpeed}), so the favourites stay the favourites.
+	 */
+	public static double fieldCruiseAbs(ChocoboColor color, RaceClass rc, double ownAbs, double riderPaceAbs) {
+		double edge = fieldLandSpeed(color, rc) / classLandSpeed(rc);
+		return Math.max(ownAbs, fieldRiderShare(rc) * riderPaceAbs * edge);
 	}
 
 	/**

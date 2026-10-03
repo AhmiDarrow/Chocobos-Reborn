@@ -48,7 +48,7 @@ public final class SquareBuilder {
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 15;
+	public static final int COURSE_VERSION = 16;
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/**

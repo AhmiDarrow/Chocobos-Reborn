@@ -293,6 +293,9 @@ public final class WhiskerMesh {
 			for (int level = 1; level <= lodLevels(); level++) {
 				m.parts(level);   // now, with the load, not as the first bird runs out of range mid-race
 			}
+			for (int level = 0; level <= lodLevels(); level++) {
+				m.parts(level, false);   // the hens' short crest too (a pass over every vertex): field birds are either sex
+			}
 			CACHE.put(id, m);
 			ChocobosReborn.LOGGER.info("Loaded mesh {}: {} parts, {} verts, {} bones", id, m.parts.length, m.totalVerts, m.boneNames.length);
 		} catch (Exception e) {

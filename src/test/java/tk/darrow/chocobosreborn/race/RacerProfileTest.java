@@ -33,7 +33,7 @@ class RacerProfileTest {
 	void bogSavvyFollowsLineHoldNotTheCDefault() {
 		double c = RacerProfile.bogSavvyChance(RacerProfile.of(RaceClass.C, RacerProfile.Role.FIELD).lineHold());
 		double s = RacerProfile.bogSavvyChance(RacerProfile.of(RaceClass.S, RacerProfile.Role.FIELD).lineHold());
-		assertEquals(0.45D + 0.55D * 0.35D, c, 1.0E-9);
+		assertEquals(0.45D + 0.55D * 0.45D, c, 1.0E-9);
 		assertTrue(s > c);
 		assertTrue(s > 0.9D);
 	}

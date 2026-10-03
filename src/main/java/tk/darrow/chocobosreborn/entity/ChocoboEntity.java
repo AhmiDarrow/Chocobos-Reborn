@@ -2073,7 +2073,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
 		if (level().isClientSide && !isControlledByLocalInstance()) {
-			steps = RaceScoring.remoteGlideSteps(steps, distanceToSqr(x, y, z));
+			// How far the server's bird moved since its last position (the glide still under
+			// way ends there), not how far this client's drawn bird is from it. The drawn bird
+			// trails by the glide itself, so measured from it a bird over 1.35 blocks a tick
+			// (A and S pace, a B dash) looked late on every packet: the glide grew a tick each
+			// time up to 8, and the field was drawn up to ~11 blocks behind where it raced.
+			double fromX = lerpSteps > 0 ? lerpX : getX(), fromY = lerpSteps > 0 ? lerpY : getY(), fromZ = lerpSteps > 0 ? lerpZ : getZ();
+			double dx = x - fromX, dy = y - fromY, dz = z - fromZ;
+			steps = RaceScoring.remoteGlideSteps(steps, dx * dx + dy * dy + dz * dz);
 		}
 		super.lerpTo(x, y, z, yRot, xRot, steps);
 	}
@@ -2086,13 +2093,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			setDeltaMovement(Vec3.ZERO);
 			// Vanilla feeds the gait from the end of travel(). Skipping it froze the
 			// legs of every bird this client does not drive; the lerp still moves
-			// the bird, so the stride follows that motion.
-			calculateEntityAnimation(false);
+			// the bird, so the stride follows that motion. A racing climber's stride
+			// counts its climb too, so it runs up a ridge face instead of floating.
+			calculateEntityAnimation(racing() && color().climb());
 			return;
 		}
 		if (raceHeld()) {
 			pendingJump = -1;
 			flapTicks = 0;
+			ridgeCarry = 0.0D;
 			setDeltaMovement(Vec3.ZERO);
 			contactSlow.clear();
 			super.travel(Vec3.ZERO);
@@ -2102,6 +2111,10 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// this side simulates the bird (the early return above takes remote birds); ridden birds
 			// bump each other outside heats too, since vanilla never pushes a vehicle
 			applyRacerContact();
+		}
+		RaceTrack.Feature suited = racing() ? suitedFeature() : null;
+		if (suited != null) {
+			setSpeed((float) (getSpeed() * RaceScoring.suitedPace(suited.type())));
 		}
 		ChocoboColor c = color();
 		Player player = getControllingPassenger() instanceof Player p ? p : null;
@@ -2130,7 +2143,118 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			// water birds: sneak to go under
 			setDeltaMovement(getDeltaMovement().add(0.0D, -0.05D, 0.0D));
 		}
+		ridgeClimbing = false;
 		super.travel(travel);
+		keepRidgePace();
+	}
+
+	/** Progress hint for {@link #onSuitedFeature}. */
+	private double featureHint = -1.0D;
+
+	/**
+	 * On the direct line of a course feature this bird's colour suits: a Green on the ridge, a
+	 * Blue on the water, a Gold on the lava. It runs there at {@link RaceScoring#suitedPace}
+	 * (the bird is in its element), so the feature is a shortcut wherever it sits: a ridge's climb
+	 * and drop cost ticks, and on a few courses the detour is barely longer than the direct line
+	 * (ShortcutGameTests). Off the band (the detour) it is plain road.
+	 */
+	private RaceTrack.@org.jetbrains.annotations.Nullable Feature suitedFeature() {
+		RaceTrack track = raceTrack() >= 0 ? RaceTrack.byId(raceTrack()) : racerTrack;
+		if (track == null) {
+			return null;
+		}
+		double t = track.progressAt(getX(), getZ(), featureHint);
+		featureHint = t;
+		RaceTrack.Feature f = track.featureAt(t);
+		return f != null && f.terrain() && f.suits(color()) && Math.abs(track.laneAt(t, getX(), getZ())) <= RaceTrack.RIDGE_BAND_HALF
+				? f : null;
+	}
+
+	/** Pace a racing climber hit its ridge face at (blocks a tick); 0 off a ridge. See {@link #keepRidgePace}. */
+	private double ridgeCarry;
+	/** This climber's horizontal pace at the end of its last tick clear of any wall. */
+	private double ridgeRunPace;
+	/** Ticks since this climber was last on the ridge face. */
+	private int ridgeCarryTicks;
+	/** Set by {@link #handleRelativeFrictionAndCalculateMovement} on a tick spent going up the ridge face. */
+	private boolean ridgeClimbing;
+
+	/**
+	 * A racing climber bounds up its ridge face at {@link RaceScoring#RIDGE_CLIMB_LIFT}
+	 * instead of vanilla's ladder 0.2 (about 8.5 ticks a block once gravity takes its share).
+	 * At the ladder rate the ridge cost a Green more than the detour saved (Ahmi,
+	 * 2026-10-02: "the climb ... usually costs the racer time"; ShortcutGameTests). The last
+	 * push only reaches the top ({@link RaceScoring#ridgeLift}): at full lift a bird crested
+	 * still rising and flew 20-odd ticks over the ridge, where it can neither steer nor dash.
+	 */
+	@Override
+	public Vec3 handleRelativeFrictionAndCalculateMovement(Vec3 travel, float friction) {
+		Vec3 v = super.handleRelativeFrictionAndCalculateMovement(travel, friction);
+		if (racing() && v.y == 0.2D && horizontalCollision && onClimbable() && color().climb()) {
+			ridgeClimbing = true;
+			if (ridgeCarry <= 0.0D) {
+				ridgeCarry = ridgeRunPace;
+			}
+			ridgeCarryTicks = 0;
+			return new Vec3(v.x, RaceScoring.ridgeLift(ridgeTopY() - getY()), v.z);
+		}
+		return v;
+	}
+
+	/** Standing level on top of the ridge this climber is on (NaN with no known course). */
+	private double ridgeTopY() {
+		RaceTrack track = raceTrack() >= 0 ? RaceTrack.byId(raceTrack()) : racerTrack;
+		if (track == null || climbHint < 0.0D) {
+			return Double.NaN;
+		}
+		return track.groundY(climbHint) + track.ridgeHeight();
+	}
+
+	/**
+	 * Over the ridge a climber keeps the pace it hit the face at: the face stops it dead, the
+	 * ladder clamp holds it to 0.15 sideways, and the drop off the far end is air (a mob keeps
+	 * 0.91 of its speed a tick there and barely accelerates). From the crest until it is back
+	 * on the road past the ridge band, its pace in the air does not fall under that carry,
+	 * the way it faces: the AI's heading follows its steering and a rider's the mouse, so a
+	 * ridge on a bend is still taken round the bend (held along its own drift, the carry ran
+	 * an A_AMMONITE Black straight off the course in the air). Runs on whichever side simulates
+	 * the bird (the rider's client for a ridden bird, the server for the field), like the rest
+	 * of travel.
+	 */
+	private void keepRidgePace() {
+		Vec3 d = getDeltaMovement();
+		double h = d.horizontalDistance();
+		if (!racing() || !color().climb()) {
+			ridgeCarry = 0.0D;
+			return;
+		}
+		if (ridgeCarry <= 0.0D) {
+			if (!horizontalCollision && onGround()) {
+				// blocks it actually covered this tick: on the ground that is about twice the
+				// velocity left after friction, so the velocity would carry only half the pace
+				ridgeRunPace = Math.hypot(getX() - xo, getZ() - zo);
+			}
+			return;
+		}
+		if (ridgeClimbing) {
+			return;
+		}
+		if (ridgeCarryTicks == 0 && d.y > 0.0D) {
+			// first tick off the face: it is over the top, so stop rising and land on it
+			d = new Vec3(d.x, 0.0D, d.z);
+			setDeltaMovement(d);
+		}
+		if (++ridgeCarryTicks > RaceScoring.RIDGE_CARRY_TICKS || (onGround() && !onRidge())) {
+			ridgeCarry = 0.0D;
+			return;
+		}
+		// in the air only: on its feet the bird runs (and gets RaceScoring.SUITED_FEATURE_PACE);
+		// in the air a mob keeps 0.91 of its speed a tick and barely accelerates, so the hop off
+		// the face and the drop off the far end would crawl. Air velocity is what it covers next tick.
+		if (!onGround() && h < ridgeCarry) {
+			float yaw = getYRot() * Mth.DEG_TO_RAD;
+			setDeltaMovement(-Mth.sin(yaw) * ridgeCarry, d.y, Mth.cos(yaw) * ridgeCarry);
+		}
 	}
 
 	private boolean waterBelow() {
@@ -2362,6 +2486,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	 */
 	public void adoptVehicleCorrection() {
 		setDeltaMovement(Vec3.ZERO);
+		ridgeCarry = 0.0D;
 		setOnGround(hasFooting());
 		resetFallDistance();
 		localX = Double.NaN;   // the snap back is not a ride across a boost pad

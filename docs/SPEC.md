@@ -195,6 +195,10 @@ Features across the direct line: BOOST strips (every class; `boost_pad` block, +
 for 50 ticks; five on a sprint's long lap, three on a grand prix's short one, each on a corner exit), WATER
 (river birds walk it), RIDGE (3-5 blocks; climbers go over), LAVA (Nether bird and
 Gold), MUD bogs (everyone -55%), each terrain feature with a detour road outside
+(since 1.1.9 a bird on the direct line of a feature it suits runs x1.3 there, x1.4 on a
+ridge top, `RaceScoring.suitedPace`; a racing climber goes up its ridge face at 2.4 blocks a
+tick, lands on top and keeps its pace through the air; `ShortcutGameTests` holds every water,
+ridge and lava feature on every course to a gain over its detour)
 (`DETOUR_INNER..DETOUR_OUTER`). C boosts only, B one terrain feature, A two (A_INFERNO three) plus a bog,
 S three or four. Where a feature sits decides what a colour is worth, so the spans are
 placed, not free-hand: `RaceTrack.detourCost` measures the blocks a detour-taker gives

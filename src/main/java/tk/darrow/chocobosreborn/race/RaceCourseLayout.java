@@ -1043,6 +1043,22 @@ public final class RaceCourseLayout {
 	 * the same colour runs down the middle of the road into the fork. The detour peels
 	 * off to the outside as before.
 	 */
+	/**
+	 * Blocks a gantry at t is raised: a ridge's height when it stands over a ridge's top or
+	 * within 12 blocks past its end, where a climber still runs (or drops) at ridge height. At
+	 * road height its beam (7 clear) hit a 3.25-tall bird coming off A_MOONSHELF's ridge, which
+	 * then climbed it (ShortcutGameTests).
+	 */
+	private int gantryLift(double t, double lap) {
+		for (RaceTrack.Feature g : track.terrainFeatures()) {
+			double from = g.start() - RaceTrack.RIDGE_BAND_PAD / lap, to = g.end() + 12.0D / lap;
+			if (g.type() == RaceTrack.Feature.Type.RIDGE && wrap(t - from) <= to - from) {
+				return track.ridgeHeight();
+			}
+		}
+		return 0;
+	}
+
 	private void shortcutMarkers(double lap) {
 		for (RaceTrack.Feature f : track.terrainFeatures()) {
 			String colour = shortcutColour(f.type());
@@ -1063,7 +1079,7 @@ public final class RaceCourseLayout {
 			}
 			// the gantry, just before the fork: a post on the infield verge, a beam over the road
 			double t = wrap(fork - 4.0D / lap);
-			int y = surf(t);
+			int y = surf(t) + gantryLift(t, lap);
 			RacePoint foot = track.pointAtLane(t, RaceTrack.ROAD_HALF + 2.5D);
 			int fx = floor(foot.x()), fz = floor(foot.z());
 			if (road.contains(new Tile(fx, fz))) {

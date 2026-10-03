@@ -31,7 +31,8 @@ final class RaceSim {
 	static final double K = 2.2D;
 	static final int RIDER_REACTION = 6;
 	static final double RIDER_BRAKE = 0.10D;
-	static final double CLIMB_TICKS_PER_BLOCK = 5.0D;
+	/** A racing climber's rate up its ridge face ({@link RaceScoring#RIDGE_CLIMB_LIFT}). */
+	static final double CLIMB_TICKS_PER_BLOCK = 1.0D / RaceScoring.ridgeClimbRate();
 
 	enum Drive {
 		/** The AI's own rules. */
@@ -101,14 +102,28 @@ final class RaceSim {
 			return new Entrant(b, d, null, b.pace(b.color().landSpeed()), RIDER_REACTION);
 		}
 
-		/** A field bird of this class and colour at {@code form} (-0.05..0.05). */
+		/** A field bird of this class and colour at {@code form} (-0.05..0.05), with no rider to key off. */
 		static Entrant field(RaceClass rc, ChocoboColor color, double form) {
-			int train = RaceScoring.fieldTraining(rc.getId(), false);
+			return field(rc, color, form, 0.0D, 0);
+		}
+
+		/** A field bird on a card with this rider: its floors key off the rider's cruise and training. */
+		static Entrant field(RaceClass rc, ChocoboColor color, double form, Bird rider) {
+			int train = (rider.speed() + rider.stamina() + rider.intel() + rider.coop()) / 4;
+			return field(rc, color, form, rider.pace(rider.color().landSpeed()), train);
+		}
+
+		/**
+		 * A field bird on a card whose best rider cruises at {@code riderPaceAbs} with {@code riderTraining}
+		 * points a stat ({@link RaceScoring#fieldCruiseAbs}, {@link RaceScoring#fieldTraining(int, boolean, int)}).
+		 */
+		static Entrant field(RaceClass rc, ChocoboColor color, double form, double riderPaceAbs, int riderTraining) {
+			int train = RaceScoring.fieldTraining(rc.getId(), false, riderTraining);
 			Bird b = new Bird(color, Math.min(4, rc.getId() + 1), train, train, train, train);
 			RacerProfile p = RacerProfile.of(rc, RacerProfile.Role.FIELD);
 			double land = RaceScoring.fieldLandSpeed(color, rc);
-			return new Entrant(b, Drive.AI, p, b.pace(land) * p.cruise() * (1.0D + form),
-					(p.reactionMin() + p.reactionMax()) / 2);
+			double cruise = RaceScoring.fieldCruiseAbs(color, rc, b.pace(land) * p.cruise(), riderPaceAbs);
+			return new Entrant(b, Drive.AI, p, cruise * (1.0D + form), (p.reactionMin() + p.reactionMax()) / 2);
 		}
 
 		/** Teiyo (or Jolo) against a rider whose own cruise is {@code riderPaceAbs}. */
@@ -274,7 +289,12 @@ final class RaceSim {
 					lastRidgeLap = lapIdx;
 					stall += c.track.ridgeHeight() * CLIMB_TICKS_PER_BLOCK;
 				}
-				if (suits) continue;
+				if (suits) {
+					if (f.covers(t)) {
+						progress *= RaceScoring.suitedPace(f.type());   // in its element
+					}
+					continue;
+				}
 				double from = f.start() - RaceTrack.DETOUR_CONNECT, to = f.end() + RaceTrack.DETOUR_CONNECT;
 				if (t >= from && t <= to) {
 					double direct = (to - from) * c.lap;

@@ -595,6 +595,29 @@ class RaceScoringTest {
 		assertEquals(8, RaceScoring.remoteGlideSteps(1, 20.0D * 20.0D));
 	}
 
+	/**
+	 * A remote bird at a steady pace, one packet a tick (updateInterval 1, vanilla's 3 lerp
+	 * steps), glided as ChocoboEntity#lerpTo does: measured from the last position, the glide
+	 * stays at 3 and the drawn bird two ticks of motion back, at S dash pace too. Measured
+	 * from the drawn bird (to 1.1.8) it fed itself past 1.35 blocks a tick and ran to 8.
+	 */
+	@Test
+	void aFastRemoteBirdIsNotDrawnFurtherBehindEachPacket() {
+		for (double v : new double[]{0.8D, 1.6D, 2.4D, 4.0D}) {
+			double target = 0.0D, shown = 0.0D;
+			int steps = 0;
+			for (int tick = 0; tick < 200; tick++) {
+				double from = steps > 0 ? target : shown;
+				target += v;
+				steps = RaceScoring.remoteGlideSteps(3, (target - from) * (target - from));
+				assertEquals(3, steps, "pace " + v + " tick " + tick);
+				shown += (target - shown) / steps;
+				steps--;
+			}
+			assertEquals(2.0D * v, target - shown, 1.0E-6D, "pace " + v);
+		}
+	}
+
 	@Test
 	void changingPingCreditsOnlyTheTripsActuallyTaken() {
 		// 200 ms RTT at GO (100 ms outbound), 100 ms at finish (50 ms inbound).

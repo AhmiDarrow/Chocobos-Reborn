@@ -13,6 +13,23 @@ import org.junit.jupiter.api.Test;
  * a bird frozen on the rail.
  */
 class RaceClimbTest {
+	/**
+	 * A racing climber goes up its ridge at 1.2 blocks a tick (vanilla's ladder was 0.118: the
+	 * ridge cost more than its detour saved) and its last push only just clears the top, so it
+	 * lands there running instead of flying over the ridge.
+	 */
+	@Test
+	void aClimberBoundsUpTheRidgeAndLandsOnTop() {
+		assertTrue(RaceScoring.ridgeClimbRate() > 1.0D, "an S ridge (5) in five ticks");
+		assertTrue(RaceScoring.ridgeLift(4.0D) == RaceScoring.RIDGE_CLIMB_LIFT);
+		assertTrue(RaceScoring.ridgeLift(Double.NaN) == RaceScoring.RIDGE_CLIMB_LIFT, "no known course: full lift");
+		assertTrue(RaceScoring.ridgeLift(-1.0D) == RaceScoring.RIDGE_CLIMB_LIFT, "still on a face over the reckoned top");
+		for (double toTop : new double[]{0.05D, 0.3D, 0.9D}) {
+			double rise = (RaceScoring.ridgeLift(toTop) - 0.08D) * 0.98D;
+			assertTrue(rise >= toTop && rise <= toTop + 0.11D, toTop + " under the top rises " + rise);
+		}
+	}
+
 	@Test
 	void theRuleClimbsOnlyTheRidgeInARace() {
 		assertTrue(RaceScoring.mayClimb(true, true, false, false), "outside a race a climber climbs anything");

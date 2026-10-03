@@ -2594,3 +2594,66 @@ boxes read "5 C / 8 B / 10 A wins each" from `BreedingOdds`; nuts page, tooltips
 `BreedingOddsTest` (per-class numbers, chance endpoints, stage mapping), `Ff7LineTest` (Great Black parents,
 Wonderful Black for Gold), `OldSaveConversionTest` (share-out). GameTests `firstPlacesCountInTheClassTheyAreWon`,
 `oldBirdSharesItsWinsOutByClass`, `greenOrBlueNeedsClassCWins`, `blackNeedsGreatParentsAndClassBWins`.
+
+## Ridges, field pace, remote glide (2026-10-02, released as 1.1.9 "In Their Element"; Ahmi: hill climbs "usually cost the racer time", water is "a shortcut by just a bit which is great"; the non-rival field is "too easy overall, should not be rival skill level but better"; "still rough on lag and fps")
+
+### Shortcuts (`ChocoboEntity.handleRelativeFrictionAndCalculateMovement` / `keepRidgePace` / `suitedFeature`, `RaceScoring.RIDGE_CLIMB_LIFT`, `ridgeLift`, `suitedPace`)
+- Measured first: `gametest/ShortcutGameTests` (one generated test per course: every WATER / RIDGE / LAVA feature,
+  the suited colour Blue / Green / Gold over it vs a Yellow at the same pace round the detour; `SHORTCUT` lines give
+  ticks and blocks travelled, `SHORTCUT-TRACE` the tick trace, a block dump when a bird is pressed past the end).
+  At vanilla's ladder rate (0.118 a tick) ridges lost up to 37 ticks; the B_FORD water was even.
+- A racing climber on its ridge face climbs 2.4 blocks a tick; the last push only reaches the reckoned top
+  (`ridgeLift`, full lift when still pressed above it: a ridge on a rising road steps up) and the first tick off the
+  face zeroes any rise, so it lands running.
+- From the face until it is on the ground off the ridge band (or 160 ticks), IN THE AIR its horizontal pace is held
+  at the blocks a tick it covered before the face (measured as displacement, `xo/zo`: the after-friction velocity on
+  the ground is about half of it), along its facing. On the ground it runs normally.
+- A bird on the direct line (|lane| <= RIDGE_BAND_HALF) of a feature it suits runs x1.3 (water, lava) / x1.4 (ridge)
+  (`suitedPace`, applied in travel like the contact slow). `RaceSim` models it and the climb rate.
+- `RaceCourseLayout.gantryLift`: a shortcut gantry over a ridge or within 12 blocks past one is raised by the ridge's
+  height (A_MOONSHELF's lava gantry beam hit birds coming off the ridge). `COURSE_VERSION` 16.
+- `RacerGoal`: pressed on a wall in RACE mode, it steers for `steerLaneAt(t)` (no lookahead): the lookahead before a
+  detour opening aimed through the rail post, and a bird alongside pinned an S_KEEP Blue for 110 ticks.
+- Result (72 features): 69 gain 1-34 ticks; three S ridges whose run-up is cut short by the feature before them
+  (standing start: S_ECLIPSE after its bog, S_KEEP after its lava, S_SKYWAY after its water) are -1 to -2, inside the
+  test's `STANDING_START_SLACK`. A suited bird coming off a merged detour still pays the swing back to the centre.
+- Remote birds: a racing climber's stride counts its vertical motion.
+
+### Field (`RaceScoring.fieldRiderShare`, `fieldCruiseAbs`, `FIELD_TRAIN_SHARE`, `fieldTraining(int, boolean, int)`)
+- At the grid a field bird cruises at least C/B 0.88, A 0.94, S 0.98 x the best rider's cruise (x its colour edge),
+  under Jolo (0.883 / 0.96 / 1.04), and trains at least 0.9 x the rider's mean training. Rivals unchanged.
+- Profiles: C dash 1.24 -> 1.40, B 1.32 -> 1.44, A 1.40 -> 1.46; C/B fewer stumbles, quicker reactions, tighter
+  line, more boost strips. (Rider dash is 1.62.)
+- `RaceSimTest` ladder now compares a rider with the field keyed off that rider. B now needs ~35 training to beat
+  the field best (was 25). New `theFieldStaysInTheRaceWithATrainedBird`: from half-trained up the field best is
+  under 1.8x the rider's time and behind Teiyo. Maxed C rider: field best 96 s -> 73 s (Teiyo 61, rider 47);
+  maxed B: 72 -> 55 (Teiyo 48, rider 36). Table in `build/race_sim.txt`.
+
+### Remote glide (`ChocoboEntity.lerpTo`, `RaceScoring.remoteGlideSteps`)
+- The glide was sized from the distance between the DRAWN bird and the new packet. The drawn bird trails by the
+  glide, so over 1.35 blocks a tick (A/S pace, B dash) it fed itself to 8 steps: the field was drawn up to ~11
+  blocks behind where it raced. Now measured from the previous target (`lerpX/Y/Z`). Test
+  `aFastRemoteBirdIsNotDrawnFurtherBehindEachPacket`.
+
+### Small
+- `WhiskerMesh.get` builds the hens' short-crest parts with the load (was a 20-50 ms hitch the first time a hen
+  entered each LOD band mid-race).
+- EntityCulling 1.11.2 (in the pack) does not tick-cull a racing bird: it skips vehicles (jockeys) and still runs
+  aiStep for culled living entities. Nothing to do.
+
+### Needs an in-game look
+- A ridden Green over a ridge (the rider's client simulates it; the server replays the packet delta, which climbs
+  2.4 a tick now: watch for "moved wrongly"), and a ridden Blue / Gold on its feature (x1.3).
+- The bound up the face and the landing on top; field strength against a trained bird in B.
+
+### Performance research (2026-10-02, not acted on)
+- Hub server (2x E5-2698 v3, slow single core): G1 pauses median 30 ms, p95 109 ms, max 178 ms on a 20 GB heap with
+  ~1 GB live (`logs/gc.log`). Generational ZGC (`-XX:+UseZGC -XX:+ZGenerational -XX:+AlwaysPreTouch`, drop the G1
+  flags and the no-op `+UseNUMA`) should take pauses under 1 ms. Live server: owner's call, restart needed.
+- Client: CurseForge default `-Xmx8192m -Xms256m`; set min = max. VSync on with a 120 cap.
+- Pack lacks Lithium (NeoForge 0.15.3 for 1.21.1); Moonrise is bigger but riskier (replaces the chunk system).
+- Biggest client cost: CPU skinning (~1.5-2 ms per near bird). `GpuBirds` on branch `racing-netcode-crowd` ports
+  alone cleanly (one comment conflict in ChocoboMeshRenderer); frame playback next; then rider authority; solid
+  racers last (design change, and a `move()` early-return bug to fix on merge). Crowd fans as static GPU buffers
+  (~2 ms on S), SquareSky as a static buffer, course plan built off-thread when the heat is posted.
+

@@ -24,7 +24,9 @@ package tk.darrow.chocobosreborn.race;
  * <li>{@code boostAim}: chance it steers for a boost strip's lane.</li>
  * </ul>
  *
- * <p>No component looks at the player. The field holds its own pace.
+ * <p>No component looks at the player during a heat. At the grid the field's pace and
+ * training have a floor off the best rider's bird ({@link RaceScoring#fieldCruiseAbs},
+ * {@link RaceScoring#fieldTraining(int, boolean, int)}), under the named rivals'.
  */
 public record RacerProfile(double cruise, double dash, double reserve, int reactionMin, int reactionMax,
                            double wobble, double stumbleChancePerLap, double lineHold, double brake, double boostAim) {
@@ -49,9 +51,11 @@ public record RacerProfile(double cruise, double dash, double reserve, int react
 			// cruise sits on the bird's own grade x speed training (and the class land speed,
 			// RaceScoring.fieldLandSpeed), so a class bird is not a flat attribute.
 			// Reaction is from GO: the riders see the same countdown, so no field jumps the lights.
-			case C -> new RacerProfile(0.885D, 1.24D, 0.05D, 14, 26, 0.90D, 0.60D, 0.35D, 0.26D, 0.45D);
-			case B -> new RacerProfile(0.885D, 1.32D, 0.10D, 11, 19, 0.60D, 0.40D, 0.60D, 0.21D, 0.65D);
-			case A -> new RacerProfile(0.945D, 1.40D, 0.15D, 9, 14, 0.35D, 0.20D, 0.80D, 0.16D, 0.85D);
+			// C and B drive tidier than they did to 1.1.8 (Ahmi, 2026-10-02: "too easy overall"):
+			// a harder dash, fewer stumbles, quicker off the line, more of the boost strips
+			case C -> new RacerProfile(0.885D, 1.40D, 0.05D, 12, 22, 0.70D, 0.40D, 0.45D, 0.23D, 0.60D);
+			case B -> new RacerProfile(0.885D, 1.44D, 0.10D, 10, 16, 0.45D, 0.25D, 0.70D, 0.18D, 0.75D);
+			case A -> new RacerProfile(0.945D, 1.46D, 0.15D, 9, 14, 0.35D, 0.20D, 0.80D, 0.16D, 0.85D);
 			case S -> new RacerProfile(0.99D, 1.48D, 0.20D, 7, 11, 0.15D, 0.05D, 0.95D, 0.11D, 0.95D);
 		};
 		return switch (role) {

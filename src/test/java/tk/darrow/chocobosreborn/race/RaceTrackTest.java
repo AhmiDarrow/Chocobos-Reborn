@@ -531,9 +531,10 @@ class RaceTrackTest {
 		// whole slot; 13: rails, pool rims and scenery kept out of the racing lanes
 		// (CourseClearanceTest); 14: two detour openings under RaceTrack.DETOUR_MERGE blocks
 		// apart are laid as one, no rail stub between them; 15: past every rejoin the outside rail
-		// flares back from the detour's rail to the kerb (RaceTrack.REJOIN_FLARE), road inside it.
-		// Older islands have to be re-laid either way.
-		assertEquals(15, SquareBuilder.COURSE_VERSION);
+		// flares back from the detour's rail to the kerb (RaceTrack.REJOIN_FLARE), road inside it;
+		// 16: a shortcut gantry over or just past a ridge is raised by the ridge's height (a bird
+		// coming off A_MOONSHELF's ridge met the beam). Older islands have to be re-laid either way.
+		assertEquals(16, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

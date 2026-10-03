@@ -93,6 +93,20 @@ class RaceSimTest {
 		return ticks(rc, x -> Entrant.field(rc, fav, bestForm(fieldBirds(rc))));
 	}
 
+	/** The field average on a card with this rider: the field keys its floor off the rider's cruise. */
+	static double fieldAvg(RaceClass rc, Bird against) {
+		double sum = 0.0D;
+		Set<ChocoboColor> cs = homeColours(rc);
+		for (ChocoboColor c : cs) sum += ticks(rc, x -> Entrant.field(rc, c, 0.0D, against));
+		return sum / cs.size();
+	}
+
+	/** The field favourite on a card with this rider. */
+	static double fieldBest(RaceClass rc, Bird against) {
+		ChocoboColor fav = favourite(rc);
+		return ticks(rc, x -> Entrant.field(rc, fav, bestForm(fieldBirds(rc)), against));
+	}
+
 	static double rider(RaceClass rc, Bird b, Drive d) {
 		return ticks(rc, x -> Entrant.rider(b, d));
 	}
@@ -126,31 +140,56 @@ class RaceSimTest {
 	void classCIsWonByAFreshGoodBirdDrivenWellButNotByCruising() {
 		RaceClass rc = RaceClass.C;
 		Bird b = fresh(riderColour(rc));
-		assertTrue(rider(rc, b, Drive.SMART) < fieldBest(rc), "a fresh Good Yellow driven well beats the C field");
-		assertTrue(rider(rc, b, Drive.CRUISE) > fieldAvg(rc), "cruising loses to an ordinary C bird");
+		assertTrue(rider(rc, b, Drive.SMART) < fieldBest(rc, b), "a fresh Good Yellow driven well beats the C field");
+		assertTrue(rider(rc, b, Drive.CRUISE) > fieldAvg(rc, b), "cruising loses to an ordinary C bird");
 	}
 
+	/** 1.1.9: a quarter-trained Green no longer does (the field drives tidier and dashes harder); a third-trained one does. */
 	@Test
 	void classBNeedsSomeTraining() {
 		RaceClass rc = RaceClass.B;
-		assertTrue(rider(rc, fresh(riderColour(rc)), Drive.SMART) > fieldBest(rc), "an untrained Green does not beat the best of B");
-		assertTrue(rider(rc, trained(riderColour(rc), 25), Drive.SMART) < fieldBest(rc), "a quarter-trained Green driven well does");
+		Bird fresh = fresh(riderColour(rc)), some = trained(riderColour(rc), 35);
+		assertTrue(rider(rc, fresh, Drive.SMART) > fieldBest(rc, fresh), "an untrained Green does not beat the best of B");
+		assertTrue(rider(rc, some, Drive.SMART) < fieldBest(rc, some), "a third-trained Green driven well does");
 	}
 
 	@Test
 	void classANeedsATrainedBird() {
 		RaceClass rc = RaceClass.A;
-		assertTrue(rider(rc, fresh(riderColour(rc)), Drive.SMART) > fieldAvg(rc), "an untrained Black loses in A");
-		assertTrue(rider(rc, trained(riderColour(rc), 50), Drive.SMART) < fieldBest(rc), "a half-trained Black driven well wins");
+		Bird fresh = fresh(riderColour(rc)), half = trained(riderColour(rc), 50);
+		assertTrue(rider(rc, fresh, Drive.SMART) > fieldAvg(rc, fresh), "an untrained Black loses in A");
+		assertTrue(rider(rc, half, Drive.SMART) < fieldBest(rc, half), "a half-trained Black driven well wins");
 	}
 
 	@Test
 	void classSNeedsANearMaxedBirdAndTheDash() {
 		RaceClass rc = RaceClass.S;
 		ChocoboColor c = riderColour(rc);
-		assertTrue(rider(rc, trained(c, 50), Drive.SMART) > fieldAvg(rc), "half-trained loses in S");
-		assertTrue(rider(rc, trained(c, 90), Drive.SMART) < fieldBest(rc), "near-maxed and driven well wins");
-		assertTrue(rider(rc, trained(c, 100), Drive.CRUISE) > fieldBest(rc), "even maxed, cruising does not");
+		Bird half = trained(c, 50), near = trained(c, 90), maxed = trained(c, 100);
+		assertTrue(rider(rc, half, Drive.SMART) > fieldAvg(rc, half), "half-trained loses in S");
+		assertTrue(rider(rc, near, Drive.SMART) < fieldBest(rc, near), "near-maxed and driven well wins");
+		assertTrue(rider(rc, maxed, Drive.CRUISE) > fieldBest(rc, maxed), "even maxed, cruising does not");
+	}
+
+	/**
+	 * Ahmi, 2026-10-02: the field was "too easy overall, should not be rival skill level but
+	 * better". It keys its floor off the rider (RaceScoring.fieldRiderShare, FIELD_TRAIN_SHARE),
+	 * so a trained bird driven well still wins, but by a race, not a lap: from half-trained up
+	 * the field's best takes under 1.8 x the rider's time (a maxed C or B bird was 2 to 2.4 x
+	 * ahead of the 1.1.8 field), and stays behind Teiyo.
+	 */
+	@Test
+	void theFieldStaysInTheRaceWithATrainedBird() {
+		for (RaceClass rc : LADDER) {
+			for (int pts : new int[]{50, 75, 100}) {
+				Bird b = trained(riderColour(rc), pts);
+				double me = rider(rc, b, Drive.SMART), field = fieldBest(rc, b);
+				assertTrue(field < me * 1.80D, rc + " " + pts + ": the field best is in the race: " + field / me);
+				if (rc.includesTeioh()) {
+					assertTrue(field > teiyo(rc, b, 0.0D), rc + " " + pts + ": Teiyo stays ahead of the field");
+				}
+			}
+		}
 	}
 
 	@Test
@@ -158,8 +197,8 @@ class RaceSimTest {
 		for (RaceClass rc : new RaceClass[]{RaceClass.B, RaceClass.A, RaceClass.S}) {
 			Bird level = classLevel(rc);
 			double teiyo = teiyo(rc, level, 0.0D);
-			assertTrue(teiyo < fieldBest(rc), rc + ": Teiyo beats the best field bird");
-			assertTrue(jolo(rc, level) < fieldAvg(rc), rc + ": Jolo beats an ordinary field bird");
+			assertTrue(teiyo < fieldBest(rc, level), rc + ": Teiyo beats the best field bird");
+			assertTrue(jolo(rc, level) < fieldAvg(rc, level), rc + ": Jolo beats an ordinary field bird");
 			assertTrue(teiyo < jolo(rc, level), rc + ": Teiyo ahead of Jolo");
 			assertTrue(rider(rc, level, Drive.SMART) < teiyo, rc + ": a well-driven class-level bird beats Teiyo");
 			assertTrue(rider(rc, level, Drive.CRUISE) > teiyo, rc + ": cruising does not");
@@ -211,7 +250,8 @@ class RaceSimTest {
 		out.add("Mean heat seconds over every course of each class. before = the 1.0.18 AI and rival pacing,");
 		out.add("after = this build (a rider's bird is the same in both). Field best = the class favourite colour at");
 		out.add("the expected best form of the card; Teiyo is paced off the rider named in the row (FF7 Teioh).");
-		out.add("Rider rows: does the bird beat the field best / Teiyo, before -> after.");
+		out.add("Rider rows: does the bird beat the field best / Teiyo, before -> after. The field keeps a share of the");
+		out.add("rider's cruise as its floor (RaceScoring.fieldRiderShare), so the field best is per rider.");
 		out.add("");
 		out.add(String.format(Locale.ROOT, "%-5s %-40s %8s %8s   %s", "class", "who", "before", "after", "beats field best / Teiyo"));
 		for (RaceClass rc : LADDER) {
@@ -236,7 +276,9 @@ class RaceSimTest {
 			for (Object[] r : refs) {
 				Bird b = (Bird) r[1];
 				double t = rider(rc, b, (Drive) r[2]);
-				String verdict = yn(t < oldBest) + "->" + yn(t < best);
+				double keyed = fieldBest(rc, b);
+				String verdict = yn(t < oldBest) + "->" + yn(t < keyed)
+						+ String.format(Locale.ROOT, " (field best %.0fs)", keyed / 20.0D);
 				if (rc.includesTeioh()) {
 					double oldT = oldTeiyo(rc, b), newT = teiyo(rc, b, 0.0D);
 					verdict += " / " + yn(t < oldT) + "->" + yn(t < newT)
