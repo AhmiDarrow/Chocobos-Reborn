@@ -19,6 +19,11 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.11 - Whistle Calls
+Uploaded 2026-10-03: `chocobosreborn-1.1.11.jar` as file **9051920** ("Chocobos Reborn 1.1.11 - Whistle Calls",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.11.md`) via
+`tools/upload_curseforge.py`. The whistle sounds on every blow, rotating four original calls; a one-second rest when no bird answers.
+
 ## 1.1.10 - Smooth Riding
 Uploaded 2026-10-03: `chocobosreborn-1.1.10.jar` as file **9050926** ("Chocobos Reborn 1.1.10 - Smooth Riding",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.10.md`) via
