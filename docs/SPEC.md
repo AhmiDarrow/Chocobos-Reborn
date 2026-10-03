@@ -231,7 +231,21 @@ grid and during a set-back hold, finished AI parking in lane -3.5, finished or f
 and a set-back bird for 2 s after its hold and until it is clear of everyone go through the
 field. Each bird is resolved by the side that simulates it: the server for AI birds, the driving
 client for a rider's own bird (it leads the remote birds by its round trip plus the lerp,
-`RacerContact.leadTicks`). The AI goes round a bird ahead in its lane on the side with room
+`RacerContact.leadTicks`).
+
+A rider's own bird is the rider's to move (`RiderAuthority`): the server takes each move the
+rider's client sends unless it is impossible (over the speed bank, a step over 10 blocks, through
+a wall, or ending inside a block) and replays it only for its side effects, so a disagreement
+about a step edge is no longer a snap back. When the server moves a ridden bird (a set-back, the
+grid), it numbers the move and drops the rider's moves sent from the old place until the client
+answers. The other racers are drawn from tick-stamped frames the server sends every tick, one
+batched packet per player (`RaceFrameSender`), played back a short adaptive delay behind
+(`PlayoutClock`, `FrameBuffer`); `-Dchocobosreborn.framePlayback=false` on either side goes back to
+vanilla's lerp and `-Dchocobosreborn.vanillaRiderMovement=true` to vanilla's move checks. Every
+set-back writes a `Race rescue:` line to the server log with its reason, and a client logs
+`Race frames stalled` when the frames stop for over 250 ms mid-race.
+
+The AI goes round a bird ahead in its lane on the side with room
 (both sides boxed in: it matches the pace ahead), keeps clear of a bird alongside, and a leader
 may drift up to a block (x skill) to cover the inside from a chaser, once, then not again for
 4 s. Skill is the profile's line hold: a C bird reacts late and misses the bird ahead about one
