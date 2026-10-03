@@ -2657,3 +2657,49 @@ Wonderful Black for Gold), `OldSaveConversionTest` (share-out). GameTests `first
   racers last (design change, and a `move()` early-return bug to fix on merge). Crowd fans as static GPU buffers
   (~2 ms on S), SquareSky as a static buffer, course plan built off-thread when the heat is posted.
 
+## Rubber-banding on the live hub, rider authority ported (2026-10-03, branch `race-smoothing`, unreleased)
+
+Ahmi: after 1.1.9 RabidWraith (Ahmi's wife; her PC is an identical build) saw "rubberbanding for rabid,
+stuttering/teleported ai", worse once birds get fast (green/blue, 50+ speed).
+
+### What was found
+- Live log, her C_HEARTFIELD heat 09:41-09:44: four small "moved wrongly" (0.3-0.7) about 19 s apart (one a lap),
+  four rescue set-backs in 35 s (94 and 51 blocks among them), and a 20-tick hold after one rescue where her client
+  slid on and was snapped back. The server logged no reason for a rescue: `Race rescue:` lines now give one.
+- Not the pack. A full-pack copy of the live server on the hub (`C:\pack-harness`, :25578, scratchpad driver
+  `pack_race.py`: one full-pack client from this PC, five AI) gave 8 snaps on Heartfield with and without Lithium,
+  the first three identical to the decimal (0.4972, 0.375, 0.2757). Lithium is the only pack mod that overwrites
+  `Entity.collide` (static mixin scan), but dropping it changed nothing. The same snaps reproduce on the
+  Chocobos-only hub harness (`--riders 1 --rider-grade 3 --rider-train 60`).
+- Cause of the snaps: Heartfield's dip (progress 0.44-0.47) alternates dirt path (top 15/16) and full blocks, so a
+  boosted bird bobs 1/16 between 69.9375 and 70.0 most ticks; three server replays a lap disagreed at those edges
+  and the rider was put back ~1.3 blocks with its speed gone. A one-move sweep (GameTest
+  `heartfieldDipRiderMovesReplayOnTheServer`, 34,029 moves) never reproduces it: it needs the carried state of a
+  real run (trace: `--trace-track C_HEARTFIELD`, build/latency-hub/results/trace-LatencyHost.csv).
+- The AI stutter was not reproduced on any harness run (clients on this PC); the per-tick "stalls" on B_KOPJE were
+  the start grid.
+
+### What changed
+- Rider authority + acknowledged teleports from `racing-netcode-crowd` (72e24e4, kill switches 89026f2, pure
+  `RiderBudget` 64140f7), ported by hand onto 1.1.9: a rider's move is taken unless it is impossible (speed bank,
+  step over 10, through a wall, ending in a block); set-backs are numbered teleports and moves sent from the old
+  place are dropped instead of each being corrected. `-Dchocobosreborn.vanillaRiderMovement=true` (server) restores
+  vanilla. Result, same heats: 0 snaps, 0 refused, 0 moved wrongly (1.1.9: 7-8 on Heartfield).
+- Frame playback of the field (PlayoutClock/FrameBuffer/RemoteRaceFrames) is ported but OFF by default: on the
+  hub harness vanilla's lerp drew a fast field smoother (judder p99 0.10, leaps 0.37/1000) than playback at the
+  1.5-tick floor (0.48, 4.15) or a 2.5 floor (0.59, 1.60). Opt in with `-Dchocobosreborn.framePlayback=true` on
+  server and clients (harness `--frame-playback`). Frames are batched (`RaceFrameSender`, one `race_frames` packet
+  per player per tick) and FrameBuffer eases climbs up to 2.6 a tick (1.1.9 ridges).
+- `Race rescue:` log line per set-back (reason: fell / off-road 80 ticks / back on past the anchor / progress jump /
+  strayed / AI recovery gave up), with position, pace and distance back.
+- Harness: `--riders 1|2|3`, `--rivals` (did not put Teiyo/Jolo on the card in a harness heat: unchecked why),
+  `--rider-grade`, `--rider-train`, `--remote-trace`, `--trace-track`, `--frame-playback`.
+- The harness server had Grok's `hubpace-4.0.0.jar` in `C:\latency-harness\mods` (9,154 chunks pinned, clients
+  timed out): moved to `C:\latency-harness\mods-removed`.
+
+### Open
+- The AI stutter she sees is still unexplained; ask for her client `logs/latest.log` after a bad race.
+- Research notes (Lithium `lithium:options` opt-out in mods.toml, OpenBoatUtils sub-stepping, Create's
+  TPS-scaled client prediction) are in the session summary, not acted on.
+- `squareBuildsCourseAndRunsHeat` flaked once ("AI racers move, max d2=0.0": no NPC visible at tick 500).
+
