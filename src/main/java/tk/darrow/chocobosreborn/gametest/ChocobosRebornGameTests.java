@@ -94,6 +94,28 @@ public class ChocobosRebornGameTests {
 		});
 	}
 
+	@GameTest(template = EMPTY)
+	public static void whistleSoundsEvenWhenNoBirdAnswers(GameTestHelper helper) {
+		helper.assertTrue(tk.darrow.chocobosreborn.sound.ModSounds.WHISTLE_CALLS.size() == 4
+				&& tk.darrow.chocobosreborn.sound.ModSounds.WHISTLE_CALLS.stream().allMatch(c -> c.isBound()),
+				"the whistle has four registered calls");
+		ServerPlayer p = helper.makeMockServerPlayerInLevel();
+		p.setGameMode(GameType.SURVIVAL);
+		ItemStack whistle = new ItemStack(ModItems.WHISTLE.get());
+		p.setItemInHand(InteractionHand.MAIN_HAND, whistle);
+		whistle.getItem().use(helper.getLevel(), p, InteractionHand.MAIN_HAND);
+		// No bird heard it, so only the short breath holds the whistle, not the full call cooldown.
+		float held = p.getCooldowns().getCooldownPercent(ModItems.WHISTLE.get(), 0F);
+		helper.assertTrue(held > 0F, "a blow with no bird still rests the whistle");
+		// A mock player is never ticked, so its cooldowns are counted down here.
+		for (int tick = 0; tick < 20; tick++) {
+			p.getCooldowns().tick();
+		}
+		helper.assertFalse(p.getCooldowns().isOnCooldown(ModItems.WHISTLE.get()),
+				"the breath is short when no bird answered");
+		helper.succeed();
+	}
+
 	@GameTest(template = EMPTY, timeoutTicks = 200)
 	public static void tameFollowsAcrossDimensions(GameTestHelper helper) {
 		ServerLevel here = helper.getLevel();

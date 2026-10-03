@@ -100,5 +100,29 @@
         "stream": true
       }
     ]
+  },
+  "item.whistle.call_1": {
+    "sounds": [
+      "chocobosreborn:item/whistle/call_1"
+    ],
+    "subtitle": "chocobosreborn.subtitle.whistle"
+  },
+  "item.whistle.call_2": {
+    "sounds": [
+      "chocobosreborn:item/whistle/call_2"
+    ],
+    "subtitle": "chocobosreborn.subtitle.whistle"
+  },
+  "item.whistle.call_3": {
+    "sounds": [
+      "chocobosreborn:item/whistle/call_3"
+    ],
+    "subtitle": "chocobosreborn.subtitle.whistle"
+  },
+  "item.whistle.call_4": {
+    "sounds": [
+      "chocobosreborn:item/whistle/call_4"
+    ],
+    "subtitle": "chocobosreborn.subtitle.whistle"
   }
 }

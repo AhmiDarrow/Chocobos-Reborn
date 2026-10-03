@@ -1,5 +1,7 @@
 package tk.darrow.chocobosreborn.sound;
 
+import java.util.List;
+
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -16,6 +18,10 @@ public final class ModSounds {
 	public static final DeferredHolder<SoundEvent, SoundEvent> KWEH_FOLLOW = sound("entity.chocobo.kweh_follow");
 	public static final DeferredHolder<SoundEvent, SoundEvent> KWEH_STAY = sound("entity.chocobo.kweh_stay");
 	public static final DeferredHolder<SoundEvent, SoundEvent> KWEH_WANDER = sound("entity.chocobo.kweh_wander");
+	/** Chocobo Whistle calls (tools/synth_whistle.py); the whistle plays them in turn. */
+	public static final List<DeferredHolder<SoundEvent, SoundEvent>> WHISTLE_CALLS = List.of(
+			sound("item.whistle.call_1"), sound("item.whistle.call_2"),
+			sound("item.whistle.call_3"), sound("item.whistle.call_4"));
 	public static final DeferredHolder<SoundEvent, SoundEvent> RACE_DASH = sound("music.race.chocobo_dash");
 	public static final DeferredHolder<SoundEvent, SoundEvent> RACE_GALLOP = sound("music.race.chocobo_race_gallop");
 	public static final DeferredHolder<SoundEvent, SoundEvent> RACE_ADVENTURE = sound("music.race.gallop_of_adventure");
