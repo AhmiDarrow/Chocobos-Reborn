@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.10 - Smooth Riding
+Uploaded 2026-10-03: `chocobosreborn-1.1.10.jar` as file **9050926** ("Chocobos Reborn 1.1.10 - Smooth Riding",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.10.md`) via
+`tools/upload_curseforge.py`. Rider authority with acknowledged teleports, the field drawn from batched tick-stamped frames (on by default), rescue reasons in the server log.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.10
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9050926
+SHA-256: `eb7ab3b5fa239eadafda1f7aabdf20ab0e763e5d61f33e67456c1319a0c89bc9`.
+
 ## 1.1.9 - In Their Element
 Uploaded 2026-10-02: `chocobosreborn-1.1.9.jar` as file **9043833** ("Chocobos Reborn 1.1.9 - In Their Element",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.9.md`) via
