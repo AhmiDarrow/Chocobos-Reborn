@@ -527,6 +527,85 @@ public class ChocobosRebornGameTests {
 		helper.succeed();
 	}
 
+	/**
+	 * Full-pack harness, 2026-10-03: a fast rider on C_HEARTFIELD was corrected ("moved wrongly",
+	 * 0.28-0.71 blocks) once a lap at the heart's dip (progress 0.44-0.47), boosted, where the
+	 * road goes between dirt path (top 15/16) and full blocks. Every move the rider's client makes
+	 * across the dip, any lane, at a run or a boost, must be one the server's replay reaches.
+	 */
+	@GameTest(template = EMPTY, timeoutTicks = 200, batch = "vehicle_course")
+	public static void heartfieldDipRiderMovesReplayOnTheServer(GameTestHelper helper) {
+		riderMovesReplayAcross(helper, RaceTrack.C_HEARTFIELD, 0.40D, 0.50D);
+	}
+
+	private static void riderMovesReplayAcross(GameTestHelper helper, RaceTrack track, double from, double to) {
+		ServerLevel level = helper.getLevel();
+		RaceManager.testLevel = level;
+		forceTrack(level, track, true);
+		SquareBuilder.buildTrack(level, track);
+		ChocoboEntity bird = ModEntities.CHOCOBO.get().create(level);
+		bird.setColor(ChocoboColor.YELLOW);
+		bird.setAge(0);
+		bird.setRaceClass(track.getRaceClass());
+		bird.setRacing(true);
+		bird.setRaceTrack(track.ordinal());
+		RacePoint first = track.pointAtLane(from, 0.0D);
+		bird.moveTo(first.x(), first.y() + 1.0D, first.z(), 0.0F, 0.0F);
+		level.addFreshEntity(bird);
+		ServerPlayer rider = packetRider(helper, bird);
+		double step = 0.15D / track.lapLength();
+		int moves = 0, wrong = 0;
+		double worst = 0.0D;
+		java.util.List<String> examples = new java.util.ArrayList<>();
+		for (double t = from; t < to; t += step) {
+			double[] tg = track.tangent(t);
+			for (double lane = -4.5D; lane <= 4.5D; lane += 0.5D) {
+				RacePoint p = track.pointAtLane(t, lane);
+				for (double speed : new double[]{1.0D, 1.5D, 2.2D}) {
+					for (double turn : new double[]{-0.15D, 0.0D, 0.15D}) {
+						// stand the bird on whatever the course laid here
+						bird.setPos(p.x(), p.y() + 1.5D, p.z());
+						bird.setDeltaMovement(Vec3.ZERO);
+						bird.move(net.minecraft.world.entity.MoverType.SELF, new Vec3(0.0D, -3.0D, 0.0D));
+						if (!bird.hasFooting()) continue;
+						Vec3 start = bird.position();
+						double dx = tg[0] * Math.cos(turn) - tg[1] * Math.sin(turn), dz = tg[0] * Math.sin(turn) + tg[1] * Math.cos(turn);
+						Vec3 stride = new Vec3(dx * speed, -0.0784D, dz * speed);
+						// the rider's client
+						bird.setOnGround(true);
+						bird.move(net.minecraft.world.entity.MoverType.SELF, stride);
+						Vec3 client = bird.position();
+						// the server's replay of that packet
+						bird.setPos(start);
+						bird.setOnGround(true);
+						vehicleBaseline(rider, bird);
+						vehiclePacketTo(rider, bird, client);
+						moves++;
+						double off = bird.position().distanceTo(client);
+						if (off > 1.0E-5D) {
+							wrong++;
+							worst = Math.max(worst, off);
+							if (examples.size() < 12) {
+								examples.add(String.format(java.util.Locale.ROOT,
+										"t %.4f lane %.1f speed %.1f turn %.2f from (%.3f, %.4f, %.3f) client +(%.4f, %.4f, %.4f) server +(%.4f, %.4f, %.4f) off %.4f",
+										t, lane, speed, turn, start.x, start.y, start.z, client.x - start.x, client.y - start.y, client.z - start.z,
+										bird.getX() - start.x, bird.getY() - start.y, bird.getZ() - start.z, off));
+							}
+						}
+					}
+				}
+			}
+		}
+		for (String e : examples) ChocobosReborn.LOGGER.warn("RIDER-REPLAY {} {}", track.name(), e);
+		ChocobosReborn.LOGGER.info("RIDER-REPLAY {} {} moves, {} corrected, worst {}", track.name(), moves, wrong, worst);
+		bird.discard();
+		forceTrack(level, track, false);
+		helper.assertTrue(moves > 1000, "the sweep stood the bird on the course; moves " + moves);
+		helper.assertTrue(wrong == 0, wrong + " of " + moves + " rider moves corrected on " + track.name() + ", worst " + worst
+				+ (examples.isEmpty() ? "" : "; e.g. " + examples.get(0)));
+		helper.succeed();
+	}
+
 	private static void vehiclePacket(ServerPlayer rider, ChocoboEntity bird, double x) {
 		var before = bird.position();
 		bird.setPos(x, before.y, before.z);

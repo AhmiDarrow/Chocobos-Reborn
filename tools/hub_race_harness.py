@@ -166,6 +166,8 @@ def main(args):
         server_extra = [f"-Dchocobosreborn.harness.{k}={v}" for k, v in (("riderGrade", args.rider_grade), ("riderTrain", args.rider_train),
                                                                          ("riders", args.riders), ("rivals", args.rivals)) if v is not None]
         client_extra = ["-Dchocobosreborn.harness.remoteTrace=true"] if args.remote_trace else []
+        if args.trace_track:
+            client_extra.append("-Dchocobosreborn.harness.traceTrack=" + args.trace_track)
         start_hub_server(jar, tracks, server_extra)
         for i, role in enumerate(ROLES[:args.riders or len(ROLES)]):
             if i:
@@ -227,8 +229,9 @@ if __name__ == "__main__":
     parser.add_argument("--all", action="store_true", help="All 48 courses")
     parser.add_argument("--rider-grade", type=int, help="Riders' grade rank (default the class's field grade)")
     parser.add_argument("--rider-train", type=int, help="Riders' training a stat (default the class's field training)")
-    parser.add_argument("--riders", type=int, choices=(2, 3), help="Real clients in each heat (the rest of the six slots are AI); default 3")
+    parser.add_argument("--riders", type=int, choices=(1, 2, 3), help="Real clients in each heat (the rest of the six slots are AI); default 3")
     parser.add_argument("--rivals", choices=("true", "false"), help="Force the named rivals on (or off) the card; default the class's roll")
+    parser.add_argument("--trace-track", help="Clients log their own bird every tick on this RaceTrack (trace-<name>.csv)")
     parser.add_argument("--remote-trace", action="store_true", help="Clients log every other racer's drawn position each tick")
     parser.add_argument("--stagger", type=int, default=25, help="Seconds between client launches")
     main(parser.parse_args())

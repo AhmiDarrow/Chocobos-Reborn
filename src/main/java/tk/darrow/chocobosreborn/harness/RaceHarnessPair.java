@@ -27,10 +27,10 @@ public final class RaceHarnessPair {
     private static int course, wait = 400, ticks;
     private static RaceSession session;
     private static final boolean FULL_FIELD = Boolean.parseBoolean(System.getProperty("chocobosreborn.harness.fullField", "true"));
-    // -Dchocobosreborn.harness.riders=2 leaves four of the six slots to the real AI
+    // -Dchocobosreborn.harness.riders=1 is a normal heat: one rider, five real AI
     private static final String[] NAMES = FULL_FIELD
             ? Arrays.copyOf(new String[]{"LatencyHost", "LatencyGuest", "LatencyGuest2"},
-                    Math.max(2, Math.min(3, Integer.getInteger("chocobosreborn.harness.riders", 3))))
+                    Math.max(1, Math.min(3, Integer.getInteger("chocobosreborn.harness.riders", 3))))
             : new String[]{"LatencyHost", "LatencyGuest"};
     private static final ChocoboEntity[] birds = new ChocoboEntity[NAMES.length];
     private static final double[] furthest = new double[NAMES.length];
