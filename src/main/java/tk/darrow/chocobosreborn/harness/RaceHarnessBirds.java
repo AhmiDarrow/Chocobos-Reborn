@@ -38,10 +38,13 @@ public final class RaceHarnessBirds {
 
 	public static void dress(ChocoboEntity bird, RaceTrack track) {
 		bird.setColor(colorFor(track));
-		bird.setGrade(ChocoboGrade.byRank(Math.min(ChocoboGrade.WONDERFUL.getRank(), track.getRaceClass().getId() + 1)));
+		// -Dchocobosreborn.harness.riderGrade / riderTrain stand in for a player's own bird
+		int grade = Integer.getInteger("chocobosreborn.harness.riderGrade",
+				Math.min(ChocoboGrade.WONDERFUL.getRank(), track.getRaceClass().getId() + 1));
+		bird.setGrade(ChocoboGrade.byRank(grade));
 		bird.setRaceClass(track.getRaceClass());
 		bird.setGenes(0, 0, 0, 0);
-		int train = RaceScoring.fieldTraining(track.getRaceClass().getId(), false);
+		int train = Integer.getInteger("chocobosreborn.harness.riderTrain", RaceScoring.fieldTraining(track.getRaceClass().getId(), false));
 		bird.setTraining(train, train, train, train);
 		bird.fillStamina();
 	}

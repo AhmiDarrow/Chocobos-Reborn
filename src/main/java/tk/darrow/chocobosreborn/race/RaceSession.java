@@ -823,20 +823,23 @@ public class RaceSession {
 			}
 			RaceLapProgress.Step step = fell ? RaceLapProgress.Step.RESCUE
 					: r.progress.step(progress, onCourse, RaceLapProgress.allowance(track.lapLength()));
+			String reason = fell ? "fell" : r.progress.rescueReason();
 			if (onCourse && !r.progress.offCourse()) {
 				r.roadX = e.getX();
 				r.roadZ = e.getZ();
 			} else if (step == RaceLapProgress.Step.NONE && !Double.isNaN(r.roadX)
 					&& RaceScoring.strayedTooFar(e.getX() - r.roadX, e.getZ() - r.roadZ)) {
 				step = RaceLapProgress.Step.RESCUE;
+				reason = "strayed from the road";
 			}
 			if (step == RaceLapProgress.Step.NONE && !r.human() && r.goal != null && r.goal.takeSetBack()) {
 				// an AI bird that got nowhere through its own recovery, twice (RacerRecovery): set it
 				// back on the road like an off-road bird rather than let it rock on a wall all race
 				step = RaceLapProgress.Step.RESCUE;
+				reason = "AI recovery gave up";
 			}
 			if (step == RaceLapProgress.Step.RESCUE) {
-				rescue(r, e);
+				rescue(r, e, reason, progress, onCourse);
 				continue;
 			}
 			if (r.human() && tick % 5 == 0) {
@@ -1407,9 +1410,15 @@ public class RaceSession {
 	 * wide line allows: set the bird down on the road where it left it, facing up the
 	 * course, and hold it a second. The lap is kept (Mario Kart's pick-up, gentler).
 	 */
-	private void rescue(Racer r, ChocoboEntity e) {
+	private void rescue(Racer r, ChocoboEntity e, String reason, double progress, boolean onCourse) {
 		double t = r.progress.lastProgress();
 		RacePoint at = setBackPoint(level, track, e, t);
+		// one line per set-back, so a rough race on the live server can be read back afterwards
+		tk.darrow.chocobosreborn.ChocobosReborn.LOGGER.info(String.format(java.util.Locale.ROOT,
+				"Race rescue: %s (%s, %s) on %s lap %d: %s; at (%.1f, %.1f, %.1f) progress %.4f onCourse=%b moving %.2f b/t; set back to (%.1f, %.1f, %.1f) progress %.4f, %.1f blocks away",
+				r.name, r.human() ? "rider" : "AI", e.color().name(), track.name(), r.laps + 1, reason,
+				e.getX(), e.getY(), e.getZ(), progress, onCourse, Math.hypot(e.getX() - e.xo, e.getZ() - e.zo),
+				at.x(), at.y(), at.z(), t, Math.sqrt(e.distanceToSqr(at.x(), at.y(), at.z()))));
 		moveRidden(e, at.x(), at.y(), at.z());
 		double[] tg = track.tangent(t);
 		face(e, (float) Math.toDegrees(Math.atan2(-tg[0], tg[1])));

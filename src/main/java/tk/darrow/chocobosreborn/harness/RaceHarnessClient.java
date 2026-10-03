@@ -182,6 +182,20 @@ public final class RaceHarnessClient {
         input.down = input.left = input.right = input.jumping = input.shiftKeyDown = false;
         input.jumping = jump;
         mc.options.keySprint.setDown(!braking && ticks % 400 < 240);
+        if (ticks > 0 && Boolean.getBoolean("chocobosreborn.harness.remoteTrace")) {
+            // every tick: where this client draws each other racer, to measure pops and stalls
+            try {
+                var rows = new StringBuilder();
+                for (ChocoboEntity seen : mc.level.getEntitiesOfClass(ChocoboEntity.class,
+                        bird.getBoundingBox().inflate(64), ChocoboEntity::racing)) {
+                    if (seen == bird) continue;
+                    rows.append(String.format(Locale.ROOT, "%s,%d,%d,%.4f,%.4f,%.4f,%b%n", track.name(), ticks, seen.getId(),
+                            seen.getX(), seen.getY(), seen.getZ(), seen.getControllingPassenger() != null));
+                }
+                Files.writeString(Path.of(System.getProperty("chocobosreborn.harness.output"), "remote-" + mc.getUser().getName() + ".csv"),
+                        rows.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } catch (java.io.IOException e) { throw new RuntimeException(e); }
+        }
         if (ticks > 0 && track.name().equals(System.getProperty("chocobosreborn.harness.traceTrack", ""))) {
             try {
                 var pads = new java.util.ArrayList<String>();

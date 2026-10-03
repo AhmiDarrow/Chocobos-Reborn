@@ -84,7 +84,7 @@ Get-CimInstance Win32_Process -Filter "Name='java.exe'" | Where-Object {{ $_.Com
 """, check=False)
 
 
-def start_hub_server(jar, tracks):
+def start_hub_server(jar, tracks, extra=()):
     print("hub: uploading", jar.name, flush=True)
     remote(f"""
 New-Item -ItemType Directory -Force -Path '{REMOTE}\\mods' | Out-Null
@@ -99,7 +99,7 @@ New-Item -ItemType Directory -Force -Path '{REMOTE}\\results-hub' | Out-Null
         "spawn-protection=0", "view-distance=6", "simulation-distance=6", "max-players=6", "allow-flight=true",
         "motd=Hub race harness", "enable-rcon=false", "white-list=false", ""])
     jvm = "\n".join(["-Xms2G", "-Xmx4G", "-Dchocobosreborn.harness=hub", "-Dchocobosreborn.harness.tracks=" + ",".join(tracks),
-                     "-Dchocobosreborn.harness.fullField=true", "-Dchocobosreborn.harness.output=" + REMOTE + "\\results-hub", ""])
+                     "-Dchocobosreborn.harness.fullField=true", "-Dchocobosreborn.harness.output=" + REMOTE + "\\results-hub", *extra, ""])
     out = remote(f"""
 Set-Content -Path '{REMOTE}\\server.properties' -Value @'
 {props}'@ -Encoding ascii
@@ -128,7 +128,7 @@ if (-not $j) {{ 'DEAD' }} elseif (Select-String -Path '{REMOTE}\\server.log' -Pa
     raise TimeoutError("hub server did not start in 10 minutes")
 
 
-def launch_client(role, tracks, log):
+def launch_client(role, tracks, log, extra=()):
     folder = BASE / role
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "options.txt").write_text(
@@ -143,7 +143,7 @@ def launch_client(role, tracks, log):
     command[-1] = "@" + argfile.as_posix()
     index = command.index("-cp")
     command[index:index] = ["-Dchocobosreborn.harness=client", "-Dchocobosreborn.harness.output=" + str(OUT),
-                            "-Dchocobosreborn.harness.tracks=" + ",".join(tracks), "-Xmx3G"]
+                            "-Dchocobosreborn.harness.tracks=" + ",".join(tracks), "-Xmx3G", *extra]
     return subprocess.Popen(command, cwd=folder, stdout=log, stderr=subprocess.STDOUT,
                             creationflags=BELOW_NORMAL | (subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0))
 
@@ -163,12 +163,15 @@ def main(args):
     clients = []
     logs = []
     try:
-        start_hub_server(jar, tracks)
-        for i, role in enumerate(ROLES):
+        server_extra = [f"-Dchocobosreborn.harness.{k}={v}" for k, v in (("riderGrade", args.rider_grade), ("riderTrain", args.rider_train),
+                                                                         ("riders", args.riders), ("rivals", args.rivals)) if v is not None]
+        client_extra = ["-Dchocobosreborn.harness.remoteTrace=true"] if args.remote_trace else []
+        start_hub_server(jar, tracks, server_extra)
+        for i, role in enumerate(ROLES[:args.riders or len(ROLES)]):
             if i:
                 time.sleep(args.stagger)
             logs.append((BASE / (role + ".log")).open("w"))
-            clients.append(launch_client(role, tracks, logs[-1]))
+            clients.append(launch_client(role, tracks, logs[-1], client_extra))
             print("client:", NAMES[role], "launched", flush=True)
         seen = 0
         started = time.monotonic()
@@ -222,5 +225,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tracks", default="", help="Comma-separated RaceTrack names; default the 24 phase-2 courses")
     parser.add_argument("--all", action="store_true", help="All 48 courses")
+    parser.add_argument("--rider-grade", type=int, help="Riders' grade rank (default the class's field grade)")
+    parser.add_argument("--rider-train", type=int, help="Riders' training a stat (default the class's field training)")
+    parser.add_argument("--riders", type=int, choices=(2, 3), help="Real clients in each heat (the rest of the six slots are AI); default 3")
+    parser.add_argument("--rivals", choices=("true", "false"), help="Force the named rivals on (or off) the card; default the class's roll")
+    parser.add_argument("--remote-trace", action="store_true", help="Clients log every other racer's drawn position each tick")
     parser.add_argument("--stagger", type=int, default=25, help="Seconds between client launches")
     main(parser.parse_args())

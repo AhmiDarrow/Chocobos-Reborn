@@ -27,7 +27,10 @@ public final class RaceHarnessPair {
     private static int course, wait = 400, ticks;
     private static RaceSession session;
     private static final boolean FULL_FIELD = Boolean.parseBoolean(System.getProperty("chocobosreborn.harness.fullField", "true"));
-    private static final String[] NAMES = FULL_FIELD ? new String[]{"LatencyHost", "LatencyGuest", "LatencyGuest2"}
+    // -Dchocobosreborn.harness.riders=2 leaves four of the six slots to the real AI
+    private static final String[] NAMES = FULL_FIELD
+            ? Arrays.copyOf(new String[]{"LatencyHost", "LatencyGuest", "LatencyGuest2"},
+                    Math.max(2, Math.min(3, Integer.getInteger("chocobosreborn.harness.riders", 3))))
             : new String[]{"LatencyHost", "LatencyGuest"};
     private static final ChocoboEntity[] birds = new ChocoboEntity[NAMES.length];
     private static final double[] furthest = new double[NAMES.length];
@@ -99,7 +102,10 @@ public final class RaceHarnessPair {
                 int rotation = Integer.getInteger("chocobosreborn.harness.gridRotation", 0);
                 Collections.rotate(gridPlayers, rotation);
                 Collections.rotate(gridBirds, rotation);
-                session = new RaceSession(players[0].serverLevel(), track, false, gridPlayers, gridBirds, false, 0);
+                String rivals = System.getProperty("chocobosreborn.harness.rivals");
+                session = rivals == null
+                        ? new RaceSession(players[0].serverLevel(), track, false, gridPlayers, gridBirds, false, 0)
+                        : new RaceSession(players[0].serverLevel(), track, false, gridPlayers, gridBirds, false, 0, Boolean.parseBoolean(rivals));
                 try {
                     var register = RaceManager.class.getDeclaredMethod("addSession", RaceSession.class);
                     register.setAccessible(true);

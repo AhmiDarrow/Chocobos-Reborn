@@ -29,6 +29,8 @@ public final class RaceLapProgress {
 	private double travelled;
 	private boolean off;
 	private int offTicks;
+	/** Why the last {@link Step#RESCUE} came, for the server log. */
+	private String rescueReason = "";
 
 	public RaceLapProgress(double start) {
 		last = start;
@@ -45,6 +47,11 @@ public final class RaceLapProgress {
 
 	public int offTicks() {
 		return offTicks;
+	}
+
+	/** Why {@link #step} last returned {@link Step#RESCUE} (off-road time, a cut back on, a jump). */
+	public String rescueReason() {
+		return rescueReason;
 	}
 
 	/** Skip allowance as a share of the lap for a course of this length. */
@@ -71,6 +78,7 @@ public final class RaceLapProgress {
 			off = true;
 			if (++offTicks >= OFF_LIMIT_TICKS) {
 				offTicks = 0;   // once per limit, until the session puts it back
+				rescueReason = "off-road " + OFF_LIMIT_TICKS + " ticks";
 				return Step.RESCUE;
 			}
 			return Step.NONE;
@@ -81,9 +89,11 @@ public final class RaceLapProgress {
 			offTicks = 0;
 			if (delta > allowance) {
 				off = true;      // still owed a put-back: keep the anchor
+				rescueReason = String.format(java.util.Locale.ROOT, "back on %.4f lap past the anchor (allowance %.4f)", delta, allowance);
 				return Step.RESCUE;
 			}
 		} else if (Math.abs(delta) > JUMP) {
+			rescueReason = String.format(java.util.Locale.ROOT, "progress jumped %.4f lap in a tick", delta);
 			return Step.RESCUE;
 		}
 		boolean crossed = delta > 0 && progress < last;
