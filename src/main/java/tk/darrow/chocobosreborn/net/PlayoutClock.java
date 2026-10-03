@@ -14,12 +14,14 @@ import java.util.ArrayDeque;
  * {@link #MIN_DELAY} so there is always a frame on each side to interpolate between.
  *
  * <p>The shown tick steps exactly one per client tick, so it moves in lockstep with the
- * client's own frame interpolation (entities are drawn between their last two tick positions),
- * plus a correction toward its target of at most {@link #MAX_SLEW} ahead (5 % faster than real
- * time: not visible) or {@link #MAX_EASE} back (frames suddenly arriving later must not starve
- * the buffer). A change in the connection never shows as a jump. A target more
- * than {@link #SNAP} ticks away (the first frame, or the server stalling for seconds) is taken
- * at once.
+ * client's own frame interpolation (entities are drawn between their last two tick positions).
+ * The client's tick moments are noisy (a tick runs on the first frame after it is due: up to a
+ * third of a tick late at 60 fps), so the error against the target is smoothed
+ * ({@link #ERROR_SMOOTHING}) and ignored inside {@link #DEADBAND}; beyond that the shown tick is
+ * corrected by at most {@link #MAX_SLEW} a tick (5 %: not visible), or {@link #MAX_EASE} back
+ * when it has run more than a tick ahead of its target (frames suddenly arriving later must
+ * not starve the buffer). A target more than {@link #SNAP} ticks away (the first frame, or the
+ * server stalling for seconds) is taken at once.
  *
  * <p>Pure arithmetic, no Minecraft types: unit-tested in {@code PlayoutClockTest}.
  */
@@ -31,6 +33,12 @@ public final class PlayoutClock {
 	public static final double MAX_SLEW = 0.05D;
 	/** Easing back is allowed faster than catching up: a starved buffer (frames suddenly later) is worse than a brief slow-down. */
 	public static final double MAX_EASE = 0.2D;
+	/** Smoothed error beyond which the fast ease back applies. */
+	public static final double EASE_BEYOND = 1.0D;
+	/** Share of each tick's error taken into the smoothed error. */
+	public static final double ERROR_SMOOTHING = 0.1D;
+	/** Smoothed errors this small are left alone: correcting them would only add noise. */
+	public static final double DEADBAND = 0.05D;
 	public static final double SNAP = 10.0D;
 
 	private final ArrayDeque<double[]> samples = new ArrayDeque<>();
@@ -39,6 +47,8 @@ public final class PlayoutClock {
 	private double lateness = 0.5D;
 	/** The server tick shown on the last client tick. */
 	private double shown = Double.NaN;
+	/** Smoothed difference between the target and the shown tick. */
+	private double error;
 
 	/** A frame taken on {@code serverTick} arrived at wall time {@code nowTicks}. */
 	public void observe(double nowTicks, int serverTick) {
@@ -78,10 +88,18 @@ public final class PlayoutClock {
 		double next = shown + 1.0D;
 		if (Double.isNaN(shown) || Math.abs(goal - next) > SNAP) {
 			shown = goal;
-		} else {
-			double error = goal - next;
-			shown = next + (error < 0.0D ? Math.max(-MAX_EASE, error) : Math.min(MAX_SLEW, error));
+			error = 0.0D;
+			return shown;
 		}
+		error += (goal - next - error) * ERROR_SMOOTHING;
+		double correction = 0.0D;
+		if (error > DEADBAND) {
+			correction = Math.min(MAX_SLEW, error - DEADBAND);
+		} else if (error < -DEADBAND) {
+			correction = Math.max(error < -EASE_BEYOND ? -MAX_EASE : -MAX_SLEW, error + DEADBAND);
+		}
+		error -= correction;   // the next target is measured against the corrected tick
+		shown = next + correction;
 		return shown;
 	}
 
@@ -98,5 +116,6 @@ public final class PlayoutClock {
 		reference = Double.NaN;
 		lateness = 0.5D;
 		shown = Double.NaN;
+		error = 0.0D;
 	}
 }

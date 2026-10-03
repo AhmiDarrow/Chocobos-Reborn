@@ -53,6 +53,9 @@ public abstract class ChocoboVehicleMoveMixin {
 	@Inject(method = "handleMoveVehicle", cancellable = true, at = @At(value = "INVOKE", shift = At.Shift.AFTER,
 			target = "Lnet/minecraft/network/protocol/PacketUtils;ensureRunningOnSameThread(Lnet/minecraft/network/protocol/Packet;Lnet/minecraft/network/PacketListener;Lnet/minecraft/server/level/ServerLevel;)V"))
 	private void chocobosreborn$riderDrives(ServerboundMoveVehiclePacket packet, CallbackInfo ci) {
+		if (!RiderAuthority.ENABLED) {
+			return;
+		}
 		Entity root = this.player.getRootVehicle();
 		if (!(root instanceof ChocoboEntity bird) || bird.getControllingPassenger() != this.player || root != this.lastVehicle) {
 			return;
