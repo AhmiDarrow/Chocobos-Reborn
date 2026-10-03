@@ -19,6 +19,14 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.9 - In Their Element
+Uploaded 2026-10-02: `chocobosreborn-1.1.9.jar` as file **9043833** ("Chocobos Reborn 1.1.9 - In Their Element",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.9.md`) via
+`tools/upload_curseforge.py`. Every water / ridge / lava shortcut pays (fast climb, suited pace), a tougher field keyed off the rider, remote glide fix, COURSE_VERSION 16.
+GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.9
+CurseForge: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn/files/9043833
+SHA-256: `013d4f1fdb4075cb839e4509436163e277958cbc7fc10f97251fffb57db838ce`.
+
 ## 1.1.8 - Two Heats in Three
 Uploaded 2026-10-02: `chocobosreborn-1.1.8.jar` as file **9038410** ("Chocobos Reborn 1.1.8 - Two Heats in Three",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.8.md`) via
