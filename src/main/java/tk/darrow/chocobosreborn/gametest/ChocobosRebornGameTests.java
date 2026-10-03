@@ -638,9 +638,11 @@ public class ChocobosRebornGameTests {
 						bird.setOnGround(true);
 						bird.move(net.minecraft.world.entity.MoverType.SELF, stride);
 						Vec3 client = bird.position();
-						// the server's replay of that packet
+						// the server's replay of that packet; each sample is one tick's move of a fresh rider
+						// (thousands in one game tick would drain RiderAuthority's speed bank)
 						bird.setPos(start);
 						bird.setOnGround(true);
+						tk.darrow.chocobosreborn.race.RiderAuthority.forget(rider);
 						vehicleBaseline(rider, bird);
 						vehiclePacketTo(rider, bird, client);
 						moves++;
