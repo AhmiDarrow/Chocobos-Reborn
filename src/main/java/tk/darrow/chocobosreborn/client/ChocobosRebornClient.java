@@ -22,6 +22,14 @@ public final class ChocobosRebornClient {
 		// the crowd in the course stands: drawn, not spawned (see CourseCrowdRenderer)
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(CourseCrowdRenderer::onRenderLevel);
         tk.darrow.chocobosreborn.net.RiderPayloads.Hud.CLIENT_HANDLER = RaceHud::update;
+		// race movement: the field played back from tick-stamped frames, and acknowledged teleports of this rider's bird
+		tk.darrow.chocobosreborn.entity.ChocoboEntity.REMOTE_DISPLAY = RemoteRaceFrames.INSTANCE;
+		tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames.NET_HANDLER = RemoteRaceFrames.INSTANCE::receive;
+		tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport.CLIENT_HANDLER = RemoteRaceFrames::applyTeleport;
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(net.neoforged.neoforge.client.event.ClientTickEvent.Pre.class,
+				RemoteRaceFrames.INSTANCE::tick);
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+				net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class, RemoteRaceFrames.INSTANCE::onLogout);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
 		// parse the plain and saddled birds while the world loads, not as the first one (often a
 		// whole saddled race field) comes into view

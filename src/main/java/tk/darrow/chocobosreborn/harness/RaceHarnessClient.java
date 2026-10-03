@@ -32,6 +32,9 @@ public final class RaceHarnessClient {
     private static int correctionBase;
     private static RaceTrack activeTrack;
     private static long lastSampleNanos;
+    /** Frame-to-frame times since the last 10-tick sample, in nanoseconds (smoothness, not average fps). */
+    private static final java.util.ArrayList<Long> frameNanos = new java.util.ArrayList<>();
+    private static long lastFrameNanos;
     /** Ticks pressed against a wall without getting anywhere; at {@link RacerLine#STUCK_TICKS} the bot recovers. */
     private static int stuckTicks;
     /** Ticks left of a recovery: steering back toward the centre line after the jump. */
@@ -67,6 +70,15 @@ public final class RaceHarnessClient {
                         super.channelRead(ctx, message);
                     }
                 });
+    }
+
+    /** Every rendered frame's time: 1 % lows and hitches show here, not in an fps average. */
+    @SubscribeEvent
+    public static void frame(net.neoforged.neoforge.client.event.RenderFrameEvent.Post event) {
+        if (!enabled()) return;
+        long now = System.nanoTime();
+        if (lastFrameNanos != 0 && frameNanos.size() < 100_000) frameNanos.add(now - lastFrameNanos);
+        lastFrameNanos = now;
     }
 
     @SubscribeEvent
@@ -212,12 +224,45 @@ public final class RaceHarnessClient {
                         StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             } catch (java.io.IOException e) { throw new RuntimeException(e); }
         }
+        if (ticks > 0) {
+            // every tick, where each other racer stands on this client: the game draws it between
+            // consecutive tick positions, so these steps are exactly the motion the rider saw
+            try {
+                Path out = Path.of(System.getProperty("chocobosreborn.harness.output"));
+                Files.createDirectories(out);
+                StringBuilder rows = new StringBuilder();
+                for (ChocoboEntity seen : mc.level.getEntitiesOfClass(ChocoboEntity.class,
+                        bird.getBoundingBox().inflate(96), e -> e.racing() && e != bird)) {
+                    rows.append(String.format(Locale.ROOT, "%s,%d,%d,%.4f,%.4f,%.4f%n", track.name(), ticks, seen.getId(),
+                            seen.getX(), seen.getY(), seen.getZ()));
+                }
+                if (!rows.isEmpty()) {
+                    Files.writeString(out.resolve("motion-" + mc.getUser().getName() + ".csv"), rows,
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                }
+            } catch (java.io.IOException e) { throw new RuntimeException(e); }
+        }
         if (ticks > 0 && ticks % 10 == 0) {
             try {
                 Path out = Path.of(System.getProperty("chocobosreborn.harness.output"));
                 Files.createDirectories(out);
                 String name = mc.getUser().getName();
                 long now = System.nanoTime();
+                if (!frameNanos.isEmpty()) {
+                    java.util.List<Long> sorted = new java.util.ArrayList<>(frameNanos);
+                    java.util.Collections.sort(sorted);
+                    int n = sorted.size();
+                    long over33 = sorted.stream().filter(v -> v > 33_300_000L).count();
+                    long birdNanos = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDER_NANOS.sumThenReset();
+                    long birds = tk.darrow.chocobosreborn.client.ChocoboMeshRenderer.RENDERED.sumThenReset();
+                    Files.writeString(out.resolve("frames-" + name + ".csv"), String.format(Locale.ROOT,
+                            "%s,%d,%d,%.2f,%.2f,%.2f,%d,%.2f,%.3f,%.1f%n", track.name(), ticks, n,
+                            sorted.get(n / 2) / 1e6, sorted.get(Math.min(n - 1, (int) (n * 0.99))) / 1e6, sorted.get(n - 1) / 1e6,
+                            over33, tk.darrow.chocobosreborn.client.RemoteRaceFrames.INSTANCE.delayTicks(),
+                            birdNanos / 1e6 / n, birds / (double) n),
+                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    frameNanos.clear();
+                }
                 Files.writeString(out.resolve("performance-" + name + ".csv"), String.format(Locale.ROOT,
                         "%s,%d,%d,%.3f%n", track.name(), ticks, mc.getFps(),
                         lastSampleNanos == 0 ? 0.0 : (now - lastSampleNanos) / 1_000_000.0),
@@ -232,8 +277,8 @@ public final class RaceHarnessClient {
                 }
                 String file = name.equals("LatencyRider") ? "client.csv" : "client-" + name + ".csv";
                 Files.writeString(out.resolve(file), String.format(Locale.ROOT,
-                        "%d,%d,%.4f,%.4f,%.4f,%.6f,%d,%b,%b,%s,%d,%.4f,%b,%b,%.2f,%d,%d%n", run, ticks, bird.getX(), bird.getY(), bird.getZ(),
-                        progress, bird.stamina(), bird.dashLocked(), bird.boosting(), track.name(), corrections.get() - correctionBase, bird.getDeltaMovement().horizontalDistance(), bird.onGround(), bird.horizontalCollision, bird.getYRot(), localBoostTicks(bird), bird.tickCount), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                        "%d,%d,%.4f,%.4f,%.4f,%.6f,%d,%b,%b,%s,%d,%.4f,%b,%b,%.2f,%d,%d,%d%n", run, ticks, bird.getX(), bird.getY(), bird.getZ(),
+                        progress, bird.stamina(), bird.dashLocked(), bird.boosting(), track.name(), corrections.get() - correctionBase, bird.getDeltaMovement().horizontalDistance(), bird.onGround(), bird.horizontalCollision, bird.getYRot(), localBoostTicks(bird), bird.tickCount, tk.darrow.chocobosreborn.client.RemoteRaceFrames.TELEPORTS.get()), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             } catch (java.io.IOException e) { throw new RuntimeException(e); }
         }
         if (ticks == 200 || (ticks > 0 && ticks % 600 == 0)) {

@@ -36,6 +36,7 @@ public final class ChocobosReborn {
 		NeoForge.EVENT_BUS.register(RaceManager.class);
 		NeoForge.EVENT_BUS.addListener(tk.darrow.chocobosreborn.race.FollowAcross::onChanged);
 		NeoForge.EVENT_BUS.addListener(ChocobosRebornCommand::register);
+		NeoForge.EVENT_BUS.addListener(tk.darrow.chocobosreborn.net.RaceFrameSender::onServerTick);
 	}
 
 	/**
@@ -77,6 +78,15 @@ public final class ChocobosReborn {
                 tk.darrow.chocobosreborn.net.RiderPayloads.Input.CODEC, tk.darrow.chocobosreborn.net.RiderPayloads.Input::handle);
         riding.playToClient(tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot.TYPE,
                 tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot.CODEC, tk.darrow.chocobosreborn.net.RiderPayloads.Snapshot::handle);
+		// Race movement: acknowledged teleports of a rider's bird, and tick-stamped frames of the field.
+		var movement = event.registrar("4");
+		movement.playToClient(tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport.TYPE,
+				tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.Teleport::handle);
+		movement.playToServer(tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck.TYPE,
+				tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.TeleportAck::handle);
+		event.registrar("4").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK)
+				.playToClient(tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames.TYPE,
+						tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames.CODEC, tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames::handle);
 		var probes = event.registrar("2").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK);
 		probes.playToClient(tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe.TYPE,
 				tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe.CODEC, tk.darrow.chocobosreborn.net.RacePayloads.LatencyProbe::handle);

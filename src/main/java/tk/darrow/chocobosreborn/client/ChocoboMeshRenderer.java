@@ -126,8 +126,22 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		return frustum.isVisible(new AABB(e.getX() - 4, e.getY() - 1, e.getZ() - 4, e.getX() + 4, e.getY() + 5, e.getZ() + 4));
 	}
 
+	/** CPU time spent skinning and emitting birds, and how many were drawn (the race harness reports them). */
+	public static final java.util.concurrent.atomic.LongAdder RENDER_NANOS = new java.util.concurrent.atomic.LongAdder();
+	public static final java.util.concurrent.atomic.LongAdder RENDERED = new java.util.concurrent.atomic.LongAdder();
+
 	@Override
 	public void render(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
+		long started = System.nanoTime();
+		try {
+			draw(e, yaw, partial, ps, buf, light);
+		} finally {
+			RENDER_NANOS.add(System.nanoTime() - started);
+			RENDERED.increment();
+		}
+	}
+
+	private void draw(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
 		String mesh = meshId(e);
 		WhiskerMesh m = WhiskerMesh.get(mesh);
 		if (m == null) {

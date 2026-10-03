@@ -776,6 +776,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Nullable
 	public static java.util.function.IntSupplier CLIENT_RTT_MS;
 
+	/**
+	 * Installed by the client mod ({@code client/RemoteRaceFrames}): racing birds this client
+	 * does not drive are played back from their server frames instead of vanilla's lerp.
+	 */
+	public interface RemoteDisplay {
+		/** Put {@code bird} where its frames say it stood at the tick shown now; false when it has none. */
+		boolean place(ChocoboEntity bird);
+		/** True while frames for this entity are arriving: vanilla's position packets are then ignored. */
+		boolean owns(int entityId);
+		/** Ticks the field is shown behind the fastest frames (see {@code PlayoutClock#behind}). */
+		double behindTicks();
+	}
+
+	public static RemoteDisplay REMOTE_DISPLAY;
+
 	/** Exempt from contact: finished and parking, or just set back on the road. */
 	public boolean raceGhost() {
 		return (this.entityData.get(DATA_CONTACT) & CONTACT_GHOST) != 0;
@@ -857,7 +872,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			contactSlow.clear();
 			return;
 		}
-		int lead = level().isClientSide && CLIENT_RTT_MS != null ? RacerContact.leadTicks(CLIENT_RTT_MS.getAsInt()) : 0;
+		int lead = level().isClientSide && CLIENT_RTT_MS != null
+				? RacerContact.leadTicks(CLIENT_RTT_MS.getAsInt(), REMOTE_DISPLAY != null ? REMOTE_DISPLAY.behindTicks() : -1.0D) : 0;
 		double reach = RacerContact.REACH + 2.0D + lead * 0.5D;
 		List<ChocoboEntity> near = level().getEntitiesOfClass(ChocoboEntity.class,
 				getBoundingBox().inflate(reach, RacerContact.HEIGHT, reach), e -> e != this && e.contactSolid());
@@ -2073,6 +2089,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	@Override
 	public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
 		if (level().isClientSide && !isControlledByLocalInstance()) {
+			if (REMOTE_DISPLAY != null && REMOTE_DISPLAY.owns(getId())) {
+				return;   // played back from its server frames (tick()): vanilla's untimed packets would only fight them
+			}
 			// How far the server's bird moved since its last position (the glide still under
 			// way ends there), not how far this client's drawn bird is from it. The drawn bird
 			// trails by the glide itself, so measured from it a bird over 1.35 blocks a tick
@@ -2083,6 +2102,15 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			steps = RaceScoring.remoteGlideSteps(steps, dx * dx + dy * dy + dz * dz);
 		}
 		super.lerpTo(x, y, z, yRot, xRot, steps);
+	}
+
+	/** Every racing bird's position this tick, stamped with the tick, for the players near it (batched by RaceFrameSender). */
+	private void broadcastRaceFrame() {
+		if (!(level() instanceof net.minecraft.server.level.ServerLevel server)) {
+			return;
+		}
+		tk.darrow.chocobosreborn.net.RaceFrameSender.add(server, new tk.darrow.chocobosreborn.net.RaceMovePayloads.Frame(getId(),
+				(int) server.getGameTime(), getX(), getY(), getZ(), getYRot(), yBodyRot, onGround()), getControllingPassenger());
 	}
 
 	@Override
@@ -2711,8 +2739,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	@Override
 	public void tick() {
+		if (level().isClientSide && REMOTE_DISPLAY != null && !isControlledByLocalInstance() && REMOTE_DISPLAY.place(this)) {
+			lerpSteps = 0;   // its old and new positions are this tick's two frames: drawn between them, never lerped
+		}
 		super.tick();
 		trackContactVelocity();
+		if (!level().isClientSide && racing()) {
+			broadcastRaceFrame();
+		}
 		if (level().isClientSide) {
             if (!racing()) { racePrediction = null; frameReady = false; }
 			if (getControllingPassenger() instanceof Player rider && isControlledByLocalInstance()) {

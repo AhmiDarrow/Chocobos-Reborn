@@ -1374,6 +1374,9 @@ public class RaceSession {
 			if (remount) {
 				rider.startRiding(bird, true);
 			}
+			// The rider's client drives this bird and ignores the server's teleport of it: tell it,
+			// and drop the moves it sent from the old place until it answers (RiderAuthority).
+			RiderAuthority.teleport(rider, bird);
 			return;
 		}
 		bird.teleportTo(x, y, z);

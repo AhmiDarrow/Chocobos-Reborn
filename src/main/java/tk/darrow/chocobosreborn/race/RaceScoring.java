@@ -366,18 +366,6 @@ public final class RaceScoring {
 		return replayDeltaY > 0.0D ? replayDeltaY + 1.0E-6D : replayDeltaY;
 	}
 
-	/**
-	 * Vanilla compares displacement from the server tick's first position with this
-	 * allowance. Replace only that comparison with displacement from the last accepted
-	 * packet: an ordered backlog is many small steps, not one huge movement. This can
-	 * be negative when a packet doubles back; it is NOT a physical velocity squared.
-	 * The unchanged comparison still rejects a single step beyond vanilla's limit.
-	 */
-	public static double vehiclePacketAllowance(double velocitySquared, double tickDistanceSquared, double stepDistanceSquared) {
-		if (!Double.isFinite(tickDistanceSquared) || !Double.isFinite(stepDistanceSquared)) return velocitySquared;
-		return velocitySquared + tickDistanceSquared - stepDistanceSquared;
-	}
-
 	/** Yaw catch-up 0..1. Zero coop is mushy; 100 is a snap to the rider. */
 	public static float turnCatchup(int cooperation) {
 		return 0.35F + 0.65F * Math.max(0, Math.min(100, cooperation)) / 100.0F;
