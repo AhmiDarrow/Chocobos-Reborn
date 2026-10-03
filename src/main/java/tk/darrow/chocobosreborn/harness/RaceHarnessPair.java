@@ -44,7 +44,14 @@ public final class RaceHarnessPair {
 
     @SubscribeEvent
     public static void beforeTick(ServerTickEvent.Pre event) {
-        if (active()) tickStart = System.nanoTime();
+        if (!active()) return;
+        long now = System.nanoTime();
+        // a tick that starts over 100 ms after the last one: the main thread stalled (wall clock, for a JFR recording)
+        if (tickStart != 0 && now - tickStart > 100_000_000L && session != null && session.running()) {
+            write("tickgaps.csv", String.format(Locale.ROOT, "%d,%.1f,%s,%d", System.currentTimeMillis(), (now - tickStart) / 1e6,
+                    TRACKS[course].name(), ticks));
+        }
+        tickStart = now;
     }
 
     private static void write(String file, String line) {

@@ -23,9 +23,10 @@ public final class ChocobosRebornClient {
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(CourseCrowdRenderer::onRenderLevel);
         tk.darrow.chocobosreborn.net.RiderPayloads.Hud.CLIENT_HANDLER = RaceHud::update;
 		// race movement: the field played back from tick-stamped frames, and acknowledged teleports of this rider's bird
-		// Frame playback is opt-in (-Dchocobosreborn.framePlayback=true, on the server too): on the hub harness,
-		// 2026-10-03, vanilla's lerp drew a fast field smoother (judder p99 0.10 against 0.48 / 0.59 tuned).
-		if (Boolean.getBoolean("chocobosreborn.framePlayback")) {
+		// Frame playback is on unless -Dchocobosreborn.framePlayback=false (on the server too). On the full pack,
+		// 2026-10-03, vanilla's entity updates froze birds 4-15 ticks (stalls 9.9/1000, playback 2.7); on a
+		// Chocobos-only client vanilla's lerp was the smoother of the two (judder p99 0.10 against 0.48).
+		if (Boolean.parseBoolean(System.getProperty("chocobosreborn.framePlayback", "true"))) {
 			tk.darrow.chocobosreborn.entity.ChocoboEntity.REMOTE_DISPLAY = RemoteRaceFrames.INSTANCE;
 		}
 		tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames.NET_HANDLER = RemoteRaceFrames.INSTANCE::receive;

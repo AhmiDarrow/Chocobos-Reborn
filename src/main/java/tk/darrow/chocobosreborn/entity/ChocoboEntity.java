@@ -790,8 +790,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	}
 
 	public static RemoteDisplay REMOTE_DISPLAY;
-	/** Tick-stamped frames of the field go out only with -Dchocobosreborn.framePlayback=true (see ChocobosRebornClient). */
-	private static final boolean SEND_RACE_FRAMES = Boolean.getBoolean("chocobosreborn.framePlayback");
+	/** Tick-stamped frames of the field go out unless -Dchocobosreborn.framePlayback=false (see ChocobosRebornClient). */
+	private static final boolean SEND_RACE_FRAMES = Boolean.parseBoolean(System.getProperty("chocobosreborn.framePlayback", "true"));
 
 	/** Exempt from contact: finished and parking, or just set back on the road. */
 	public boolean raceGhost() {

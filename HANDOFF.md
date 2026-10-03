@@ -2685,7 +2685,7 @@ stuttering/teleported ai", worse once birds get fast (green/blue, 50+ speed).
   step over 10, through a wall, ending in a block); set-backs are numbered teleports and moves sent from the old
   place are dropped instead of each being corrected. `-Dchocobosreborn.vanillaRiderMovement=true` (server) restores
   vanilla. Result, same heats: 0 snaps, 0 refused, 0 moved wrongly (1.1.9: 7-8 on Heartfield).
-- Frame playback of the field (PlayoutClock/FrameBuffer/RemoteRaceFrames) is ported but OFF by default: on the
+- (Superseded below: frame playback is now ON by default.) Frame playback of the field (PlayoutClock/FrameBuffer/RemoteRaceFrames) was first OFF by default: on the
   hub harness vanilla's lerp drew a fast field smoother (judder p99 0.10, leaps 0.37/1000) than playback at the
   1.5-tick floor (0.48, 4.15) or a 2.5 floor (0.59, 1.60). Opt in with `-Dchocobosreborn.framePlayback=true` on
   server and clients (harness `--frame-playback`). Frames are batched (`RaceFrameSender`, one `race_frames` packet
@@ -2703,3 +2703,17 @@ stuttering/teleported ai", worse once birds get fast (green/blue, 50+ speed).
   TPS-scaled client prediction) are in the session summary, not acted on.
 - `squareBuildsCourseAndRunsHeat` flaked once ("AI racers move, max d2=0.0": no NPC visible at tick 500).
 
+### Frame playback on by default; the pack's delivery stalls (2026-10-03, later)
+- Ahmi: "turn frame playback on but keep investigating". On the full-pack client vanilla's entity updates froze AI
+  4-15 ticks then jumped (stalls 9.86/1000, leaps 6.88, Heartfield 132 freezes); with frame playback 2.66 / 2.16 / 0.
+  `-Dchocobosreborn.framePlayback=false` (server and client) turns it off; harness `--no-frame-playback`.
+- What the freezes are: the whole server->client stream goes quiet for 0.15-3.4 s, then everything queued arrives in a
+  burst (70 frame packets in 100 ms after a 3.4 s gap). Not the server's main thread (tick-gap log in the harness: none
+  over 100 ms during those heats), not the server's Netty thread (JFR: nearly idle), not client rendering (frames
+  steady), not one slow packet (the first packet after a gap varies). Intermittent: a heat with a client JFR attached
+  had no gap at all. The harness server runs on the hub's NUMA node 1 at Normal priority beside an idle client; the
+  live server is node 0 / High, so it may not happen on live at all.
+- Client now logs `Race frames stalled N ms (server ticks a -> b)` when frames arrive over 250 ms apart mid-race: ask for
+  a rider's client latest.log after a rough heat.
+- Harness instrumentation: `net-<name>.csv` (every packet's arrival, kind and class or channel), `tickgaps.csv` on the
+  server (main-thread gaps over 100 ms, wall clock), and scratchpad pack_race.py records JFR on both sides.

@@ -67,9 +67,43 @@ public final class RaceHarnessClient {
                 new io.netty.channel.ChannelInboundHandlerAdapter() {
                     @Override public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object message) throws Exception {
                         if (message instanceof net.minecraft.network.protocol.game.ClientboundMoveVehiclePacket) corrections.incrementAndGet();
+                        if (activeTrack != null) netLog.add(new Object[] { System.nanoTime(), packetKind(message), packetName(message) });
                         super.channelRead(ctx, message);
                     }
                 });
+    }
+
+    /** Arrival (network thread, decoded) of every packet in a heat: {nanos, kind}; written out by {@link #flushNetLog}. */
+    private static final java.util.concurrent.ConcurrentLinkedQueue<Object[]> netLog = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    /** The packet's class, or a custom payload's channel: names whatever arrives first after a stall. */
+    private static String packetName(Object message) {
+        if (message instanceof net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket p) return p.payload().type().id().toString();
+        return message.getClass().getSimpleName();
+    }
+
+    /** C chunk data, M vanilla entity move / teleport, F race frames, B bundle, O anything else. */
+    private static long packetKind(Object message) {
+        if (message instanceof net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket
+                || message instanceof net.minecraft.network.protocol.game.ClientboundLightUpdatePacket
+                || message instanceof net.minecraft.network.protocol.game.ClientboundChunkBatchStartPacket
+                || message instanceof net.minecraft.network.protocol.game.ClientboundChunkBatchFinishedPacket) return 'C';
+        if (message instanceof net.minecraft.network.protocol.game.ClientboundMoveEntityPacket
+                || message instanceof net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket) return 'M';
+        if (message instanceof net.minecraft.network.protocol.common.ClientboundCustomPayloadPacket p
+                && p.payload() instanceof tk.darrow.chocobosreborn.net.RaceMovePayloads.Frames) return 'F';
+        if (message instanceof net.minecraft.network.protocol.game.ClientboundBundlePacket) return 'B';
+        return 'O';
+    }
+
+    /** One line per packet: track, client tick, arrival nanos, kind. */
+    private static void flushNetLog(Path out, String name, RaceTrack track) throws java.io.IOException {
+        StringBuilder sb = new StringBuilder();
+        for (Object[] e; (e = netLog.poll()) != null; ) {
+            sb.append(track.name()).append(',').append(ticks).append(',').append(e[0]).append(',').append((char) (long) (Long) e[1])
+                    .append(',').append(e[2]).append('\n');
+        }
+        if (sb.length() > 0) Files.writeString(out.resolve("net-" + name + ".csv"), sb.toString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
 
     /** Every rendered frame's time: 1 % lows and hitches show here, not in an fps average. */
@@ -248,6 +282,7 @@ public final class RaceHarnessClient {
                 Files.createDirectories(out);
                 String name = mc.getUser().getName();
                 long now = System.nanoTime();
+                flushNetLog(out, name, track);
                 if (!frameNanos.isEmpty()) {
                     java.util.List<Long> sorted = new java.util.ArrayList<>(frameNanos);
                     java.util.Collections.sort(sorted);

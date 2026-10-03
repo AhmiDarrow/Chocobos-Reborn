@@ -48,7 +48,23 @@ public final class RemoteRaceFrames implements ChocoboEntity.RemoteDisplay {
 	/** Network thread. */
 	public void receive(RaceMovePayloads.Frame frame, long arrivedNanos) {
 		incoming.add(new Arrival(frame, arrivedNanos));
+		// Frames come every server tick; a long silence mid-race shows as the field freezing, then catching up.
+		// Logged so a rough race on a real server can be read back from the client log (full-pack harness,
+		// 2026-10-03: the whole connection went quiet for 0.5-3.4 s at a time, the server still ticking).
+		long last = lastArrivalNanos;
+		lastArrivalNanos = arrivedNanos;
+		int gapMs = (int) ((arrivedNanos - last) / 1_000_000L);
+		// queued frames still arrive in order: after a stall the next one is the next tick's (between races the tick jumps)
+		if (last != 0L && gapMs > STALL_LOG_MS && frame.tick() <= lastFrameTick + 3) {
+			tk.darrow.chocobosreborn.ChocobosReborn.LOGGER.warn("Race frames stalled {} ms (server ticks {} -> {})", gapMs, lastFrameTick, frame.tick());
+		}
+		lastFrameTick = Math.max(lastFrameTick, frame.tick());
 	}
+
+	/** Gap between frame arrivals worth a log line: five ticks. */
+	private static final int STALL_LOG_MS = 250;
+	private volatile long lastArrivalNanos;
+	private volatile int lastFrameTick = Integer.MIN_VALUE / 2;
 
 	/** Before the level ticks: take this tick's frames and choose the tick the field is shown at. */
 	public void tick(ClientTickEvent.Pre event) {
