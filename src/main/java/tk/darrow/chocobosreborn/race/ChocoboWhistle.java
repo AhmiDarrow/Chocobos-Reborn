@@ -65,6 +65,7 @@ public final class ChocoboWhistle {
 		int racing = 0;
 		int busy = 0;
 		int lost = 0;
+		int parked = 0;
 		int qualified = 0;
 		int accepted = 0;
 		for (BirdRecord record : ledger.owned(me)) {
@@ -82,6 +83,10 @@ public final class ChocoboWhistle {
 				ServerLevel source = at == null ? null : whereLevel(server, at);
 				if (at == null || source == null) {
 					lost++;
+					continue;
+				}
+				if (at.command() != ChocoboLedger.UNKNOWN_COMMAND && at.command() != WhistleRules.FOLLOW) {
+					parked++;          // left on Stay or Wander: not worth loading its chunk to leave it there
 					continue;
 				}
 				if (accepted >= WhistleRules.CAP) {
@@ -112,13 +117,14 @@ public final class ChocoboWhistle {
 				case HERE, WhistleRules.Reason.MOUNTED -> here++;
 				case RACING -> racing++;
 				case BUSY -> busy++;
+				case PARKED -> parked++;
 				default -> {
 				}
 			}
 		}
 		int coming = blow.arrived + blow.waiting;
 		boolean capped = qualified > WhistleRules.CAP;
-		String key = WhistleRules.noticeKey(coming, capped, here, racing, busy, lost);
+		String key = WhistleRules.noticeKey(coming, capped, here, racing, busy, lost, parked);
 		if (coming > 0) {
 			if ("chocobosreborn.whistle.called_many".equals(key)) {
 				owner.displayClientMessage(Component.translatable(key, coming), false);

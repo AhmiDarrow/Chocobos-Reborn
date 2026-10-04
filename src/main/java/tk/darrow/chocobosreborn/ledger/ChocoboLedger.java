@@ -32,9 +32,14 @@ public final class ChocoboLedger extends SavedData {
 	/** Released from the almanac while unloaded: untamed the next time they are seen. */
 	private final java.util.Set<UUID> pendingRelease = new java.util.HashSet<>();
 
-	/** Dimension location string plus the block the bird last saved at. */
-	public record Where(String dim, int x, int y, int z) {
+	/**
+	 * Dimension location string plus the block the bird last saved at, and its order then (Follow 0, Stay 1,
+	 * Wander 2; {@link #UNKNOWN_COMMAND} for entries saved before the order was kept).
+	 */
+	public record Where(String dim, int x, int y, int z, int command) {
 	}
+
+	public static final int UNKNOWN_COMMAND = -1;
 
 	public static ChocoboLedger get(MinecraftServer server) {
 		return server.overworld().getDataStorage().computeIfAbsent(FACTORY, NAME);
@@ -55,7 +60,8 @@ public final class ChocoboLedger extends SavedData {
 				continue;
 			}
 			ledger.where.put(compound.getUUID("Id"), new Where(compound.getString("Dim"),
-					compound.getInt("X"), compound.getInt("Y"), compound.getInt("Z")));
+					compound.getInt("X"), compound.getInt("Y"), compound.getInt("Z"),
+					compound.contains("Cmd") ? compound.getInt("Cmd") : UNKNOWN_COMMAND));
 		}
 		for (net.minecraft.nbt.Tag t : tag.getList("PendingRelease", Tag.TAG_INT_ARRAY)) {
 			ledger.pendingRelease.add(net.minecraft.nbt.NbtUtils.loadUUID(t));
@@ -83,6 +89,7 @@ public final class ChocoboLedger extends SavedData {
 			compound.putInt("X", entry.getValue().x());
 			compound.putInt("Y", entry.getValue().y());
 			compound.putInt("Z", entry.getValue().z());
+			compound.putInt("Cmd", entry.getValue().command());
 			places.add(compound);
 		}
 		tag.put("Where", places);
@@ -115,11 +122,12 @@ public final class ChocoboLedger extends SavedData {
 			return;
 		}
 		BlockPos pos = bird.blockPosition();
-		rememberWhere(bird.getUUID(), level.dimension().location().toString(), pos.getX(), pos.getY(), pos.getZ());
+		rememberWhere(bird.getUUID(), level.dimension().location().toString(), pos.getX(), pos.getY(), pos.getZ(),
+				bird.command().ordinal());
 	}
 
-	private void rememberWhere(UUID id, String dim, int x, int y, int z) {
-		Where next = new Where(dim, x, y, z);
+	private void rememberWhere(UUID id, String dim, int x, int y, int z, int command) {
+		Where next = new Where(dim, x, y, z, command);
 		if (next.equals(where.get(id))) {
 			return;
 		}

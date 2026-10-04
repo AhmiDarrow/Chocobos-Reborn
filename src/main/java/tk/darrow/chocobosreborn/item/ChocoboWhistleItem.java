@@ -18,9 +18,9 @@ import tk.darrow.chocobosreborn.sound.CallRotation;
 import tk.darrow.chocobosreborn.sound.ModSounds;
 
 /**
- * Chocobo Whistle: calls the player's own tame chocobos to them, from any
- * distance and any dimension. Stay and Wander answer too. A bird already
- * in a heat, on a lead, or under another rider does not.
+ * Chocobo Whistle: calls the player's own tame chocobos that are following
+ * them, from any distance and any dimension. A bird left on Stay or Wander
+ * stays put, and so does one in a heat, on a lead, or under another rider.
  */
 public class ChocoboWhistleItem extends Item {
 	private static final int COOLDOWN = 60;

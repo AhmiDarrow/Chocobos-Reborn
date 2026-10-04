@@ -116,6 +116,30 @@ public class ChocobosRebornGameTests {
 		helper.succeed();
 	}
 
+	@GameTest(template = EMPTY)
+	public static void whistleCallsOnlyTheFollowingBird(GameTestHelper helper) {
+		ChocoboEntity follower = spawnAdult(helper, new BlockPos(2, 1, 2), true, ChocoboColor.YELLOW);
+		ChocoboEntity sitter = spawnAdult(helper, new BlockPos(4, 1, 2), false, ChocoboColor.YELLOW);
+		ServerPlayer p = (ServerPlayer) owner(helper, follower, sitter);
+		sitter.giveCommand(ChocoboEntity.Command.STAY, p);
+		// Stand the whistler 30 blocks off, outside the 16-block "already here" ring.
+		Vec3 far = helper.absoluteVec(new Vec3(2.5, 1, 32.5));
+		helper.getLevel().setBlock(BlockPos.containing(far).below(), Blocks.STONE.defaultBlockState(), 3);
+		p.moveTo(far.x, far.y, far.z);
+		Vec3 sitterWas = sitter.position();
+		ItemStack whistle = new ItemStack(ModItems.WHISTLE.get());
+		p.setItemInHand(InteractionHand.MAIN_HAND, whistle);
+		whistle.getItem().use(helper.getLevel(), p, InteractionHand.MAIN_HAND);
+		helper.runAtTickTime(5, () -> {
+			ChocoboEntity came = (ChocoboEntity) helper.getLevel().getEntity(follower.getUUID());
+			helper.assertTrue(came != null && came.distanceTo(p) < 12.0F, "the following bird comes to the whistle");
+			ChocoboEntity stayed = (ChocoboEntity) helper.getLevel().getEntity(sitter.getUUID());
+			helper.assertTrue(stayed != null && stayed.position().distanceTo(sitterWas) < 1.0D
+					&& stayed.command() == ChocoboEntity.Command.STAY, "the bird on Stay stays where it was left");
+			helper.succeed();
+		});
+	}
+
 	@GameTest(template = EMPTY, timeoutTicks = 200)
 	public static void tameFollowsAcrossDimensions(GameTestHelper helper) {
 		ServerLevel here = helper.getLevel();

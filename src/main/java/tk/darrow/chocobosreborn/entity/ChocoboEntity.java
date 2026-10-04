@@ -660,6 +660,8 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (player != null) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.command." + command.id() + ".told", getDisplayName()), true);
 			}
+			// The whistle reads the order from the ledger, so a parked bird is not loaded just to be left.
+			ledgerUpdate();
 		}
 	}
 

@@ -10,14 +10,29 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-/** Whistle eligibility is a pure predicate: Follow, Stay and Wander come; a heat, a lead, or the wrong rider does not. */
+/** Whistle eligibility is a pure predicate: only Follow comes; Stay, Wander, a heat, a lead, or the wrong rider do not. */
 class WhistleRulesTest {
 	@Test
-	void followStayAndWanderAreCalled() {
+	void onlyFollowIsCalled() {
 		assertTrue(WhistleRules.eligible(WhistleRules.Facts.ready(0)), "follow is called");
-		assertTrue(WhistleRules.eligible(WhistleRules.Facts.ready(1)), "stay is called");
-		assertTrue(WhistleRules.eligible(WhistleRules.Facts.ready(2)), "wander is called");
+		assertEquals(WhistleRules.Reason.PARKED, WhistleRules.reason(WhistleRules.Facts.ready(1)), "stay stays");
+		assertEquals(WhistleRules.Reason.PARKED, WhistleRules.reason(WhistleRules.Facts.ready(2)), "wander stays");
 		assertTrue(WhistleRules.eligible(WhistleRules.Facts.ready(0).withChick(true)), "a chicobo is called");
+	}
+
+	@Test
+	void parkedBirdsAreCountedAndNamedWhenNothingFollows() {
+		List<UUID> ids = List.of(new UUID(3L, 1L), new UUID(3L, 2L), new UUID(3L, 3L));
+		WhistleRules.Selection selection = WhistleRules.select(ids, List.of(
+				WhistleRules.Facts.ready(1), WhistleRules.Facts.ready(2), WhistleRules.Facts.ready(0)));
+		assertEquals(List.of(ids.get(2)), selection.call(), "only the following bird comes");
+		assertEquals(2, selection.parked(), "the stay and wander birds are counted as parked");
+		assertEquals("chocobosreborn.whistle.parked", WhistleRules.noticeKey(0, false, 0, 0, 0, 0, 2),
+				"nothing following says so");
+		assertEquals("chocobosreborn.whistle.here", WhistleRules.noticeKey(0, false, 1, 0, 0, 0, 2),
+				"a follower already here wins over parked birds");
+		assertEquals("chocobosreborn.whistle.none", WhistleRules.noticeKey(0, false, 0, 0, 0, 0, 0),
+				"no birds at all");
 	}
 
 	@Test
@@ -44,7 +59,7 @@ class WhistleRulesTest {
 		List<WhistleRules.Facts> facts = new ArrayList<>();
 		for (int i = 0; i < 9; i++) {
 			ids.add(new UUID(0L, i + 1L));
-			facts.add(WhistleRules.Facts.ready(i % 3));
+			facts.add(WhistleRules.Facts.ready(0));
 		}
 		WhistleRules.Selection selection = WhistleRules.select(ids, facts);
 		assertEquals(8, selection.call().size(), "nine qualifying birds return eight");

@@ -6,24 +6,27 @@ import java.util.UUID;
 
 /**
  * Who a Chocobo Whistle may call. Pure: no entity, so a unit test can say so
- * without a world. Follow, Stay and Wander all come; a bird already in range does not.
+ * without a world. Only a bird on Follow comes: Stay and Wander were put somewhere on purpose and stay
+ * there. A bird already in range does not come either.
  */
 public final class WhistleRules {
 	/** Birds summoned on one blow. Further qualifying birds stay where they are. */
 	public static final int CAP = 8;
 	/** Same dimension and at most this far: already here, not called. */
 	public static final double HERE_BLOCKS = 16.0D;
+	/** {@code Facts.command} of a bird on Follow, the only order the whistle calls. */
+	public static final int FOLLOW = 0;
 
 	private WhistleRules() {
 	}
 
 	public enum Reason {
-		CALL, HERE, MOUNTED, DEAD, OWNER, TAME, RECORD, NPC, TOWN, RACING, LEASH, BUSY
+		CALL, HERE, MOUNTED, DEAD, OWNER, TAME, RECORD, NPC, TOWN, PARKED, RACING, LEASH, BUSY
 	}
 
 	/**
-	 * One bird as the whistle sees it. {@code command} is Follow 0, Stay 1, Wander 2
-	 * and is not a gate. {@code chick} is not a gate either.
+	 * One bird as the whistle sees it. {@code command} is Follow 0, Stay 1, Wander 2; only
+	 * Follow is called. {@code chick} is not a gate.
 	 */
 	public record Facts(boolean owned, boolean recordAlive, boolean tame, boolean dead, boolean raceNpc,
 	                    boolean townBird, boolean racing, boolean activeRacer, boolean scheduled, boolean leashed,
@@ -126,6 +129,9 @@ public final class WhistleRules {
 		if (facts.townBird()) {
 			return Reason.TOWN;
 		}
+		if (facts.command() != FOLLOW) {
+			return Reason.PARKED;
+		}
 		if (facts.racing() || facts.activeRacer() || facts.scheduled()) {
 			return Reason.RACING;
 		}
@@ -149,7 +155,7 @@ public final class WhistleRules {
 	}
 
 	/** Ledger order in, first {@link #CAP} calls out. {@code capped} when more than the cap would come. */
-	public record Selection(List<UUID> call, boolean capped, int here, int racing, int busy) {
+	public record Selection(List<UUID> call, boolean capped, int here, int racing, int busy, int parked) {
 	}
 
 	public static Selection select(List<UUID> ids, List<Facts> facts) {
@@ -161,6 +167,7 @@ public final class WhistleRules {
 		int here = 0;
 		int racing = 0;
 		int busy = 0;
+		int parked = 0;
 		for (int i = 0; i < ids.size(); i++) {
 			switch (reason(facts.get(i))) {
 				case CALL -> {
@@ -172,15 +179,16 @@ public final class WhistleRules {
 				case HERE, MOUNTED -> here++;
 				case RACING -> racing++;
 				case BUSY -> busy++;
+				case PARKED -> parked++;
 				default -> {
 				}
 			}
 		}
-		return new Selection(List.copyOf(call), qualified > CAP, here, racing, busy);
+		return new Selection(List.copyOf(call), qualified > CAP, here, racing, busy, parked);
 	}
 
 	/** Lang key for the blow. A coming bird uses chat; the rest use the action bar. */
-	public static String noticeKey(int coming, boolean capped, int here, int racing, int busy, int lost) {
+	public static String noticeKey(int coming, boolean capped, int here, int racing, int busy, int lost, int parked) {
 		if (coming > 0) {
 			if (capped) {
 				return "chocobosreborn.whistle.capped";
@@ -201,6 +209,9 @@ public final class WhistleRules {
 		}
 		if (here > 0) {
 			return "chocobosreborn.whistle.here";
+		}
+		if (parked > 0) {
+			return "chocobosreborn.whistle.parked";
 		}
 		return "chocobosreborn.whistle.none";
 	}
