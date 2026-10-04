@@ -19,6 +19,11 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.12 - Only Followers
+Uploaded 2026-10-03: `chocobosreborn-1.1.12.jar` as file **9053026** ("Chocobos Reborn 1.1.12 - Only Followers",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.12.md`) via
+`tools/upload_curseforge.py`. The whistle calls only birds on Follow; the ledger keeps each bird's command so parked birds are not loaded.
+
 ## 1.1.11 - Whistle Calls
 Uploaded 2026-10-03: `chocobosreborn-1.1.11.jar` as file **9051920** ("Chocobos Reborn 1.1.11 - Whistle Calls",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.11.md`) via
