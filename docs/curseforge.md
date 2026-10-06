@@ -23,6 +23,11 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.13 - Every Item Explains Itself
+Uploaded 2026-10-06: `chocobosreborn-1.1.13.jar` as file **9082540** ("Chocobos Reborn 1.1.13 - Every Item Explains Itself",
+release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.13.md`) via
+`tools/upload_curseforge.py`. Hint tooltips on the seeds, saddle, GP, crops, Square Gate and Boost Pad; wrapping hints; project links; any taming path records the bird. GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.13
+
 ## 1.1.12 - Only Followers
 Uploaded 2026-10-03: `chocobosreborn-1.1.12.jar` as file **9053026** ("Chocobos Reborn 1.1.12 - Only Followers",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.12.md`) via
