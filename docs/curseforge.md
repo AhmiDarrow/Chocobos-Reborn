@@ -5,6 +5,10 @@ project from similarly named search results).
 
 Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 
+## Before release
+
+`./gradlew test`, then `./gradlew runVerification` on a **fresh** `build/verification/world` (delete the old one first). The GameTest world is reused between runs, so the mock player's bird ledger fills with stale "alive" birds; they eat the whistle's cap of eight and `whistleCallsOnlyTheFollowingBird` fails although nothing is wrong. Then `./gradlew build`.
+
 ## What to upload
 
 - Jar: `build/libs/chocobosreborn-<version>.jar` from `./gradlew build` (GameTests are

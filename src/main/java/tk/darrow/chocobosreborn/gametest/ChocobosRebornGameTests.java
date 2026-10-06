@@ -125,14 +125,27 @@ public class ChocobosRebornGameTests {
 		// Stand the whistler 30 blocks off, outside the 16-block "already here" ring.
 		Vec3 far = helper.absoluteVec(new Vec3(2.5, 1, 32.5));
 		helper.getLevel().setBlock(BlockPos.containing(far).below(), Blocks.STONE.defaultBlockState(), 3);
-		p.moveTo(far.x, far.y, far.z);
+		// The whistler stands outside the test structure, so the chunks the bird would land in are not loaded
+		// unless the test loads them. Whether the landing crosses a chunk border depends on where the batch sits.
+		int farCx = BlockPos.containing(far).getX() >> 4;
+		int farCz = BlockPos.containing(far).getZ() >> 4;
+		for (int cx = -1; cx <= 1; cx++) {
+			for (int cz = -1; cz <= 1; cz++) {
+				helper.getLevel().getChunk(farCx + cx, farCz + cz);
+				helper.getLevel().setChunkForced(farCx + cx, farCz + cz, true);
+			}
+		}
+		// A proper teleport: a mock player's connection re-applies its last teleport target a little later,
+		// so a plain moveTo is undone and the player snaps back to the world spawn mid-test.
+		p.teleportTo(far.x, far.y, far.z);
 		Vec3 sitterWas = sitter.position();
 		ItemStack whistle = new ItemStack(ModItems.WHISTLE.get());
 		p.setItemInHand(InteractionHand.MAIN_HAND, whistle);
 		whistle.getItem().use(helper.getLevel(), p, InteractionHand.MAIN_HAND);
 		helper.runAtTickTime(5, () -> {
 			ChocoboEntity came = (ChocoboEntity) helper.getLevel().getEntity(follower.getUUID());
-			helper.assertTrue(came != null && came.distanceTo(p) < 12.0F, "the following bird comes to the whistle");
+			helper.assertTrue(came != null && came.position().distanceTo(far) < 12.0D,
+					"the following bird comes to where the whistle was blown: " + (came == null ? "gone" : came.position()));
 			ChocoboEntity stayed = (ChocoboEntity) helper.getLevel().getEntity(sitter.getUUID());
 			helper.assertTrue(stayed != null && stayed.position().distanceTo(sitterWas) < 1.0D
 					&& stayed.command() == ChocoboEntity.Command.STAY, "the bird on Stay stays where it was left");

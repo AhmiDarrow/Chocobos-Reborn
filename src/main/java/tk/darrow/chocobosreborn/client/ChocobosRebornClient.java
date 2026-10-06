@@ -18,6 +18,7 @@ public final class ChocobosRebornClient {
 		modBus.addListener((net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent event) ->
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(ItemHints::tooltip);
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceHud::tick);
 		// the crowd in the course stands: drawn, not spawned (see CourseCrowdRenderer)
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(CourseCrowdRenderer::onRenderLevel);

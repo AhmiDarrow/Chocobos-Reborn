@@ -1710,6 +1710,13 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		return chick;
 	}
 
+	/** Any taming, Gysahl or another mod's, puts the bird on the ledger so the whistle and the almanac know it. */
+	@Override
+	public void tame(net.minecraft.world.entity.player.Player player) {
+		super.tame(player);
+		ledgerUpdate();
+	}
+
 	private void ledgerUpdate() {
 		if (level() instanceof ServerLevel sl && isTame() && !raceNpc()) {
 			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).update(this);
