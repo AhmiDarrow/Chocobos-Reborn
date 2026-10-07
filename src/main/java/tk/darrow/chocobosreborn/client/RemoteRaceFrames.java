@@ -146,6 +146,8 @@ public final class RemoteRaceFrames implements ChocoboEntity.RemoteDisplay {
 
 	private void clear() {
 		incoming.clear();
+		lastArrivalNanos = 0L;
+		lastFrameTick = Integer.MIN_VALUE / 2;
 		buffers.clear();
 		lastFrame.clear();
 		clock.reset();

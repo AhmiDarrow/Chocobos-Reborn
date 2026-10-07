@@ -457,6 +457,6 @@ public final class HeatSchedule {
 
 	/** m:ss for a number of seconds. */
 	public static String clock(int seconds) {
-		return String.format("%d:%02d", seconds / 60, seconds % 60);
+		return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60, seconds % 60);
 	}
 }

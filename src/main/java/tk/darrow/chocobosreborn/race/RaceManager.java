@@ -652,6 +652,7 @@ public final class RaceManager {
 		OWED_GP.clear();
 		FollowAcross.reset();
 		ChocoboWhistle.reset();
+		tk.darrow.chocobosreborn.net.RaceFrameSender.reset();
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
 		TownLife.reset();

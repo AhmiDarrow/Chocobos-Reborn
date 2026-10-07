@@ -31,6 +31,11 @@ public final class RaceFrameSender {
 		PENDING.computeIfAbsent(level, l -> new ArrayList<>()).add(new Pending(frame, driver));
 	}
 
+	/** Server stop: the per-level lists must not outlive their server (singleplayer switches worlds in one JVM). */
+	public static void reset() {
+		PENDING.clear();
+	}
+
 	public static void onServerTick(ServerTickEvent.Post event) {
 		if (PENDING.isEmpty()) {
 			return;
