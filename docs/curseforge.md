@@ -23,6 +23,9 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.14 - Said Once
+Uploaded 2026-10-07: `chocobosreborn-1.1.14.jar` as file **9091543** ("Chocobos Reborn 1.1.14 - Said Once", release, 1.21.1 / NeoForge / Client+Server). Changelog is `docs/RELEASE_1.1.14.md`. Hints scoped to own items, plain-digit queue clock, rejoin stall log, race data released on world close.
+
 ## 1.1.13 - Every Item Explains Itself
 Uploaded 2026-10-06: `chocobosreborn-1.1.13.jar` as file **9082540** ("Chocobos Reborn 1.1.13 - Every Item Explains Itself",
 release, 1.21.1 / NeoForge / Client+Server, changelog `docs/RELEASE_1.1.13.md`) via
