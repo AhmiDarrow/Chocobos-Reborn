@@ -23,6 +23,9 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.1.15 - Clean Sweep
+Uploaded 2026-10-10: `chocobosreborn-1.1.15.jar` as file **9118527** ("Chocobos Reborn 1.1.15 - Clean Sweep", release, 1.21.1 / NeoForge / Client+Server). Changelog is `docs/RELEASE_1.1.15.md`. GPU-skinned birds, atlases prepared off the render thread, courses laid over the countdown, waiting bets ride their heat, field odds at least even, gauntlet bug sweep. GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.15
+
 ## 1.1.14 - Said Once
 Uploaded 2026-10-07: `chocobosreborn-1.1.14.jar` as file **9091543** ("Chocobos Reborn 1.1.14 - Said Once", release, 1.21.1 / NeoForge / Client+Server). Changelog is `docs/RELEASE_1.1.14.md`. Hints scoped to own items, plain-digit queue clock, rejoin stall log, race data released on world close.
 
