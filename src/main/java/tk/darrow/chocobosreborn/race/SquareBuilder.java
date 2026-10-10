@@ -71,7 +71,7 @@ public final class SquareBuilder {
 	}
 
 	/** "minecraft:oak_stairs[facing=south]" style lookup, cached. Unknown blocks fall back to stone with a warning. */
-	private static BlockState state(ServerLevel level, String id) {
+	static BlockState state(ServerLevel level, String id) {
 		BlockState cached = STATES.get(id);
 		if (cached != null) {
 			return cached;
@@ -119,12 +119,12 @@ public final class SquareBuilder {
 	/** Lay the course island for {@code track} once; every course has its own place in the void. */
 	public static void buildTrack(ServerLevel level, RaceTrack track) {
 		SquareData data = SquareData.get(level);
-		if (data.courseVersion() < COURSE_VERSION) {
-			// the course plan changed since these islands were laid: relay each on its next use
-			data.clearBuilt();
-			data.setCourseVersion(COURSE_VERSION);
-		}
+		syncCourseVersion(data);
 		if (data.isBuilt(track)) {
+			return;
+		}
+		// laid a chunk at a time since its heat was posted (CourseBuilds): the rest now
+		if (CourseBuilds.finishNow(level, track)) {
 			return;
 		}
 		RaceCourseLayout layout = RaceCourseLayout.of(track);
@@ -136,6 +136,20 @@ public final class SquareBuilder {
 			RaceCourseLayout.Cell c = e.getKey();
 			place(level, new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()));
 		}
+		finishTrack(level, track, layout, cleared);
+	}
+
+	/** The course plan changed since these islands were laid: relay each on its next use. */
+	static void syncCourseVersion(SquareData data) {
+		if (data.courseVersion() < COURSE_VERSION) {
+			data.clearBuilt();
+			data.setCourseVersion(COURSE_VERSION);
+		}
+	}
+
+	/** Blocks are down: write the signs and mark the course built. */
+	static void finishTrack(ServerLevel level, RaceTrack track, RaceCourseLayout layout, int cleared) {
+		SquareData data = SquareData.get(level);
 		// the shortcut gantries name the feature and the breeds that take it straight
 		for (RaceCourseLayout.ShortcutSign sc : layout.shortcutSigns()) {
 			String k = "chocobosreborn.sign.shortcut." + sc.type().name().toLowerCase(java.util.Locale.ROOT);
@@ -150,8 +164,8 @@ public final class SquareBuilder {
 					"chocobosreborn.sign.course.go");
 		}
 		data.setBuilt(track);
-		ChocobosReborn.LOGGER.info("Whiskerwind: built {} ({} blocks, {} chunks, {} leftovers cleared)", track.id(), plan.size(),
-				RaceCourseLayout.of(track).chunks().size(), cleared);
+		ChocobosReborn.LOGGER.info("Whiskerwind: built {} ({} blocks, {} chunks, {} leftovers cleared)", track.id(),
+				layout.blocks().size(), layout.chunks().size(), cleared);
 	}
 
 	/**
@@ -164,16 +178,24 @@ public final class SquareBuilder {
 		Map<RaceCourseLayout.Cell, String> plan = layout.blocks();
 		int lo = Math.max(level.getMinBuildHeight(), layout.minY() - 16);
 		int hi = Math.min(level.getMaxBuildHeight() - 1, layout.maxY() + 32);
+		int cleared = 0;
+		for (long key : chunks) {
+			cleared += clearChunk(level, plan, lo, hi, (int) (key >> 32), (int) key);
+		}
+		return cleared;
+	}
+
+	/** {@link #clearIsland} for one chunk: what the plan does not place, between {@code lo} and {@code hi}. */
+	static int clearChunk(ServerLevel level, Map<RaceCourseLayout.Cell, String> plan, int lo, int hi, int cx, int cz) {
 		BlockState air = Blocks.AIR.defaultBlockState();
 		BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
 		int cleared = 0;
-		for (long key : chunks) {
-			int cx = (int) (key >> 32), cz = (int) key;
+		{
 			// a chunk no plan ever reached was never generated and holds nothing; asking at
 			// EMPTY reads what is saved without generating it on the server thread
 			if (level.getChunk(cx, cz, net.minecraft.world.level.chunk.status.ChunkStatus.EMPTY, true).getPersistedStatus()
 					!= net.minecraft.world.level.chunk.status.ChunkStatus.FULL) {
-				continue;
+				return 0;
 			}
 			net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(cx, cz);
 			net.minecraft.world.level.chunk.LevelChunkSection[] sections = chunk.getSections();

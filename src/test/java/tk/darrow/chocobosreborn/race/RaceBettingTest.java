@@ -61,8 +61,9 @@ class RaceBettingTest {
 		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.TEIOH, 3, 3));
 		assertEquals(6, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, 1));
 		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.OPPONENT, 1, 3));
-		// FIELD is priced by how many AI birds it covers: five of six is close to evens
-		assertEquals(1, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, RaceScoring.expectedFieldBirds(1, false)));
+		// FIELD is priced by how many AI birds it covers: five of six is even money (2x back), never just the stake
+		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, RaceScoring.expectedFieldBirds(1, false)));
+		assertEquals(3, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, 2));
 		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.FIELD, 0, 4));
 		assertEquals(2, RaceScoring.odds(RaceScoring.BetPick.FIELD, 3, RaceScoring.expectedFieldBirds(1, true)));
 	}

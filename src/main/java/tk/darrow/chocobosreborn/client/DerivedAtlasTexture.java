@@ -12,7 +12,13 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
+import net.minecraft.Util;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A breed atlas derived at load from the shipped yellow one ({@link AtlasTint}), so the
@@ -23,18 +29,22 @@ import java.util.Set;
  */
 public final class DerivedAtlasTexture extends AbstractTexture {
 	private static final Set<ResourceLocation> REGISTERED = new HashSet<>();
+	/**
+	 * Atlases being derived off the render thread (decode, recolour, eyelids: tens of ms each), keyed by the
+	 * location they will be registered under. {@link #load} takes the finished image instead of deriving it.
+	 */
+	private static final Map<ResourceLocation, CompletableFuture<NativeImage>> PREPARED = new ConcurrentHashMap<>();
 
+	private final ResourceLocation self;
 	private final ResourceLocation source;
 	private final float[] tint;
 	private final ResourceLocation eyelids;
 	private final boolean recolorSource;
 	private final boolean yellowLids;
 
-	private DerivedAtlasTexture(ResourceLocation source, int[] rgb) {
-		this(source, rgb, null, true);
-	}
-
-	private DerivedAtlasTexture(ResourceLocation source, int[] rgb, ResourceLocation eyelids, boolean recolorSource) {
+	private DerivedAtlasTexture(ResourceLocation self, ResourceLocation source, int[] rgb, @Nullable ResourceLocation eyelids,
+	                            boolean recolorSource) {
+		this.self = self;
 		this.source = source;
 		this.tint = AtlasTint.tint(rgb);
 		this.eyelids = eyelids;
@@ -42,14 +52,59 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 		this.yellowLids = rgb[0] == 245 && rgb[1] == 184 && rgb[2] == 18;
 	}
 
-	/** Cache a closed-eye variant once; no image processing occurs per render frame. */
-	public static void ensureBlink(ResourceLocation derived, ResourceLocation source, ResourceLocation eyelids, int[] rgb, boolean recolorSource) {
+	/**
+	 * A closed-eye variant, derived off the render thread. True once it can be drawn; until then (the first blink of
+	 * a breed) the caller keeps the eyes open rather than stalling a frame on the copy.
+	 */
+	public static boolean ensureBlink(ResourceLocation derived, ResourceLocation source, ResourceLocation eyelids, int[] rgb, boolean recolorSource) {
 		TextureManager textures = Minecraft.getInstance().getTextureManager();
-		if (REGISTERED.contains(derived) && textures.getTexture(derived, null) != null) return;
+		if (REGISTERED.contains(derived) && textures.getTexture(derived, null) != null) {
+			return true;
+		}
 		if (textures.getTexture(derived, null) == null) {
-			textures.register(derived, new DerivedAtlasTexture(source, rgb, eyelids, recolorSource));
+			REGISTERED.remove(derived);   // a reload dropped it (a failed load): make it again
+			CompletableFuture<NativeImage> ready = PREPARED.get(derived);
+			if (ready == null) {
+				prepare(derived, source, eyelids, rgb, recolorSource);
+				return false;
+			}
+			if (!ready.isDone()) {
+				return false;
+			}
+			textures.register(derived, new DerivedAtlasTexture(derived, source, rgb, eyelids, recolorSource));
 		}
 		REGISTERED.add(derived);
+		return true;
+	}
+
+	/** Start deriving {@code derived} on a background thread (nothing if it is registered or already under way). */
+	public static void prepare(ResourceLocation derived, ResourceLocation source, @Nullable ResourceLocation eyelids, int[] rgb,
+	                           boolean recolorSource) {
+		if (REGISTERED.contains(derived) || PREPARED.containsKey(derived)) {
+			return;
+		}
+		DerivedAtlasTexture recipe = new DerivedAtlasTexture(derived, source, rgb, eyelids, recolorSource);
+		ResourceManager manager = Minecraft.getInstance().getResourceManager();
+		PREPARED.put(derived, CompletableFuture.supplyAsync(() -> {
+			try {
+				return recipe.build(manager);
+			} catch (IOException error) {
+				throw new java.io.UncheckedIOException(error);
+			}
+		}, Util.backgroundExecutor()));
+	}
+
+	/** Body atlas of a recoloured breed, derived ahead of its first frame (see {@link #prepare}). */
+	public static void prepare(ResourceLocation derived, ResourceLocation source, int[] rgb) {
+		prepare(derived, source, null, rgb, true);
+	}
+
+	/** Leaving the world: drop images nobody drew (native memory), and what is still being derived. */
+	public static void clearPrepared() {
+		for (CompletableFuture<NativeImage> f : PREPARED.values()) {
+			f.thenAccept(NativeImage::close);
+		}
+		PREPARED.clear();
 	}
 
 	/**
@@ -63,13 +118,36 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 			return;
 		}
 		if (textures.getTexture(derived, null) == null) {
-			textures.register(derived, new DerivedAtlasTexture(source, rgb));
+			// waits for a derivation already under way (see prepare) rather than starting a second one
+			textures.register(derived, new DerivedAtlasTexture(derived, source, rgb, null, true));
 		}
 		REGISTERED.add(derived);
 	}
 
 	@Override
 	public void load(ResourceManager manager) throws IOException {
+		NativeImage image = null;
+		CompletableFuture<NativeImage> ready = PREPARED.remove(self);
+		if (ready != null) {
+			try {
+				image = ready.join();
+			} catch (java.util.concurrent.CompletionException | java.util.concurrent.CancellationException failed) {
+				image = null;   // derive it here instead (and report that error if it repeats)
+			}
+		}
+		if (image == null) {
+			image = build(manager);
+		}
+		NativeImage done = image;
+		if (!RenderSystem.isOnRenderThreadOrInit()) {
+			RenderSystem.recordRenderCall(() -> upload(done));
+		} else {
+			upload(done);
+		}
+	}
+
+	/** Read the source atlas and derive this texture's pixels (any thread). */
+	private NativeImage build(ResourceManager manager) throws IOException {
 		NativeImage image;
 		try (InputStream in = manager.getResourceOrThrow(source).open()) {
 			image = NativeImage.read(in);
@@ -80,11 +158,7 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 			image.close();   // 4 MB of native memory otherwise
 			throw ex;
 		}
-		if (!RenderSystem.isOnRenderThreadOrInit()) {
-			RenderSystem.recordRenderCall(() -> upload(image));
-		} else {
-			upload(image);
-		}
+		return image;
 	}
 
 	private void derive(ResourceManager manager, NativeImage image) throws IOException {

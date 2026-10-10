@@ -1116,12 +1116,15 @@ public final class RaceScoring {
 		};
 	}
 
-	/** Roughly fair on a six-bird card: 6x for a lone field bird, 2x for three or four, evens for five. */
+	/**
+	 * Roughly fair on a six-bird card: 6x for a lone field bird, 3x for two, 2x from three up. A payout is the total
+	 * handed back, so 2x is even money; five field birds once rounded to 1x, which only returned the stake.
+	 */
 	public static int fieldOdds(int fieldBirds) {
 		if (fieldBirds <= 0) {
 			return 6;
 		}
-		return Math.max(1, Math.round(6.0F / fieldBirds));
+		return Math.max(2, Math.round(6.0F / fieldBirds));
 	}
 
 	/** Field birds on a ranked card with {@code humans} riders (Teiyo and Jolo take two slots when they run). */

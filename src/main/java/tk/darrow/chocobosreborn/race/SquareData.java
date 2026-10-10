@@ -227,6 +227,12 @@ public class SquareData extends SavedData {
 		setDirty();
 	}
 
+	/** Mark one course unlaid (GameTests of the course builder). */
+	public void forgetBuilt(RaceTrack track) {
+		builtTracks.remove(track.ordinal());
+		setDirty();
+	}
+
 	/** Laid by an older plan and not relaid since. */
 	public boolean isStale(RaceTrack track) {
 		return staleTracks.contains(track.ordinal());

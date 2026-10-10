@@ -237,7 +237,8 @@ public final class HeatSchedule {
 						c ? RaceSession.NAME_RISIKA : RaceSession.NAME_TEIYO, c ? RaceSession.NAME_AHMI : RaceSession.NAME_JOLO));
 			}
 			if (player.level() instanceof ServerLevel square && Square.isSquare(square)) {
-				SquareBuilder.buildTrack(square, track);
+				// laid over the countdown, a chunk at a time (it was one long tick for the whole server)
+				CourseBuilds.request(square, track);
 			}
 		}
 		if (player.level() instanceof ServerLevel sl) {

@@ -558,6 +558,11 @@ public class RaceSession {
 		return racers.get(0).player == null ? new UUID(0L, 0L) : racers.get(0).player;
 	}
 
+	/** The level the heat runs in (Whiskerwind). */
+	ServerLevel level() {
+		return level;
+	}
+
 	public boolean hasPlayer(UUID id) {
 		return racers.stream().anyMatch(r -> id.equals(r.player) && !r.forfeited);
 	}

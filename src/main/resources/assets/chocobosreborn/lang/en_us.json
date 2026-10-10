@@ -123,6 +123,7 @@
   "chocobosreborn.bet.closed": "Books are closed.",
   "chocobosreborn.bet.pick": "Pick: %s (pays %sx, up to %s GP). Hand me GP to place it.",
   "chocobosreborn.bet.placed": "Bet %s GP on %s.",
+  "chocobosreborn.bet.attached": "Your %s GP on %s rides this heat at %sx.",
   "chocobosreborn.bet.refused": "One bet per heat, 1–%s GP on that pick. Rook never pays more than the purse.",
   "chocobosreborn.bet.capped": "Rook hands back %s GP: this heat takes %s at most on that pick.",
   "chocobosreborn.bet.won": "Your bet paid %s GP!",

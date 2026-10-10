@@ -2761,3 +2761,29 @@ clears the built-course set.
 
 Needs an in-game look: the new sky buffer (both layers, rain dimming, dawn cross-fade), the race HUD position over
 the hotbar, gate ride-through, the rebuilt village (waterfalls, beds, fence joins).
+
+## 1.1.15 staged: betting, versions, race smoothness (2026-10-10, branch `sweep-gauntlet`, unreleased)
+
+Ahmi: "fix betting sync versions, optimize racing for smoothest play".
+
+- **Betting.** A spectator's waiting bet now joins the next ranked heat when it goes on its grid
+  (`RaceManager.attachWaitingBets`, from `addSession` and `startRace`); before, only riders' own waiting bets were
+  taken, and a spectator's sat in player data until they walked back to Rook during a HOLD. Joining says the real
+  odds (`bet.attached`: Rook quotes a guess before the card is drawn). FIELD pays at least 2x (`fieldOdds`; five
+  field birds rounded to 1x, the stake back). GameTest `squareBuildsCourseAndRunsHeat` checks the attach.
+- **Versions.** `mod_version` 1.1.15; README, store footer, `docs/RELEASE_1.1.15.md` (draft, not published). No
+  payload format changed, so the network channel versions stay (1, 2, 3, 4).
+- **GPU skinning** ported from `racing-netcode-crowd` 4d3a457 (`client/GpuBirds`, `shaders/core/skinned_bird.*`):
+  rest-pose parts in static buffers, 18 bone affines a draw. CPU path for glowing birds, emissive parts, GUI
+  previews, Iris/Oculus packs, `-Dchocobosreborn.cpuBirds=true`, or any GPU failure.
+- **Atlases off the render thread** (`DerivedAtlasTexture.prepare`): every tracked bird's breed and blink atlas is
+  started from `shouldRender` once a second; the saddled race bodies at login. A blink whose copy is not ready keeps
+  the eyes open instead of stalling; a body still being made is waited for (as before, but usually done).
+- **Courses laid over the countdown** (`race/CourseBuilds`): plan built off-thread (`RaceCourseLayout.build` /
+  `adopt`, outside `of`'s lock), then 5 ms of chunks a tick; `buildTrack` finishes the rest when the heat starts.
+  GameTest `courseIsLaidOverSeveralTicks` (it caught an EnumMap entry read after `remove()` that crashed the server).
+- **Verified:** 326 unit tests (1 skipped), 125/125 GameTests, `tools/latency_harness.py` on C_MEADOW: all five
+  profiles finished, 0 vehicle corrections, 0 wall recoveries; client logged "Birds are skinned on the graphics card";
+  median frame 16.7 ms at the 60 fps cap, 7 frames over 33 ms in the run, bird drawing 0.065 ms a frame; screenshots
+  (build/latency/client/screenshots) show the GPU birds, the field with jockeys, the new sky and the HUD line.
+- Not measured here: the hub's multi-client crowd harness and a full-pack client (shader-pack users take the CPU path).

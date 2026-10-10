@@ -103,6 +103,22 @@ public final class RaceCourseLayout {
 	/** Cells that are the course's own driving surface as built, for the lane-clearance test. */
 	private final Set<Cell> surfaceCells = new HashSet<>();
 
+	/** A fresh plan, not cached: for building off the server thread ({@link CourseBuilds}) without holding {@link #of}'s lock. */
+	static RaceCourseLayout build(RaceTrack track) {
+		return new RaceCourseLayout(track);
+	}
+
+	/** Cache a plan built by {@link #build}; one already cached wins (both are the same plan). */
+	static synchronized RaceCourseLayout adopt(RaceTrack track, RaceCourseLayout layout) {
+		java.lang.ref.SoftReference<RaceCourseLayout> ref = CACHE.get(track);
+		RaceCourseLayout cached = ref == null ? null : ref.get();
+		if (cached != null) {
+			return cached;
+		}
+		CACHE.put(track, new java.lang.ref.SoftReference<>(layout));
+		return layout;
+	}
+
 	public static synchronized RaceCourseLayout of(RaceTrack track) {
 		java.lang.ref.SoftReference<RaceCourseLayout> ref = CACHE.get(track);
 		RaceCourseLayout layout = ref == null ? null : ref.get();

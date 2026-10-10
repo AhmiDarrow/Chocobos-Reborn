@@ -111,8 +111,10 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 			ResourceLocation mask = EYELIDS.computeIfAbsent(mesh, key -> ResourceLocation.fromNamespaceAndPath(
 					ChocobosReborn.MOD_ID, "textures/entity/" + key + "/eyes_blink.png"));
 			int[] lidTint = id == ChocoboColor.FLAME.getId() ? FLAME_LID : PLUMAGE[id];
-			DerivedAtlasTexture.ensureBlink(closed, derived ? set[ChocoboColor.YELLOW.getId()] : set[id], mask, lidTint, derived);
-			return closed;
+			if (DerivedAtlasTexture.ensureBlink(closed, derived ? set[ChocoboColor.YELLOW.getId()] : set[id], mask, lidTint, derived)) {
+				return closed;
+			}
+			// the closed-eye copy is still being made off the render thread: this blink keeps its eyes open
 		}
 		if (derived) {
 			// the jar ships yellow, End and Nether; the solid breeds are recoloured from yellow at load
@@ -121,8 +123,49 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		return set[id];
 	}
 
+	/**
+	 * Start deriving a bird's atlases off the render thread: its body (a recoloured breed) and its closed-eye copy.
+	 * Called from shouldRender for every tracked bird, usually well before it is near enough to draw.
+	 */
+	public static void prepareAtlases(ChocoboEntity e) {
+		prepareAtlases(meshId(e), Math.min(e.displayColor().getId(), SKINS.length - 1));
+	}
+
+	/**
+	 * The saddled race mesh's recoloured breeds: a heat's field arrives all at once, in the player's view. Bodies only
+	 * (about 4 MB each until drawn): a blink never waits for its copy, so those are made as the birds turn up.
+	 */
+	public static void prepareRaceAtlases() {
+		for (ChocoboColor c : ChocoboColor.values()) {
+			int id = Math.min(c.getId(), SKINS.length - 1);
+			if (ChocoboColor.byId(id).derivedAtlas()) {
+				DerivedAtlasTexture.prepare(SKINS_SADDLED[id], SKINS_SADDLED[ChocoboColor.YELLOW.getId()], PLUMAGE[id]);
+			}
+		}
+	}
+
+	private static void prepareAtlases(String mesh, int id) {
+		ResourceLocation[] set = mesh.equals("chocobo_saddled") ? SKINS_SADDLED
+				: mesh.startsWith("chocobo_armor_") ? SKINS_ARMOR.computeIfAbsent(mesh, ChocoboMeshRenderer::skins) : SKINS;
+		boolean derived = ChocoboColor.byId(id).derivedAtlas();
+		if (derived) {
+			DerivedAtlasTexture.prepare(set[id], set[ChocoboColor.YELLOW.getId()], PLUMAGE[id]);
+		}
+		ResourceLocation closed = BLINK_SKINS.computeIfAbsent(set[id], key -> ResourceLocation.fromNamespaceAndPath(
+				key.getNamespace(), key.getPath().replace(".png", "_blink.png")));
+		ResourceLocation mask = EYELIDS.computeIfAbsent(mesh, key -> ResourceLocation.fromNamespaceAndPath(
+				ChocobosReborn.MOD_ID, "textures/entity/" + key + "/eyes_blink.png"));
+		int[] lidTint = id == ChocoboColor.FLAME.getId() ? FLAME_LID : PLUMAGE[id];
+		DerivedAtlasTexture.prepare(closed, derived ? set[ChocoboColor.YELLOW.getId()] : set[id], mask, lidTint, derived);
+	}
+
 	@Override
 	public boolean shouldRender(ChocoboEntity e, net.minecraft.client.renderer.culling.Frustum frustum, double x, double y, double z) {
+		// every tracked bird passes here each frame, near or far: once a second, start deriving its atlases so they
+		// are ready before it is close enough to draw (its colour and tack are synced by now)
+		if ((e.tickCount + e.getId()) % 20 == 0) {
+			prepareAtlases(e);
+		}
 		// vanilla's distance cull first: it carries the Entity Distance slider
 		if (!e.shouldRender(x, y, z)) {
 			return false;
@@ -138,6 +181,8 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	/** CPU time spent skinning and emitting birds, and how many were drawn (the race harness reports them). */
 	public static final java.util.concurrent.atomic.LongAdder RENDER_NANOS = new java.util.concurrent.atomic.LongAdder();
 	public static final java.util.concurrent.atomic.LongAdder RENDERED = new java.util.concurrent.atomic.LongAdder();
+	/** Triangle corners drawn (CPU and GPU paths; the race harness reports them). */
+	public static final java.util.concurrent.atomic.LongAdder VERTICES = new java.util.concurrent.atomic.LongAdder();
 
 	@Override
 	public void render(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
@@ -230,9 +275,19 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();
 		RenderType bodyType = quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex);
+		// on the graphics card unless the bird glows (the outline pass reads buffered quads), is a GUI
+		// preview (drawn outside the level's matrices), or the path is off (see GpuBirds)
+		boolean gpu = !quads && e.isAddedToLevel() && GpuBirds.usable(nb);
 		for (WhiskerMesh.Part part : m.parts(lodLevel(e), e.male())) {
+			if (gpu && part.emissiveTri.length == 0
+					&& GpuBirds.draw(part, RenderType.entityCutoutNoCull(tex), skinner.composed(), nb, hidden,
+							PLUMAGE[breed], YELLOW, light, overlay)) {
+				VERTICES.add(part.triCount * 3L);
+				continue;
+			}
 			// fetched per part: the glow pass below switches the shared buffer, which ends the body batch
 			VertexConsumer vc = buf.getBuffer(bodyType);
+			VERTICES.add(part.triCount * (quads ? 4L : 3L));
 			skinner.skin(part, hidden, anyHidden);
 			emit(vc, part, colors(part, breed), light, overlay, quads);
 			if (part.emissiveTri.length > 0) {

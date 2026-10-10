@@ -255,7 +255,7 @@ public final class RaceManager {
 		DuelDesk.withdraw(player);
 		TradeDesk.withdraw(player);
 		RaceSession session = new RaceSession(level, track, ranked, player, bird);
-		SESSIONS.add(session);
+		addSession(session);
 		return true;
 	}
 
@@ -306,6 +306,24 @@ public final class RaceManager {
 	/** A session built elsewhere (the heat timetable). */
 	static void addSession(RaceSession session) {
 		SESSIONS.add(session);
+		attachWaitingBets(session);
+	}
+
+	/**
+	 * A ranked heat is on its grid: every waiting stake in Whiskerwind rides on it, as Rook promised ("your bet rides
+	 * on the next one Esther starts"). Only the riders' own were taken before; a spectator's stayed in their data until
+	 * they happened to walk back to Rook during the countdown, else it waited for some later heat.
+	 */
+	private static void attachWaitingBets(RaceSession session) {
+		if (!session.ranked()) {
+			return;
+		}
+		// the riders' own were taken on the grid (RaceSession); a rider in another heat keeps theirs for that one
+		for (ServerPlayer p : java.util.List.copyOf(session.level().players())) {
+			if (hasPendingBet(p) && sessionOf(p.getUUID()) == null) {
+				settlePendingOnto(p, session);
+			}
+		}
 	}
 
 	/** The course picker answered: mode 0 = enter the timetable's next ranked heat, 1 = post a duel challenge. */
@@ -483,6 +501,9 @@ public final class RaceManager {
 			n = cap;
 		}
 		s.takeBookieBet(player.getUUID(), legal, n);
+		// Rook quoted a guess before the card was drawn (how many riders, whether the rivals run): say what it pays now
+		player.displayClientMessage(Component.translatable("chocobosreborn.bet.attached", n,
+				Component.translatable(RaceScoring.betLangKey(legal, s.track().getRaceClass())), s.odds(legal)), false);
 		return n;
 	}
 
@@ -512,6 +533,7 @@ public final class RaceManager {
 			DuelDesk.tick(square);
 			TradeDesk.tick(square);
 			HeatSchedule.tick(square);
+			CourseBuilds.tick(square);
 			TownLife.tick(square);
 		}
 		if (square != null) {
@@ -680,6 +702,7 @@ public final class RaceManager {
 		tk.darrow.chocobosreborn.net.RaceFrameSender.reset();
 		SESSIONS.clear();
 		SquareBuilder.resetPending();
+		CourseBuilds.reset();
 		TownLife.reset();
 		ServerLevel square = Square.level(event.getServer());
 		if (square != null) {

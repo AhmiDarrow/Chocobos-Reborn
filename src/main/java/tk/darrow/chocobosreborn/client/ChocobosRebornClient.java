@@ -15,6 +15,7 @@ public final class ChocobosRebornClient {
 		modBus.addListener(this::renderers);
 		modBus.addListener(this::screens);
 		modBus.addListener(SquareSky::registerShaders);
+		modBus.addListener(GpuBirds::registerShaders);
 		modBus.addListener((net.neoforged.neoforge.client.event.RegisterDimensionSpecialEffectsEvent event) ->
 				event.register(tk.darrow.chocobosreborn.race.Square.DIMENSION.location(), new SquareSky()));
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
@@ -38,6 +39,8 @@ public final class ChocobosRebornClient {
 				RemoteRaceFrames.INSTANCE::tick);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
 				net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class, RemoteRaceFrames.INSTANCE::onLogout);
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+				net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class, event -> DerivedAtlasTexture.clearPrepared());
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
 		// parse the plain, saddled and armoured birds while the world loads, not as the first one (often a
 		// whole saddled race field) comes into view
@@ -45,6 +48,8 @@ public final class ChocobosRebornClient {
 				(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) -> {
 					WhiskerMesh.get("chocobo");
 					WhiskerMesh.get("chocobo_saddled");
+					// and the race field's breed atlases, off the render thread (each was a stall on first sight)
+					ChocoboMeshRenderer.prepareRaceAtlases();
 					// armour meshes too: the first armoured bird in view parsed one on the render thread (a visible hitch)
 					for (var tier : tk.darrow.chocobosreborn.item.ChocoboArmorItem.Tier.values()) {
 						if (tier.mesh() != null) {

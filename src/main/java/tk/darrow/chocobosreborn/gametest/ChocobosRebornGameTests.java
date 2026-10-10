@@ -1050,6 +1050,40 @@ public class ChocobosRebornGameTests {
 		});
 	}
 
+	/**
+	 * A course posted for a heat is laid over the countdown (CourseBuilds): planned off the server thread, then a
+	 * few milliseconds of chunks a tick, and it ends built with every planned solid in place.
+	 */
+	@GameTest(template = EMPTY, timeoutTicks = 1200)
+	public static void courseIsLaidOverSeveralTicks(GameTestHelper helper) {
+		ServerLevel level = helper.getLevel();
+		RaceTrack track = RaceTrack.B_KOPJE;
+		forceTrack(level, track, true);
+		tk.darrow.chocobosreborn.race.SquareData data = tk.darrow.chocobosreborn.race.SquareData.get(level);
+		data.forgetBuilt(track);
+		tk.darrow.chocobosreborn.race.CourseBuilds.request(level, track);
+		helper.assertTrue(!data.isBuilt(track), "not laid in the tick it was posted");
+		int[] ticks = {0};
+		helper.succeedWhen(() -> {
+			tk.darrow.chocobosreborn.race.CourseBuilds.tick(level);
+			ticks[0]++;
+			helper.assertTrue(data.isBuilt(track), "still laying " + track.id());
+			helper.assertTrue(ticks[0] > 1, "laid over more than one tick, took " + ticks[0]);
+			int checked = 0, missing = 0;
+			for (var e : RaceCourseLayout.of(track).blocks().entrySet()) {
+				if (e.getValue().equals("air") || (checked++ % 37) != 0) {
+					continue;
+				}
+				RaceCourseLayout.Cell c = e.getKey();
+				if (level.getBlockState(new BlockPos(c.x(), c.y(), c.z())).isAir()) {
+					missing++;
+				}
+			}
+			helper.assertTrue(missing == 0, missing + " planned blocks missing of " + checked / 37);
+			forceTrack(level, track, false);
+		});
+	}
+
 	private static void forceTrack(ServerLevel level, RaceTrack track, boolean on) {
 		for (long key : RaceCourseLayout.of(track).chunks()) {
 			level.setChunkForced((int) (key >> 32), (int) key, on);
@@ -1401,9 +1435,15 @@ public class ChocobosRebornGameTests {
 		helper.runAtTickTime(5, () -> {
 			ChocoboEntity mine = sp.getVehicle() instanceof ChocoboEntity c ? c : null;
 			helper.assertTrue(mine != null, "mounted in the Square");
+			// a spectator's waiting bet ("rides on the next one Esther starts") joins the heat when it goes on the grid
+			ServerPlayer fan = helper.makeMockServerPlayerInLevel();
+			RaceManager.BetReply waiting = RaceManager.placeBet(fan, RaceScoring.BetPick.FIELD, 2);
 			helper.assertTrue(RaceManager.startRace(sp, 0, true), "heat starts");
 			RaceSession s = RaceManager.sessionOf(sp.getUUID());
 			helper.assertTrue(s != null && s.state() == RaceSession.State.HOLD, "hold");
+			if (waiting == RaceManager.BetReply.PLACED) {   // WAIT when another test's heat was live at that moment
+				helper.assertTrue(!RaceManager.hasPendingBet(fan), "the spectator's waiting bet rides this heat");
+			}
 			helper.assertTrue(mine.racing(), "racing flag");
 			// code-awarded advancement resolves against the datapack
 			tk.darrow.chocobosreborn.race.SquareAdvancements.award(sp, tk.darrow.chocobosreborn.race.SquareAdvancements.SQUARE);

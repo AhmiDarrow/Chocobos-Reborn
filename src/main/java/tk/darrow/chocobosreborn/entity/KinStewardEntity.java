@@ -441,11 +441,8 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 			return InteractionResult.CONSUME;
 		}
 		if (s != null && RaceManager.hasPendingBet(player)) {
-			int moved = RaceManager.settlePendingOnto(player, s);
-			if (moved > 0) {
-				player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", moved,
-						Component.translatable(RaceScoring.betLangKey(pick, heatClass))), false);
-			}
+			// says "rides this heat at Nx" itself when it attaches
+			RaceManager.settlePendingOnto(player, s);
 			return InteractionResult.CONSUME;
 		}
 		// Rook never pays more than the purse: without a heat yet, the class sprint's purse is the ceiling
