@@ -33,9 +33,11 @@ public final class SquareSky extends DimensionSpecialEffects {
 	private static final ResourceLocation MOON = ResourceLocation.withDefaultNamespace("textures/environment/moon_phases.png");
 	private static final int SEGMENTS = 96, RINGS = 48;
 	private static final float[] MESH = mesh();
-	/** MESH positions through this frame's sky matrix, shared by both layers (render thread only). */
-	private static final float[] VIEW = new float[MESH.length / 5 * 3];
-	private static final org.joml.Vector3f SCRATCH = new org.joml.Vector3f();
+	/**
+	 * The sphere on the GPU, built once (render thread). It was transformed on the CPU and re-sent every frame for
+	 * each visible layer: about 37k vertices a frame through the Tesselator in the Square.
+	 */
+	private static com.mojang.blaze3d.vertex.VertexBuffer sphere;
 	private static ShaderInstance panoramaShader;
 
 	public SquareSky() {
@@ -82,11 +84,25 @@ public final class SquareSky extends DimensionSpecialEffects {
 			return true;
 		}
 		float day = dayness(level.getDayTime(), partialTick);
-		draw(level, partialTick, modelViewMatrix, new float[]{1 - day, day});
+		draw(level, partialTick, modelViewMatrix, projectionMatrix, new float[]{1 - day, day});
 		return true;
 	}
 
-	private static void draw(ClientLevel level, float partial, Matrix4f modelView, float[] weights) {
+	private static com.mojang.blaze3d.vertex.VertexBuffer sphere() {
+		if (sphere == null) {
+			var buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+			for (int i = 0; i < MESH.length; i += 5) {
+				buffer.addVertex(MESH[i], MESH[i + 1], MESH[i + 2]).setUv(MESH[i + 3], MESH[i + 4]).setColor(1F, 1F, 1F, 1F);
+			}
+			sphere = new com.mojang.blaze3d.vertex.VertexBuffer(com.mojang.blaze3d.vertex.VertexBuffer.Usage.STATIC);
+			sphere.bind();
+			sphere.upload(buffer.buildOrThrow());
+			com.mojang.blaze3d.vertex.VertexBuffer.unbind();
+		}
+		return sphere;
+	}
+
+	private static void draw(ClientLevel level, float partial, Matrix4f modelView, Matrix4f projection, float[] weights) {
 		Matrix4f matrix = new Matrix4f(modelView).m30(0).m31(0).m32(0);
 		var oldShader = RenderSystem.getShader();
 		float[] oldColor = RenderSystem.getShaderColor().clone();
@@ -100,7 +116,7 @@ public final class SquareSky extends DimensionSpecialEffects {
 		RenderSystem.setShaderColor(1, 1, 1, 1);
 		try {
 			float sum = 0;
-			boolean transformed = false;
+			ShaderInstance shader = panoramaShader != null ? panoramaShader : GameRenderer.getPositionTexColorShader();
 			for (int layer = 0; layer < LAYERS.length; layer++) {
 				float weight = Math.clamp(weights[layer], 0F, 1F);
 				if (weight < .001F) {
@@ -109,24 +125,14 @@ public final class SquareSky extends DimensionSpecialEffects {
 				sum += weight;
 				float alpha = weight / sum;   // exact weighted cross-fade
 				RenderSystem.setShaderTexture(0, LAYERS[layer]);
-				if (!transformed) {
-					// the same transform addVertex(matrix, ...) does, once a frame for both layers and
-					// without its new Vector3f per vertex (18k vertices a layer)
-					for (int i = 0, k = 0; i < MESH.length; i += 5, k += 3) {
-						matrix.transformPosition(MESH[i], MESH[i + 1], MESH[i + 2], SCRATCH);
-						VIEW[k] = SCRATCH.x();
-						VIEW[k + 1] = SCRATCH.y();
-						VIEW[k + 2] = SCRATCH.z();
-					}
-					transformed = true;
-				}
-				var buffer = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-				for (int i = 0, k = 0; i < MESH.length; i += 5, k += 3) {
-					buffer.addVertex(VIEW[k], VIEW[k + 1], VIEW[k + 2])
-							.setUv(MESH[i + 3], MESH[i + 4]).setColor(light, light, light, alpha);
-				}
-				BufferUploader.drawWithShader(buffer.buildOrThrow());
+				// the vertices are white: rain dimming and the layer's alpha go through ColorModulator
+				RenderSystem.setShaderColor(light, light, light, alpha);
+				var vb = sphere();
+				vb.bind();
+				vb.drawWithShader(matrix, projection, shader);
+				com.mojang.blaze3d.vertex.VertexBuffer.unbind();
 			}
+			RenderSystem.setShaderColor(1, 1, 1, 1);
 			RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
 			RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
 			float celestial = level.getTimeOfDay(partial);

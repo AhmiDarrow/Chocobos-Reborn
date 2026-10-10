@@ -123,7 +123,16 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 
 	@Override
 	public boolean shouldRender(ChocoboEntity e, net.minecraft.client.renderer.culling.Frustum frustum, double x, double y, double z) {
-		return frustum.isVisible(new AABB(e.getX() - 4, e.getY() - 1, e.getZ() - 4, e.getX() + 4, e.getY() + 5, e.getZ() + 4));
+		// vanilla's distance cull first: it carries the Entity Distance slider
+		if (!e.shouldRender(x, y, z)) {
+			return false;
+		}
+		if (e.noCulling) {
+			return true;
+		}
+		// the skinned mesh reaches past the hitbox (neck, tail, a stride); vanilla's own test keeps the leash case
+		return frustum.isVisible(new AABB(e.getX() - 4, e.getY() - 1, e.getZ() - 4, e.getX() + 4, e.getY() + 5, e.getZ() + 4))
+				|| super.shouldRender(e, frustum, x, y, z);
 	}
 
 	/** CPU time spent skinning and emitting birds, and how many were drawn (the race harness reports them). */
@@ -142,6 +151,11 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 	}
 
 	private void draw(ChocoboEntity e, float yaw, float partial, PoseStack ps, MultiBufferSource buf, int light) {
+		if (e.isInvisible()) {
+			// an invisibility potion hides the bird; the name tag and leash still draw
+			super.render(e, yaw, partial, ps, buf, light);
+			return;
+		}
 		String mesh = meshId(e);
 		WhiskerMesh m = WhiskerMesh.get(mesh);
 		if (m == null) {
@@ -215,8 +229,10 @@ public class ChocoboMeshRenderer extends EntityRenderer<ChocoboEntity> {
 		ResourceLocation tex = texture(e, mesh);
 		// triangles save the duplicated fourth vertex; the quad type keeps the outline for a glowing bird
 		boolean quads = e.isCurrentlyGlowing();
-		VertexConsumer vc = buf.getBuffer(quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex));
+		RenderType bodyType = quads ? RenderType.entityCutoutNoCull(tex) : ModRenderTypes.entityCutoutNoCullTriangles(tex);
 		for (WhiskerMesh.Part part : m.parts(lodLevel(e), e.male())) {
+			// fetched per part: the glow pass below switches the shared buffer, which ends the body batch
+			VertexConsumer vc = buf.getBuffer(bodyType);
 			skinner.skin(part, hidden, anyHidden);
 			emit(vc, part, colors(part, breed), light, overlay, quads);
 			if (part.emissiveTri.length > 0) {

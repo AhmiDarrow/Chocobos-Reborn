@@ -72,10 +72,18 @@ final class VillagePlan {
 			fill(l, x - 1, Y, z - 1, x + 1, Y, z + 1, "stone");
 			fill(l, x - 1, Y + 1, z - 1, x + 1, Y + 1, z + 1, "stone_brick_wall");
 			set(l, x, Y + 1, z, "water");
-			int ox = (int) Math.round(Math.cos(theta) * 2.0D), oz = (int) Math.round(Math.sin(theta) * 2.0D);
-			set(l, x + ox, Y, z + oz, "air");
-			set(l, x + ox, Y - 1, z + oz, "air");
-			set(l, x + ox, Y + 1, z + oz, "air");
+			// water only flows square to the grid and never through a wall: open the ring on the rim side
+			// (straight, not diagonal) and drop over the lip one further out
+			int dx = 0, dz = 0;
+			if (Math.abs(Math.cos(theta)) >= Math.abs(Math.sin(theta))) {
+				dx = Math.cos(theta) > 0.0D ? 1 : -1;
+			} else {
+				dz = Math.sin(theta) > 0.0D ? 1 : -1;
+			}
+			set(l, x + dx, Y + 1, z + dz, "air");
+			set(l, x + 2 * dx, Y, z + 2 * dz, "air");
+			set(l, x + 2 * dx, Y - 1, z + 2 * dz, "air");
+			set(l, x + 2 * dx, Y + 1, z + 2 * dz, "air");
 		}
 		// lantern posts on the kerb, not on the floor (Ahmi)
 		for (int i = 0; i < 14; i++) {

@@ -19,16 +19,27 @@ class ShortcutMarkerTest {
 			assertEquals(terrain.size(), layout.shortcutSigns().size(), track.name() + " one sign per shortcut");
 			for (RaceTrack.Feature f : terrain) {
 				String stripe = RaceCourseLayout.shortcutColour(f.type()) + "_concrete";
-				double t = f.start() - RaceTrack.DETOUR_CONNECT - 10.0D / track.lapLength();
-				t -= Math.floor(t);
-				boolean found = false;
-				for (int back = 0; back < 8 && !found; back++) {
-					double tt = t - back * 0.5D / track.lapLength();
-					RacePoint q = track.pointAt(tt - Math.floor(tt));
-					int y = (int) track.groundY(tt - Math.floor(tt)) - 1;
-					found = stripe.equals(layout.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(q.x()), y, (int) Math.floor(q.z()))));
+				double lap = track.lapLength();
+				double fork = f.start() - RaceTrack.DETOUR_CONNECT;
+				// anywhere on the approach (22 blocks before the fork up to the feature): the stripe leaves out the
+				// stretch that runs over the feature before it (a bog or a pool keeps its own floor)
+				int found = 0, off = 0;
+				for (double d = 22.0D; d >= -RaceTrack.DETOUR_CONNECT * lap + 1.0D; d -= 0.5D) {
+					double tt = fork - d / lap;
+					tt -= Math.floor(tt);
+					RacePoint q = track.pointAt(tt);
+					int y = (int) track.groundY(tt) - 1;
+					String at = layout.blocks().get(new RaceCourseLayout.Cell((int) Math.floor(q.x()), y, (int) Math.floor(q.z())));
+					if (stripe.equals(at)) {
+						found++;
+						if (track.terrainAt(tt) != null) {
+							off++;
+						}
+					}
 				}
-				assertTrue(found, track.name() + " " + f.type() + " stripe on the approach");
+				assertTrue(found >= 4, track.name() + " " + f.type() + " stripe on the approach: " + found);
+				// a half-block step at the feature's edge can land in the block the last stripe cell before it took
+				assertTrue(off <= 2, track.name() + " " + f.type() + " stripe painted over another feature: " + off);
 			}
 		}
 		assertTrue(features > 20, "the ladder has shortcuts to mark: " + features);

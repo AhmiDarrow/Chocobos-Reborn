@@ -204,8 +204,11 @@ final class VillageLayout {
 		if (heatLive && !night) {
 			return Activity.WATCH;
 		}
-		if (t < 1000L || night) {
-			return t < 1000L && !night ? Activity.SOCIAL : Activity.HOME;
+		if (night) {
+			return Activity.HOME;
+		}
+		if (t < 1000L || t >= 23500L) {
+			return Activity.SOCIAL;   // dawn: 23500-23999 fell through to EVENING and sent everyone to the inn
 		}
 		if (t < 8000L) {
 			return Activity.WORK;

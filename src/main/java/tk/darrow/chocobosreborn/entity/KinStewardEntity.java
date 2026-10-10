@@ -453,7 +453,8 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 				: RaceScoring.maxStake(RaceScoring.basePurse(classId),
 						RaceScoring.odds(pick, classId, RaceScoring.expectedFieldBirds(1, teioh)));
 		int stake = RaceScoring.clampStake(hand.getCount(), cap);
-		if (RaceManager.placeBet(player, pick, stake)) {
+		RaceManager.BetReply reply = RaceManager.placeBet(player, pick, stake);
+		if (reply == RaceManager.BetReply.PLACED) {
 			hand.shrink(stake);
 			player.displayClientMessage(Component.translatable("chocobosreborn.bet.placed", stake,
 					Component.translatable(RaceScoring.betLangKey(pick, heatClass))), false);
@@ -461,7 +462,7 @@ public class KinStewardEntity extends PathfinderMob implements Merchant {
 				player.displayClientMessage(Component.translatable("chocobosreborn.bet.no_heat"), false);
 			}
 		} else {
-			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refused", cap), true);
+			player.displayClientMessage(Component.translatable(reply.key, cap), true);
 		}
 		return InteractionResult.CONSUME;
 	}

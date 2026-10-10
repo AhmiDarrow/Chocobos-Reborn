@@ -12,6 +12,8 @@ Adults stand about twice a player's height, crest to claw. Chicobos hatch small 
 
 A freshly tamed bird stands up and follows you. Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you, **Stay** put, or **Wander** within 24 blocks of where you left them. A bird on Follow comes with you into the Nether, the End, Whiskerwind and back, and lands a couple of blocks behind you. A plain right-click still sits a bird down or stands it back up.
 
+A **Chocobo Whistle** (a feather over three gold nuggets) calls the birds following you from any distance, even from another dimension. Birds left on Stay or Wander stay put.
+
 Your adult birds shed a **feather** every few minutes, and a **brush** loosens one on the spot, with hearts.
 
 Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice. Nether birds are born in the Nether, End birds on the End's outer islands. Hold a **Chocobo Lure** and wild birds come to you and glow.
@@ -103,4 +105,4 @@ Chocobos Reborn works standalone. In [Ninjacat Skies](https://www.curseforge.com
 
 Chocobo is Square Enix intellectual property. This is a fan work and does not claim that IP. Nothing from Square Enix is shipped: birds, calls, item art and music are original. Code is MIT. Art and music are CC-BY-SA 4.0.
 
-Version 1.1.2. Created by Ahmi Darrow.
+Version 1.1.14. Created by Ahmi Darrow.

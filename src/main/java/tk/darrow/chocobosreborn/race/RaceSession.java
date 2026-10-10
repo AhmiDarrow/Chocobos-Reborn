@@ -77,6 +77,15 @@ public class RaceSession {
 		int ghostUntil;
 		/** The terrain feature this rider was last told about (lap * 100 + index), so each approach warns once. */
 		int warnedFeature = -1;
+		/**
+		 * A rider's ranked win is booked on the bird the moment it is placed first (see {@link #bookWin}): by
+		 * {@link #finish} the bird may be gone (logged out with its rider, or taken home by the Pocketwatch).
+		 */
+		boolean winBooked;
+		/** The bird the win was booked on, kept for the result lines even if it has left the level. */
+		@Nullable ChocoboEntity winBird;
+		boolean winBelow;
+		@Nullable RaceScoring.Promotion won;
 
 		Racer(ChocoboEntity ref, @Nullable UUID player, String name, double lane, double startProgress) {
 			this.ref = ref;
@@ -183,8 +192,22 @@ public class RaceSession {
 	}
 
 	public RaceScoring.BetPick nextPick(RaceScoring.BetPick pick, UUID bettor) {
-		return RaceScoring.nextLivePick(pick, ranked, hasPlayer(bettor), hasJolo(), hasTeiyo(),
+		RaceScoring.BetPick next = RaceScoring.nextLivePick(pick, ranked, hasPlayer(bettor), hasJolo(), hasTeiyo(),
 				humans().size() > 1);
+		if (next == RaceScoring.BetPick.FIELD && !hasFieldBirds()) {
+			// a card of riders and rivals only: FIELD can never win, so the cycle skips it while anything else pays
+			RaceScoring.BetPick after = RaceScoring.nextLivePick(next, ranked, hasPlayer(bettor), hasJolo(), hasTeiyo(),
+					humans().size() > 1);
+			if (after != RaceScoring.BetPick.FIELD) {
+				return after;
+			}
+		}
+		return next;
+	}
+
+	/** A FIELD bet can pay: some AI bird on the card is neither Teiyo nor Jolo. */
+	public boolean hasFieldBirds() {
+		return fieldBirds() > 0;
 	}
 
 	/** The most Rook takes on {@code pick} in this heat: a payout never beats the purse. */
@@ -216,11 +239,12 @@ public class RaceSession {
 
 	private boolean hasJolo() {
 		// Class C: Ahmi takes the Jolo (slightly slower) slot; Risika takes Teiyo's.
-		return racers.stream().anyMatch(r -> NAME_JOLO.equals(r.name) || NAME_AHMI.equals(r.name));
+		// AI only: a rider whose username is "Jolo" or "Ahmi" is not the rival (settleBet skips humans too)
+		return racers.stream().anyMatch(r -> !r.human() && (NAME_JOLO.equals(r.name) || NAME_AHMI.equals(r.name)));
 	}
 
 	private boolean hasTeiyo() {
-		return racers.stream().anyMatch(r -> NAME_TEIYO.equals(r.name) || NAME_RISIKA.equals(r.name));
+		return racers.stream().anyMatch(r -> !r.human() && (NAME_TEIYO.equals(r.name) || NAME_RISIKA.equals(r.name)));
 	}
 
 	private RaceScoring.BetPick legalLivePick(RaceScoring.BetPick pick, UUID bettor) {
@@ -302,7 +326,7 @@ public class RaceSession {
 					// a racer may only back themselves: a pick that pays when they lose goes back
 					if (n > 0) {
 						DuelDesk.giveGp(p, n);
-						p.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+						p.displayClientMessage(Component.translatable("chocobosreborn.bet.self_only", n), false);
 					}
 					continue;
 				}
@@ -929,11 +953,31 @@ public class RaceSession {
 				break;
 			}
 			r.finishIndex = finishCount++;
+			bookWin(r);
 			ServerPlayer player = r.serverPlayer();
 			if (player != null) {
 				player.displayClientMessage(Component.translatable("chocobosreborn.race.finish",
 						RaceScoring.placeOf(r.finishIndex, finishCount)), false);
 			}
+		}
+	}
+
+	/** A rider placed first in a ranked heat: the points and the win count go on the bird now, while it is here. */
+	private void bookWin(Racer r) {
+		if (!r.human() || r.winBooked || r.finishIndex != 0) {
+			return;
+		}
+		ChocoboEntity mine = r.entity();
+		if (mine == null) {
+			return;   // finish() tries again
+		}
+		r.winBooked = true;
+		r.winBird = mine;
+		// racing below your class: half the purse and no credit toward promotion
+		r.winBelow = mine.raceClass().getId() > track.getRaceClass().getId();
+		int place = RaceScoring.placeOf(r.finishIndex, finishCount);
+		if (!r.winBelow && RaceScoring.awardsRankedWin(ranked, true, place)) {
+			r.won = mine.recordFirstPlace(true, track.winPoints());
 		}
 	}
 
@@ -996,6 +1040,8 @@ public class RaceSession {
 			return;
 		}
 		settleFinishes(true);
+		// nobody crossed the line: every stake goes back below (a running leader's SELF bet must not pay)
+		boolean result = racers.stream().anyMatch(r -> r.finishIndex >= 0);
 		for (Racer me : humans()) {
 			if (me.settled) {
 				continue;
@@ -1004,14 +1050,12 @@ public class RaceSession {
 			ServerPlayer player = me.serverPlayer();
 			int place = RaceScoring.resultPlace(me.finishIndex, me.forfeited, finishCount, racers.size(), placeNow(me));
 			boolean completed = me.finishIndex >= 0;
-			ChocoboEntity mine = me.entity();
+			bookWin(me);
+			ChocoboEntity mine = me.winBooked ? me.winBird : me.entity();
 			// racing below your class: half the purse and no credit toward promotion
-			boolean below = mine != null && mine.raceClass().getId() > track.getRaceClass().getId();
+			boolean below = me.winBooked ? me.winBelow : mine != null && mine.raceClass().getId() > track.getRaceClass().getId();
 			int earned = track.winPoints();
-			RaceScoring.Promotion won = null;
-			if (mine != null && !below && RaceScoring.awardsRankedWin(ranked, completed, place)) {
-				won = mine.recordFirstPlace(true, earned);
-			}
+			RaceScoring.Promotion won = me.won;
 			if (player == null) {
 				if (me.player != null) {
 					int gp = completed && !duel ? RacePrizes.gp(track, place, ranked) : 0;
@@ -1021,7 +1065,9 @@ public class RaceSession {
 					if (gp > 0) {
 						RaceManager.oweGp(level.getServer(), me.player, gp);
 					}
-					settleBet(null, me.player, place == 1);
+					if (result) {
+						settleBet(null, me.player, place == 1);
+					}
 				}
 				continue;
 			}
@@ -1049,7 +1095,9 @@ public class RaceSession {
 					player.displayClientMessage(Component.translatable("chocobosreborn.race.prize_item", prizeName), false);
 				}
 			}
-			settleBet(player, player.getUUID(), place == 1);
+			if (result) {
+				settleBet(player, player.getUUID(), place == 1);
+			}
 			if (place == 1) {
 				// Player-relative: teardown teleports home and a world sting at the line dies.
 				player.playNotifySound(ModSounds.RACE_VICTORY.get(), SoundSource.MUSIC, 1.0F, 1.0F);
@@ -1490,12 +1538,20 @@ public class RaceSession {
 		aborting = true;
 		for (Racer h : humans()) {
 			if (h.running()) {
-				forfeit(h, h.serverPlayer());
+				// still on the course when the server stops (an admin restart): not this rider's doing, so their own
+				// stake goes back; spectators' bets settle on the result below if anyone has crossed the line
+				ServerPlayer sp = h.serverPlayer();
+				if (sp != null) {
+					refundStake(sp);
+				}
+				forfeit(h, sp);
 			}
 		}
 		aborting = false;
 		if (state != State.DONE) {
-			boolean anyPlaced = humans().stream().anyMatch(h -> h.finishIndex >= 0);
+			// any finisher, AI included (the rule finish() uses): a server stop after Teiyo crossed is a settled heat,
+			// not a refund of the stakes that lost
+			boolean anyPlaced = racers.stream().anyMatch(r -> r.finishIndex >= 0);
 			if (anyPlaced) {
 				finish();
 			} else {

@@ -534,7 +534,7 @@ class RaceTrackTest {
 		// flares back from the detour's rail to the kerb (RaceTrack.REJOIN_FLARE), road inside it;
 		// 16: a shortcut gantry over or just past a ridge is raised by the ridge's height (a bird
 		// coming off A_MOONSHELF's ridge met the beam). Older islands have to be re-laid either way.
-		assertEquals(16, SquareBuilder.COURSE_VERSION);
+		assertEquals(17, SquareBuilder.COURSE_VERSION);
 	}
 
 	@Test

@@ -28,6 +28,8 @@ public final class HeatSchedule {
 	/** A sign-up inside the last ten seconds before a mark takes the next one; otherwise heats are every five minutes, full stop. */
 	public static final int MIN_LEAD = 200;
 	private static final int NOTICE_2MIN = 2400, NOTICE_1MIN = 1200, NOTICE_10S = 200;
+	/** A call fires only in the first ten seconds of its window: a heat posted later than that already said its time. */
+	private static final int CALL_GRACE = 200;
 
 	/** One scheduled heat: its course, whether the named rivals run it, and who has entered (player -> bird). */
 	public static final class Heat {
@@ -37,7 +39,8 @@ public final class HeatSchedule {
 		final boolean rivals;
 		final Map<UUID, UUID> entrants = new LinkedHashMap<>();
 		private int lastNotice = -1;   // seconds shown in the countdown
-		private int lastCall;          // 2 = two-minute call, 1 = one-minute call
+		private boolean called2;       // the two-minute call went out
+		private boolean called1;       // the one-minute call went out
 
 		Heat(RaceTrack track, long startTick, boolean rivals) {
 			this.track = track;
@@ -288,12 +291,14 @@ public final class HeatSchedule {
 		for (RaceClass rc : new ArrayList<>(HEATS.keySet())) {
 			Heat heat = HEATS.get(rc);
 			long left = heat.startTick - now;
-			if (left <= NOTICE_2MIN && left > NOTICE_1MIN && heat.lastCall < 2) {
-				heat.lastCall = 2;
+			// each call once (a single "last call" mark skipped the one-minute call after the two-minute one); a heat
+			// posted well inside the two-minute window does not hear "2 minutes" right after "in 1:05"
+			if (left <= NOTICE_2MIN && left > NOTICE_2MIN - CALL_GRACE && !heat.called2) {
+				heat.called2 = true;
 				announce(square, Component.translatable("chocobosreborn.heat.notice", courseName(heat), rc.name(),
 						2, heat.entrants.size(), RaceSession.FIELD));
-			} else if (left <= NOTICE_1MIN && left > NOTICE_10S && heat.lastCall < 1) {
-				heat.lastCall = 1;
+			} else if (left <= NOTICE_1MIN && left > NOTICE_1MIN - CALL_GRACE && !heat.called1) {
+				heat.called1 = true;
 				announce(square, Component.translatable("chocobosreborn.heat.notice", courseName(heat), rc.name(),
 						1, heat.entrants.size(), RaceSession.FIELD));
 			} else if (left > NOTICE_10S && left % 20 == 0) {

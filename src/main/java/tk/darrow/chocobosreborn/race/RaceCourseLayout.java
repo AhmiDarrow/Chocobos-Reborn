@@ -1066,7 +1066,8 @@ public final class RaceCourseLayout {
 			// the stripe: dashed, three wide, from 22 blocks before the fork to the feature
 			for (double d = 22.0D; d >= -RaceTrack.DETOUR_CONNECT * lap + 1.0D; d -= 0.5D) {
 				double t = wrap(fork - d / lap);
-				if (boostAt(t) || ((int) Math.floor(d / 2.0D) & 1) == 1) {
+				// not over the feature before this one: concrete in a bog took its drag, in a pool it stood in the water
+				if (boostAt(t) || track.terrainAt(t) != null || ((int) Math.floor(d / 2.0D) & 1) == 1) {
 					continue;
 				}
 				int y = surf(t);
@@ -1391,7 +1392,7 @@ public final class RaceCourseLayout {
 			case RIVER -> pick == 0 ? "fern" : pick == 1 ? "short_grass" : pick == 2 ? "mossy_cobblestone" : "blue_orchid";
 			case SNOW -> pick == 0 ? "snow" : pick == 1 ? "snow[layers=3]" : pick == 2 ? "packed_ice" : "snow";
 			case CAVERN -> pick == 0 ? "glow_lichen[down=true]" : pick == 1 ? "small_amethyst_bud[facing=up]" : pick == 2 ? "pointed_dripstone[vertical_direction=up]" : "cobbled_deepslate_wall";
-			case JUNGLE -> pick == 0 ? "fern" : pick == 1 ? "large_fern[half=lower]" : pick == 2 ? "moss_carpet" : "jungle_leaves[persistent=true]";
+			case JUNGLE -> pick == 0 ? "fern" : pick == 1 ? "short_grass" : pick == 2 ? "moss_carpet" : "jungle_leaves[persistent=true]";
 			case NETHER -> pick == 0 ? "crimson_nylium" : pick == 1 ? "warped_nylium" : pick == 2 ? "soul_soil" : "shroomlight";
 			case SKYWAY -> "air";
 			case KEEP -> pick == 0 ? "polished_blackstone_wall" : pick == 1 ? "magma_block" : pick == 2 ? "soul_fire" : "blackstone_wall";

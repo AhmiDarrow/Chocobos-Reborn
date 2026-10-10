@@ -35,9 +35,17 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 		return color;
 	}
 
-	/** Vanilla dispenser behaviour uses EntityType.spawn, which never sees this item's colour. */
-	public static void registerDispensers() {
-		DefaultDispenseItemBehavior behaviour = new DefaultDispenseItemBehavior() {
+	/**
+	 * Vanilla dispenser behaviour uses EntityType.spawn, which never sees this item's colour. Handed to NeoForge's own
+	 * egg registration: registering it separately raced NeoForge's default in common setup, and a dispensed Gold egg
+	 * could hatch a wild Yellow.
+	 */
+	@Override
+	protected net.minecraft.core.dispenser.DispenseItemBehavior createDispenseBehavior() {
+		return DISPENSE;
+	}
+
+	private static final DefaultDispenseItemBehavior DISPENSE = new DefaultDispenseItemBehavior() {
 			@Override
 			protected ItemStack execute(BlockSource source, ItemStack stack) {
 				if (!(stack.getItem() instanceof ChocoboSpawnEggItem egg)) {
@@ -56,10 +64,6 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 				return stack;
 			}
 		};
-		for (ChocoboColor c : ChocoboColor.values()) {
-			DispenserBlock.registerBehavior(ModItems.eggItem(c), behaviour);
-		}
-	}
 
 	@Override
 	public InteractionResult interactLivingEntity(ItemStack stack, Player player, net.minecraft.world.entity.LivingEntity target, InteractionHand hand) {
@@ -73,6 +77,7 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 		if (chick == null) {
 			return InteractionResult.FAIL;
 		}
+		named(chick, stack);
 		chick.setOwnerUUID(player.getUUID());
 		chick.setTame(true, false);
 		tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).update(chick);
@@ -99,10 +104,12 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 		if (!(level instanceof ServerLevel sl)) {
 			return InteractionResult.SUCCESS;
 		}
-		if (spawnColored(sl, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D,
-				level.random.nextFloat() * 360.0F, false, true) == null) {
+		ChocoboEntity bird = spawnColored(sl, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D,
+				level.random.nextFloat() * 360.0F, false, true);
+		if (bird == null) {
 			return InteractionResult.FAIL;
 		}
+		named(bird, context.getItemInHand());
 		if (context.getPlayer() != null && !context.getPlayer().getAbilities().instabuild) {
 			context.getItemInHand().shrink(1);
 		}
@@ -125,13 +132,19 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 		if (lava && !color.lavaWalk() && !color.fireImmune()) {
 			return InteractionResultHolder.pass(stack);
 		}
+		// spawn protection and adventure mode, as vanilla's egg checks before placing on a liquid
+		if (!level.mayInteract(player, pos) || !player.mayUseItemAt(pos, hit.getDirection(), stack)) {
+			return InteractionResultHolder.fail(stack);
+		}
 		if (!(level instanceof ServerLevel sl)) {
 			return InteractionResultHolder.success(stack);
 		}
-		if (spawnColored(sl, pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D,
-				level.random.nextFloat() * 360.0F, false, true) == null) {
+		ChocoboEntity bird = spawnColored(sl, pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D,
+				level.random.nextFloat() * 360.0F, false, true);
+		if (bird == null) {
 			return InteractionResultHolder.fail(stack);
 		}
+		named(bird, stack);
 		if (!player.getAbilities().instabuild) {
 			stack.shrink(1);
 		}
@@ -156,5 +169,13 @@ public class ChocoboSpawnEggItem extends DeferredSpawnEggItem {
 		bird.finalizeSpawn(level, level.getCurrentDifficultyAt(bird.blockPosition()), MobSpawnType.SPAWN_EGG, null);
 		level.addFreshEntity(bird);
 		return bird;
+	}
+
+	/** An egg renamed on an anvil names its bird, as vanilla eggs do. */
+	private static void named(ChocoboEntity bird, ItemStack stack) {
+		net.minecraft.network.chat.Component name = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME);
+		if (name != null) {
+			bird.setCustomName(name);   // a hatched chick is booked into the ledger after this, name included
+		}
 	}
 }

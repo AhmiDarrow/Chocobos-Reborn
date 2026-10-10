@@ -43,12 +43,12 @@ public final class SquareBuilder {
 	 * only for a deliberate village change; every bump scrubs and relays the village and
 	 * clears the built-course set on the next visit.
 	 */
-	public static final int PADDOCK_VERSION = 13;
+	public static final int PADDOCK_VERSION = 14;   // 14: fences/walls/panes join both ways, inn beds, rim waterfalls spill
 	/**
 	 * Bump when RaceCourseLayout changes (arrow, kerbs, stands...): built islands are
 	 * cleared of the old plan and relaid on their next use, without touching the village.
 	 */
-	public static final int COURSE_VERSION = 16;
+	public static final int COURSE_VERSION = 17;   // 17: rails join both ways, stripes stay off bogs and pools, no half ferns
 
 	private static final Map<String, BlockState> STATES = new HashMap<>();
 	/**
@@ -89,7 +89,19 @@ public final class SquareBuilder {
 	}
 
 	static void set(ServerLevel level, int x, int y, int z, String id) {
-		level.setBlock(new BlockPos(x, y, z), state(level, id), 2);
+		place(level, new BlockPos(x, y, z), state(level, id));
+	}
+
+	/**
+	 * setBlock with flag 2 reshapes the neighbours but not the placed block itself, so a fence, wall or pane run laid
+	 * in order joined each post to the next one only (half arms on one side). /fill does the same reshaping first.
+	 */
+	static void place(ServerLevel level, BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
+		if (state.getBlock() instanceof net.minecraft.world.level.block.CrossCollisionBlock
+				|| state.getBlock() instanceof net.minecraft.world.level.block.WallBlock) {
+			state = net.minecraft.world.level.block.Block.updateFromNeighbourShapes(state, level, pos);
+		}
+		level.setBlock(pos, state, 2);
 	}
 
 	static void fill(ServerLevel level, int x0, int y0, int z0, int x1, int y1, int z1, String id) {
@@ -122,7 +134,7 @@ public final class SquareBuilder {
 		int cleared = clearIsland(level, layout, data.isStale(track) ? layout.slotClearChunks() : layout.clearChunks());
 		for (Map.Entry<RaceCourseLayout.Cell, String> e : plan.entrySet()) {
 			RaceCourseLayout.Cell c = e.getKey();
-			level.setBlock(new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()), 2);
+			place(level, new BlockPos(c.x(), c.y(), c.z()), state(level, e.getValue()));
 		}
 		// the shortcut gantries name the feature and the breeds that take it straight
 		for (RaceCourseLayout.ShortcutSign sc : layout.shortcutSigns()) {

@@ -20,6 +20,8 @@ public final class ChocobosRebornClient {
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onClientTick);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(ItemHints::tooltip);
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceHud::tick);
+		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceHud::onSystemChat);
+		modBus.addListener(RaceHud::register);
 		// the crowd in the course stands: drawn, not spawned (see CourseCrowdRenderer)
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(CourseCrowdRenderer::onRenderLevel);
         tk.darrow.chocobosreborn.net.RiderPayloads.Hud.CLIENT_HANDLER = RaceHud::update;
@@ -37,12 +39,18 @@ public final class ChocobosRebornClient {
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
 				net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class, RemoteRaceFrames.INSTANCE::onLogout);
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(RaceMusic::onPlaySound);
-		// parse the plain and saddled birds while the world loads, not as the first one (often a
+		// parse the plain, saddled and armoured birds while the world loads, not as the first one (often a
 		// whole saddled race field) comes into view
 		net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
 				(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) -> {
 					WhiskerMesh.get("chocobo");
 					WhiskerMesh.get("chocobo_saddled");
+					// armour meshes too: the first armoured bird in view parsed one on the render thread (a visible hitch)
+					for (var tier : tk.darrow.chocobosreborn.item.ChocoboArmorItem.Tier.values()) {
+						if (tier.mesh() != null) {
+							WhiskerMesh.get("chocobo_armor_" + tier.mesh());
+						}
+					}
 				});
 		tk.darrow.chocobosreborn.net.AlmanacPayload.CLIENT_OPENER = data -> {
 			var mc = net.minecraft.client.Minecraft.getInstance();

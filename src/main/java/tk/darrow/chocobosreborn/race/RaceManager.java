@@ -364,30 +364,49 @@ public final class RaceManager {
 	 * starts (the rider is locked in the stall once a heat exists, so Rook has to
 	 * take bets beforehand).
 	 */
-	public static boolean placeBet(ServerPlayer player, RaceScoring.BetPick pick, int stake) {
+	/** What Rook says to a stake: taken, or why not (each refusal has its own line). */
+	public enum BetReply {
+		PLACED(null), REFUSED("chocobosreborn.bet.refused"), CLOSED("chocobosreborn.bet.closed"),
+		WAIT("chocobosreborn.bet.wait"), NO_FIELD("chocobosreborn.bet.no_field");
+
+		@org.jetbrains.annotations.Nullable
+		public final String key;
+
+		BetReply(@org.jetbrains.annotations.Nullable String key) {
+			this.key = key;
+		}
+	}
+
+	public static BetReply placeBet(ServerPlayer player, RaceScoring.BetPick pick, int stake) {
 		int amount = RaceScoring.clampStake(stake);
 		RaceSession s = sessionForBet(player.getUUID());
 		if (s != null) {
-			if (!RaceScoring.booksOpen(true, s.running())
-					|| !RaceScoring.mayPlaceBet(true, s.hasBookieBet(player.getUUID()), amount)) {
-				return false;
+			if (!RaceScoring.booksOpen(true, s.running())) {
+				return BetReply.CLOSED;
 			}
-			s.takeBookieBet(player.getUUID(), s.legalPick(pick, player.getUUID()), amount);
-			return true;
+			if (!RaceScoring.mayPlaceBet(true, s.hasBookieBet(player.getUUID()), amount)) {
+				return BetReply.REFUSED;
+			}
+			RaceScoring.BetPick legal = s.legalPick(pick, player.getUUID());
+			if (legal == RaceScoring.BetPick.FIELD && !s.hasFieldBirds()) {
+				return BetReply.NO_FIELD;   // riders and rivals only: FIELD can never win
+			}
+			s.takeBookieBet(player.getUUID(), legal, amount);
+			return BetReply.PLACED;
 		}
 		CompoundTag tag = player.getPersistentData();
 		if (SESSIONS.stream().anyMatch(RaceSession::live) && !HeatSchedule.entered(player.getUUID())) {
-			return false;
+			return BetReply.WAIT;   // another heat (a duel, a fun heat) is running: not a wrong stake
 		}
 		if (HeatSchedule.entered(player.getUUID()) && pick != RaceScoring.BetPick.SELF) {
-			return false;   // entered racers may only back themselves
+			return BetReply.REFUSED;   // entered racers may only back themselves
 		}
 		if (!RaceScoring.mayPlaceBet(true, tag.contains(PENDING_BET), amount)) {
-			return false;
+			return BetReply.REFUSED;
 		}
 		tag.putInt(PENDING_BET, pick.ordinal());
 		tag.putInt(PENDING_STAKE, amount);
-		return true;
+		return BetReply.PLACED;
 	}
 
 	/** Birds whose rider a session is deliberately letting go (a teleported player). */
@@ -442,7 +461,13 @@ public final class RaceManager {
 		if (legal == RaceScoring.BetPick.SELF && pending != RaceScoring.BetPick.SELF) {
 			// the bettor is riding in this heat: a pick that pays when they lose goes back
 			DuelDesk.giveGp(player, n);
-			player.displayClientMessage(Component.translatable("chocobosreborn.bet.refunded", n), false);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.self_only", n), false);
+			return 0;
+		}
+		if (legal == RaceScoring.BetPick.FIELD && !s.hasFieldBirds()) {
+			// riders and rivals only: a field stake could never win
+			DuelDesk.giveGp(player, n);
+			player.displayClientMessage(Component.translatable("chocobosreborn.bet.no_field_back", n), false);
 			return 0;
 		}
 		if (legal != pending && (pending == RaceScoring.BetPick.JOE || pending == RaceScoring.BetPick.TEIOH)) {

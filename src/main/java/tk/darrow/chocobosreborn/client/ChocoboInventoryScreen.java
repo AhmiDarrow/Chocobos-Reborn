@@ -102,15 +102,15 @@ public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInven
 			well(g, x + 7 + col * 18, y + 141);
 		}
 		// slot hints when empty
-		hint(g, x + 8, y + 18, 0, "S");
-		hint(g, x + 8, y + 36, 1, "A");
-		hint(g, x + 8, y + 54, 2, "B");
+		hint(g, x + 8, y + 18, 0, "chocobosreborn.inv.slot.saddle_short");
+		hint(g, x + 8, y + 36, 1, "chocobosreborn.inv.slot.armor_short");
+		hint(g, x + 8, y + 54, 2, "chocobosreborn.inv.slot.bags_short");
 		tabs(g, mouseX, mouseY);
 	}
 
-	private void hint(GuiGraphics g, int x, int y, int slot, String letter) {
+	private void hint(GuiGraphics g, int x, int y, int slot, String key) {
 		if (menu.getSlot(slot).getItem().isEmpty()) {
-			g.drawString(font, letter, x + 5, y + 4, 0xFF5A5A5A, false);
+			g.drawString(font, net.minecraft.network.chat.Component.translatable(key), x + 5, y + 4, 0xFF5A5A5A, false);
 		}
 	}
 

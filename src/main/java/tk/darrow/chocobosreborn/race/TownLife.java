@@ -29,7 +29,8 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 public final class TownLife {
 	/** A heat this close (or running) sends the townsfolk to the overlook. */
 	private static final int WATCH_LEAD_SECONDS = 90;
-	private static final int[] CALLS = {120, 60, 0};
+	/** Two-minute and one-minute calls, and the start peal one second out (at 0 the timetable has already started the heat and dropped it). */
+	private static final int[] CALLS = {120, 60, 1};
 	private static final RaceClass[] CLASSES = RaceClass.values(), NONE = new RaceClass[0];
 
 	private static long liveTick = Long.MIN_VALUE;
@@ -38,6 +39,12 @@ public final class TownLife {
 	private static final Map<RaceClass, long[]> RUNG = new EnumMap<>(RaceClass.class);
 	private static int strokes;
 	private static long nextStroke;
+	/** A winner was recorded while the board's chunk was unloaded (the riders are out on a course island). */
+	private static boolean boardPending;
+	/** A rider's win lights the plaza until this game time, once someone is there to see it. */
+	private static long fireworksUntil = Long.MIN_VALUE;
+	/** How long a rider's win keeps its fireworks waiting for the plaza to load (teardown brings riders home). */
+	private static final long FIREWORKS_WAIT = 600L;
 
 	private TownLife() {
 	}
@@ -49,6 +56,8 @@ public final class TownLife {
 		cheer = false;
 		RUNG.clear();
 		strokes = 0;
+		boardPending = false;
+		fireworksUntil = Long.MIN_VALUE;
 	}
 
 	/** A heat is called within 90 s, or one is running. Cached once a second. */
@@ -89,6 +98,9 @@ public final class TownLife {
 			return;
 		}
 		long now = square.getGameTime();
+		if (now % 20L == 0L) {
+			flushWinner(square, now);
+		}
 		if (!HeatSchedule.anyPending()) {
 			RUNG.clear();   // what the per-class pass below does with nothing on the timetable
 			if (strokes <= 0) {
@@ -144,17 +156,33 @@ public final class TownLife {
 		w.putString("Track", trackId);
 		w.putDouble("Seconds", seconds);
 		SquareData.get(square).setWinner(rc.getId(), w);
-		writeBoard(square);
+		// the heat ends with every rider on a course island far from the plaza: the board and the fireworks wait
+		// until their chunks are loaded again (they were skipped for good before)
+		boardPending = true;
 		if (human) {
-			fireworks(square);
+			fireworksUntil = square.getGameTime() + FIREWORKS_WAIT;
+		}
+		flushWinner(square, square.getGameTime());
+	}
+
+	private static void flushWinner(ServerLevel square, long now) {
+		if (boardPending && writeBoard(square)) {
+			boardPending = false;
+		}
+		if (fireworksUntil != Long.MIN_VALUE) {
+			if (now > fireworksUntil) {
+				fireworksUntil = Long.MIN_VALUE;
+			} else if (fireworks(square)) {
+				fireworksUntil = Long.MIN_VALUE;
+			}
 		}
 	}
 
-	/** Write every sign on the winners' board from the saved winners (skipped while its chunk is unloaded). */
-	static void writeBoard(ServerLevel square) {
+	/** Write every sign on the winners' board from the saved winners; false (nothing written) while its chunk is unloaded. */
+	static boolean writeBoard(ServerLevel square) {
 		int[][] spots = VillageDistrict.boardSigns();
 		if (!square.isLoaded(new BlockPos(spots[0][0], spots[0][1], spots[0][2]))) {
-			return;
+			return false;
 		}
 		SquareData data = SquareData.get(square);
 		for (int c = 0; c < 4; c++) {
@@ -175,6 +203,7 @@ public final class TownLife {
 		}
 		put(square, spots[4], new Component[]{Component.translatable("chocobosreborn.board.title.0"),
 				Component.translatable("chocobosreborn.board.title.1"), Component.empty(), Component.empty()});
+		return true;
 	}
 
 	/** A named bird's name, or "#key" for an unnamed bird's colour, translated on the client. */
@@ -190,11 +219,11 @@ public final class TownLife {
 		}
 	}
 
-	/** Five rockets over the plaza in the tribe colours, if anyone is there to see them. */
-	static void fireworks(ServerLevel square) {
+	/** Five rockets over the plaza in the tribe colours, if anyone is there to see them (false: not loaded yet). */
+	static boolean fireworks(ServerLevel square) {
 		BlockPos centre = new BlockPos(VillageLayout.PX, SquareBuilder.GROUND_Y + 1, VillageLayout.PZ);
 		if (!square.areEntitiesLoaded(ChunkPos.asLong(centre))) {
-			return;
+			return false;
 		}
 		int[] colours = {0xF2C12E, 0x3C8DDE, 0x4F9A5A, 0xE0662A, 0xFFFFFF};
 		for (int i = 0; i < 5; i++) {
@@ -207,5 +236,6 @@ public final class TownLife {
 					centre.getY(), centre.getZ() + 0.5D + Math.sin(a) * 6.0D, rocket);
 			square.addFreshEntity(e);
 		}
+		return true;
 	}
 }

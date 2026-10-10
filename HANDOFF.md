@@ -2717,3 +2717,47 @@ stuttering/teleported ai", worse once birds get fast (green/blue, 50+ speed).
   a rider's client latest.log after a rough heat.
 - Harness instrumentation: `net-<name>.csv` (every packet's arrival, kind and class or channel), `tickgaps.csv` on the
   server (main-thread gaps over 100 ms, wall clock), and scratchpad pack_race.py records JFR on both sides.
+
+## Gauntlet sweep (2026-10-10, branch `sweep-gauntlet`, unreleased)
+
+Six reviewers (client, race/net, course/village, entity, AI/whistle/ledger/breed, items/resources) over the whole mod;
+every finding below was checked against the code before it was fixed.
+
+- **Client.** Race standings are their own HUD layer (`RaceHud`), not the action bar: sent every tick they wiped
+  the server's lap, off-road and shortcut lines. Almanac chapter buttons shrink to fit (Release was below the screen
+  at GUI height 240); hens preview as hens; page widgets respect the kept scroll. The bird renderer honours the
+  Entity Distance slider and invisibility, fetches its buffer per part (glow pass ended the batch), armour meshes
+  preload at login. Derived atlases close their image on a failed load and re-register after a reload. Scrolled
+  course buttons hide under the header. `SquareSky` draws a static `VertexBuffer` (was ~37k vertices re-sent a frame).
+- **Betting.** Rival names match AI only; FIELD is skipped / refused when no field bird runs; nobody across the line
+  refunds every stake (a running leader's SELF bet paid); a server stop with any finisher settles the heat, but a
+  still-running rider's own stake goes back. New lines `bet.self_only`, `bet.no_field(_back)`, `bet.wait`;
+  `RaceManager.placeBet` returns a `BetReply`.
+- **Race.** A rider's ranked win is booked on the bird when it is placed (`bookWin`): logging out or leaving by
+  Pocketwatch in the grace no longer loses the points. A bird outside the Square drops a stale `raceTrack`.
+  The one-minute heat call fires (it never did); the start peal rings at 1 s. The winners' board and fireworks wait
+  for the plaza chunk to load (they were skipped every heat).
+- **Course / village (`COURSE_VERSION` 17, `PADDOCK_VERSION` 14).** Fences, walls, panes and bars join both ways
+  (`SquareBuilder.place`); shortcut stripes stay off bogs and pools (A_CRYSTAL, S_ECLIPSE and others lost bog drag);
+  no half large ferns; inn beds face north; rim waterfalls open on a straight side; dawn is SOCIAL, not the inn.
+- **Bird.** Riding into a Square gate works (measured by distance between probes: a ridden bird's server delta is 0);
+  a nut no longer skips the breeding cooldown (heart packet every tick); Stay is refused with a line on a nut-fed bird;
+  the lure finds the nearest player holding one; jockeys track as far as their birds (24).
+- **Whistle / follow.** One landing search (`FollowAcross.landingNear`): rejects lava, fire, magma, powder snow,
+  berry bushes, cobweb; falls back down the column, else refuses (no more mid-air or in-rock landings). A bird tied
+  to a fence in an unloaded chunk stays; "eight came" only when eight did; follow-across leaves other riders seated.
+- **Ledger.** A bred chick is booked when it joins the world (a cancelled birth left a living ghost).
+- **Eggs.** Dispenser behaviour goes through `createDispenseBehavior` (raced NeoForge's default); an egg on your own
+  bird hatches a chick; pick-block gives the bird's colour; named eggs name the bird; liquid placement respects spawn
+  protection.
+- **Docs / lang.** Whistle in README, SPEC and the store page; store footer 1.1.14; dead keys
+  `block...gysahl_green.hint` and `item...square_gate` removed; Square advancement text.
+
+Left (reported, not changed): FIELD at 5 field birds pays 1x (balance call); the lag credit trusts the client's
+probe echo (vanilla ping is no safer); `updateInterval(1)` for every chocobo (measure before changing); spawn-egg
+birds have zero born genes (design?); a first-time course build is one long tick; atlas derivation on first sight
+still runs on the render thread; Fair and Exchange both sell leads at different prices; the village rebuild still
+clears the built-course set.
+
+Needs an in-game look: the new sky buffer (both layers, rain dimming, dawn cross-fade), the race HUD position over
+the hotbar, gate ride-through, the rebuilt village (waterfalls, beds, fence joins).

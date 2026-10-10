@@ -310,7 +310,7 @@ public class RacerGoal extends Goal {
 		if (bird.horizontalCollision && bird.onGround()) {
 			bird.getJumpControl().jump();
 		}
-		if (!layout.onCourse(bird.getX(), bird.getZ()) && bird.tickCount % 10 == 0) {
+		if (bird.tickCount % 10 == 0 && !layout.onCourse(bird.getX(), bird.getZ())) {   // the cheap test first
 			// Drifted off the road: nudge back onto the line (or the detour).
 			RacePoint back = track.pointAtLane(t, track.steerLaneAt(t, directLane, color, bogSavvy));
 			bird.getMoveControl().setWantedPosition(back.x(), back.y(), back.z(), mul);

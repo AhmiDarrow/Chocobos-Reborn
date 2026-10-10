@@ -123,7 +123,8 @@ public final class ChocoboWhistle {
 			}
 		}
 		int coming = blow.arrived + blow.waiting;
-		boolean capped = qualified > WhistleRules.CAP;
+		// "eight came" only when eight did: a teleport another mod blocked does not count
+		boolean capped = qualified > WhistleRules.CAP && coming >= WhistleRules.CAP;
 		String key = WhistleRules.noticeKey(coming, capped, here, racing, busy, lost, parked);
 		if (coming > 0) {
 			if ("chocobosreborn.whistle.called_many".equals(key)) {
@@ -162,7 +163,9 @@ public final class ChocoboWhistle {
 		ServerPlayer owner = server.getPlayerList().getPlayer(pending.owner);
 		if (owner != null && owner.isAlive() && !owner.isSpectator()) {
 			BirdRecord record = ChocoboLedger.get(server).find(bird.getUUID());
-			if (record != null && WhistleRules.reason(facts(bird, owner, record)) == WhistleRules.Reason.CALL) {
+			// a saved lead is reattached on the bird's first tick, after this: isLeashed() still reads false here
+			boolean tied = bird.getLeashData() != null;
+			if (record != null && !tied && WhistleRules.reason(facts(bird, owner, record)) == WhistleRules.Reason.CALL) {
 				if (blow == null) {
 					blow = new Blow(owner.getUUID());
 				}
@@ -286,12 +289,17 @@ public final class ChocoboWhistle {
 	}
 
 	private static boolean summon(ChocoboEntity bird, ServerPlayer owner, Blow blow) {
-		if (bird.isVehicle()) {
-			for (Entity passenger : bird.getPassengers()) {
-				if (passenger instanceof Player player && !owner.getUUID().equals(player.getUUID())) {
-					return false;
-				}
+		for (Entity passenger : bird.getPassengers()) {
+			if (passenger instanceof Player player && !owner.getUUID().equals(player.getUUID())) {
+				return false;
 			}
+		}
+		// later birds land on a spun yaw, a step further behind, so eight do not share one block
+		Vec3 spot = FollowAcross.landingNear(owner, bird, owner.getYRot() + blow.slot * 40.0F, 2.5D + blow.slot * 1.5D);
+		if (spot == null) {
+			return false;   // nowhere safe to land it: it stays where it is
+		}
+		if (bird.isVehicle()) {
 			RaceManager.RELEASING.add(bird.getUUID());
 			try {
 				bird.ejectPassengers();
@@ -299,7 +307,6 @@ public final class ChocoboWhistle {
 				RaceManager.RELEASING.remove(bird.getUUID());
 			}
 		}
-		Vec3 spot = blow.slot == 0 ? FollowAcross.landing(owner, bird) : spread(owner, bird, blow.slot);
 		// Load the landing the way a portal does, or a cross-dimension copy is dropped with the chunk.
 		BlockPos at = BlockPos.containing(spot);
 		ServerLevel destination = owner.serverLevel();
@@ -318,53 +325,6 @@ public final class ChocoboWhistle {
 		live.giveCommand(ChocoboEntity.Command.FOLLOW, null);
 		if (live.level() instanceof ServerLevel level) {
 			ChocoboLedger.get(level).update(live);
-		}
-		return true;
-	}
-
-	/** Later birds land on a spun yaw, a step further behind, so eight do not share one block. */
-	private static Vec3 spread(ServerPlayer owner, ChocoboEntity bird, int index) {
-		float yawDeg = owner.getYRot() + index * 40.0F;
-		double distance = 2.5D + index * 1.5D;
-		ServerLevel level = owner.serverLevel();
-		float yaw = yawDeg * (Mth.PI / 180.0F);
-		double x = owner.getX() + Math.sin(yaw) * distance;
-		double z = owner.getZ() - Math.cos(yaw) * distance;
-		BlockPos base = BlockPos.containing(x, owner.getY(), z);
-		int tall = Math.max(1, Mth.ceil(bird.getBbHeight()));
-		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-		for (int r = 0; r <= 3; r++) {
-			for (int dx = -r; dx <= r; dx++) {
-				for (int dz = -r; dz <= r; dz++) {
-					if (r > 0 && Math.max(Math.abs(dx), Math.abs(dz)) != r) {
-						continue;
-					}
-					for (int dy = 3; dy >= -6; dy--) {
-						cursor.set(base.getX() + dx, base.getY() + dy, base.getZ() + dz);
-						if (standable(level, cursor, tall)) {
-							return new Vec3(cursor.getX() + 0.5D, cursor.getY(), cursor.getZ() + 0.5D);
-						}
-					}
-				}
-			}
-		}
-		return new Vec3(x, owner.getY(), z);
-	}
-
-	private static boolean standable(ServerLevel level, BlockPos feet, int tall) {
-		if (!level.getWorldBorder().isWithinBounds(feet)) {
-			return false;
-		}
-		BlockPos ground = feet.below();
-		BlockState floor = level.getBlockState(ground);
-		if (!floor.isFaceSturdy(level, ground, Direction.UP)) {
-			return false;
-		}
-		for (int i = 0; i < tall; i++) {
-			BlockPos at = feet.above(i);
-			if (!level.getBlockState(at).getCollisionShape(level, at).isEmpty()) {
-				return false;
-			}
 		}
 		return true;
 	}

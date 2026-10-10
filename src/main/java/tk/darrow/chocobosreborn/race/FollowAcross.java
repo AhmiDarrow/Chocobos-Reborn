@@ -99,6 +99,17 @@ public final class FollowAcross {
 		if (waiting(bird, now)) {
 			return bird;
 		}
+		for (Entity passenger : bird.getPassengers()) {
+			if (passenger instanceof net.minecraft.world.entity.player.Player p && !p.getUUID().equals(owner.getUUID())) {
+				return bird;   // someone else is riding it (a /ride, another mod): not thrown off, as the whistle does
+			}
+		}
+		Vec3 spot = landing(owner, bird);
+		if (spot == null) {
+			// nowhere safe near the owner (flying, in a two-high tunnel, over lava): try again later
+			WAIT.put(bird.getUUID(), now + RETRY_TICKS);
+			return bird;
+		}
 		if (bird.isVehicle()) {
 			RaceManager.RELEASING.add(bird.getUUID());
 			try {
@@ -107,7 +118,6 @@ public final class FollowAcross {
 				RaceManager.RELEASING.remove(bird.getUUID());
 			}
 		}
-		Vec3 spot = landing(owner, bird);
 		// The owner's chunk ticket may not cover the landing yet. Load it the way a portal does,
 		// or the copy is created and then dropped with the unloaded chunk.
 		BlockPos at = BlockPos.containing(spot);
@@ -143,11 +153,22 @@ public final class FollowAcross {
 	}
 
 	/** Open ground a couple of blocks behind the owner, so a portal does not immediately send the bird back. */
+	@org.jetbrains.annotations.Nullable
 	static Vec3 landing(ServerPlayer owner, ChocoboEntity bird) {
+		return landingNear(owner, bird, owner.getYRot(), 2.5D);
+	}
+
+	/**
+	 * Safe ground {@code distance} blocks behind the owner along {@code yawDeg}: within three blocks across and from
+	 * three above to six below that point, else straight down that column. Null if there is none: a bird is never
+	 * put in mid-air (an owner flying or on elytra) or inside the rock.
+	 */
+	@org.jetbrains.annotations.Nullable
+	public static Vec3 landingNear(ServerPlayer owner, ChocoboEntity bird, float yawDeg, double distance) {
 		ServerLevel level = owner.serverLevel();
-		float yaw = owner.getYRot() * (Mth.PI / 180.0F);
-		double x = owner.getX() + Math.sin(yaw) * 2.5D;
-		double z = owner.getZ() - Math.cos(yaw) * 2.5D;
+		float yaw = yawDeg * (Mth.PI / 180.0F);
+		double x = owner.getX() + Math.sin(yaw) * distance;
+		double z = owner.getZ() - Math.cos(yaw) * distance;
 		BlockPos base = BlockPos.containing(x, owner.getY(), z);
 		int tall = Math.max(1, Mth.ceil(bird.getBbHeight()));
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -159,18 +180,26 @@ public final class FollowAcross {
 					}
 					for (int dy = 3; dy >= -6; dy--) {
 						cursor.set(base.getX() + dx, base.getY() + dy, base.getZ() + dz);
-						if (standable(level, cursor, tall)) {
+						if (standable(level, cursor, tall, bird.fireImmune())) {
 							return new Vec3(cursor.getX() + 0.5D, cursor.getY(), cursor.getZ() + 0.5D);
 						}
 					}
 				}
 			}
 		}
-		return new Vec3(x, owner.getY(), z);
+		// the owner is high above any floor: the first safe ground below, if the drop is not into the void
+		for (int y = base.getY() - 7; y > level.getMinBuildHeight(); y--) {
+			cursor.set(base.getX(), y, base.getZ());
+			if (standable(level, cursor, tall, bird.fireImmune())) {
+				return new Vec3(cursor.getX() + 0.5D, cursor.getY(), cursor.getZ() + 0.5D);
+			}
+		}
+		return null;
 	}
 
-	private static boolean standable(ServerLevel level, BlockPos feet, int tall) {
-		if (!level.getWorldBorder().isWithinBounds(feet)) {
+	/** Sturdy ground, room for the bird's height, and nothing that burns or traps it (lava, fire, powder snow). */
+	static boolean standable(ServerLevel level, BlockPos feet, int tall, boolean fireImmune) {
+		if (!level.getWorldBorder().isWithinBounds(feet) || !level.isInWorldBounds(feet)) {
 			return false;
 		}
 		BlockPos ground = feet.below();
@@ -178,12 +207,26 @@ public final class FollowAcross {
 		if (!floor.isFaceSturdy(level, ground, Direction.UP)) {
 			return false;
 		}
+		if (!fireImmune && floor.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK)) {
+			return false;
+		}
 		for (int i = 0; i < tall; i++) {
 			BlockPos at = feet.above(i);
-			if (!level.getBlockState(at).getCollisionShape(level, at).isEmpty()) {
+			BlockState st = level.getBlockState(at);
+			if (!st.getCollisionShape(level, at).isEmpty() || hazard(st, fireImmune)) {
 				return false;
 			}
 		}
 		return true;
+	}
+
+	/** No collision box, but not somewhere to stand: lava and fire (unless it does not burn), powder snow, berry bushes. */
+	private static boolean hazard(BlockState st, boolean fireImmune) {
+		if (st.is(net.minecraft.world.level.block.Blocks.POWDER_SNOW) || st.is(net.minecraft.world.level.block.Blocks.SWEET_BERRY_BUSH)
+				|| st.is(net.minecraft.world.level.block.Blocks.WITHER_ROSE) || st.is(net.minecraft.world.level.block.Blocks.COBWEB)) {
+			return true;
+		}
+		return !fireImmune && (st.getFluidState().is(net.minecraft.tags.FluidTags.LAVA)
+				|| st.is(net.minecraft.tags.BlockTags.FIRE));
 	}
 }

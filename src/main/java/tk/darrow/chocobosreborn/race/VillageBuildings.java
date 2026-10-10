@@ -207,8 +207,9 @@ final class VillageBuildings {
 		set(l, cx, Y + 3, cz, "lantern[hanging=true]");
 		set(l, cx, Y + 7, cz, "lantern[hanging=true]");
 		for (int x = x0 + 2; x < x1 - 1; x += 3) {
-			set(l, x, Y + 5, z0 + 1, "red_bed[facing=south,part=head]");
-			set(l, x, Y + 5, z0 + 2, "red_bed[facing=south,part=foot]");
+			// a bed's head is its foot moved along facing: head north of the foot
+			set(l, x, Y + 5, z0 + 1, "red_bed[facing=north,part=head]");
+			set(l, x, Y + 5, z0 + 2, "red_bed[facing=north,part=foot]");
 		}
 		// bell tower on the east side with a copper cap
 		int tx = x1 + 3;

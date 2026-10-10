@@ -313,8 +313,10 @@ code (`tools/write_datapack.py`).
 
 8 greens, 8 nuts, Gysahl seeds (crop `gysahl_green`), Chocobo Lure, GP, Chocobo
 Saddle, Chocobo Almanac (illustrated guide + "My Chocobos" ledger pages with rename,
-`ledger/`), Chocobo Pocketwatch (Whiskerwind and back), four Chocobo Armors, Saddlebags,
-Square Gate block (Square-internal, no recipe), spawn eggs (8 colours + kin). Loot: seeds from grass (global loot
+`ledger/`), Chocobo Pocketwatch (Whiskerwind and back), Chocobo Whistle (calls Follow birds
+from any distance or dimension, `race/ChocoboWhistle`), four Chocobo Armors, Saddlebags,
+Square Gate and Boost Pad blocks (Square-internal, no recipe), Wild Gysahl (placed by other mods' worldgen,
+none by this mod), spawn eggs (8 colours + kin). Loot: seeds from grass (global loot
 modifier); the gysahl crop drops only Gysahl and seeds. Nothing else in the wild: every
 other green and every nut is Whiskerwind stock or a race prize. Tooltips
 `chocobosreborn.tip.*`.

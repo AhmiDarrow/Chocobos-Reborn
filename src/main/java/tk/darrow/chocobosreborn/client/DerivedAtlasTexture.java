@@ -44,8 +44,8 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 
 	/** Cache a closed-eye variant once; no image processing occurs per render frame. */
 	public static void ensureBlink(ResourceLocation derived, ResourceLocation source, ResourceLocation eyelids, int[] rgb, boolean recolorSource) {
-		if (REGISTERED.contains(derived)) return;
 		TextureManager textures = Minecraft.getInstance().getTextureManager();
+		if (REGISTERED.contains(derived) && textures.getTexture(derived, null) != null) return;
 		if (textures.getTexture(derived, null) == null) {
 			textures.register(derived, new DerivedAtlasTexture(source, rgb, eyelids, recolorSource));
 		}
@@ -57,10 +57,11 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 	 * every frame; only the first call registers (render thread, resources loaded).
 	 */
 	public static void ensure(ResourceLocation derived, ResourceLocation source, int[] rgb) {
-		if (REGISTERED.contains(derived)) {
+		TextureManager textures = Minecraft.getInstance().getTextureManager();
+		// a load that failed is stored as the missing texture until a resource reload drops it: then register again
+		if (REGISTERED.contains(derived) && textures.getTexture(derived, null) != null) {
 			return;
 		}
-		TextureManager textures = Minecraft.getInstance().getTextureManager();
 		if (textures.getTexture(derived, null) == null) {
 			textures.register(derived, new DerivedAtlasTexture(source, rgb));
 		}
@@ -73,6 +74,20 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 		try (InputStream in = manager.getResourceOrThrow(source).open()) {
 			image = NativeImage.read(in);
 		}
+		try {
+			derive(manager, image);
+		} catch (IOException | RuntimeException ex) {
+			image.close();   // 4 MB of native memory otherwise
+			throw ex;
+		}
+		if (!RenderSystem.isOnRenderThreadOrInit()) {
+			RenderSystem.recordRenderCall(() -> upload(image));
+		} else {
+			upload(image);
+		}
+	}
+
+	private void derive(ResourceManager manager, NativeImage image) throws IOException {
 		int w = image.getWidth(), h = image.getHeight();
 		int[] pixels = new int[w * h];
 		for (int y = 0; y < h; y++) {
@@ -96,11 +111,6 @@ public final class DerivedAtlasTexture extends AbstractTexture {
 			for (int x = 0; x < w; x++) {
 				image.setPixelRGBA(x, y, pixels[y * w + x]);
 			}
-		}
-		if (!RenderSystem.isOnRenderThreadOrInit()) {
-			RenderSystem.recordRenderCall(() -> upload(image));
-		} else {
-			upload(image);
 		}
 	}
 

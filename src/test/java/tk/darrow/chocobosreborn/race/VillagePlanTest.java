@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VillagePlanTest {
 	@Test
 	void paddockVersionThirteenRebuildsTheVillage() {
-		assertEquals(13, SquareBuilder.PADDOCK_VERSION);
+		assertEquals(14, SquareBuilder.PADDOCK_VERSION);
 	}
 
 	@Test
@@ -87,6 +87,8 @@ class VillagePlanTest {
 		assertEquals(VillageLayout.Activity.WATCH, VillageLayout.activity(3000L, true));
 		assertEquals(VillageLayout.Activity.HOME, VillageLayout.activity(18000L, true), "nobody gets up for a night heat");
 		assertEquals(VillageLayout.Activity.WORK, VillageLayout.activity(24000L + 3000L, false), "day time wraps");
+		assertEquals(VillageLayout.Activity.SOCIAL, VillageLayout.activity(23700L, false), "dawn is social, not the inn");
+		assertEquals(VillageLayout.Activity.SOCIAL, VillageLayout.activity(500L, false));
 		for (int i = 0; i < VillageLayout.residents().size(); i++) {
 			double[] w = VillageLayout.watchSpot(i);
 			double r = Math.hypot(w[0] - 0.5D, w[1] - (VillageLayout.OVERLOOK_Z + 0.5D));

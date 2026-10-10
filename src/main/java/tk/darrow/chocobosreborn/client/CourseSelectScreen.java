@@ -174,7 +174,10 @@ public class CourseSelectScreen extends Screen {
 
 	private void applyScroll() {
 		for (int i = 0; i < moving.size(); i++) {
-			moving.get(i).setY(movingBaseY.get(i) - scroll);
+			Button b = moving.get(i);
+			b.setY(movingBaseY.get(i) - scroll);
+			// under the header the button is covered but would still show its tooltip on hover
+			b.visible = b.getY() >= HEADER && b.getY() < height;
 		}
 	}
 
@@ -223,7 +226,7 @@ public class CourseSelectScreen extends Screen {
 		for (var e : counts.entrySet()) {
 			out.append(" · ").append(Component.translatable("chocobosreborn.select.f." + e.getKey().name().toLowerCase(java.util.Locale.ROOT)));
 			if (e.getValue() > 1) {
-				out.append(" x" + e.getValue());
+				out.append(" ").append(Component.translatable("chocobosreborn.select.f.count", e.getValue()));
 			}
 		}
 		return out;

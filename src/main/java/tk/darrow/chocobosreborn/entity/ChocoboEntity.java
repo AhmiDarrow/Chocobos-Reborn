@@ -170,6 +170,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 	private int flapTicks;
 	/** Ticks before a ridden bird will use a Square gate again. */
 	private int gateCooldown;
+	/**
+	 * Where the last gate probe saw the bird. A ridden bird's server delta is always zero (its rider's client moves
+	 * it), so riding into a gate never registered on the delta: measure the ground covered between probes instead.
+	 */
+	private double gateProbeX = Double.NaN, gateProbeZ;
 	/** Rider is holding sneak: dive (fliers) / submerge (water birds). Set in travel(). */
 	private boolean descending;
 	/**
@@ -641,6 +646,14 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	/** Owner's order from the equipment screen or a plain right-click: say it, and kweh it. */
 	public void giveCommand(Command command, @Nullable Player player) {
+		if (command == Command.STAY && fedNut() != ChocoboNut.NONE && !isBaby()) {
+			// a nut keeps the bird in love until it hatches, and love stands a sitting bird up the next tick:
+			// say so instead of confirming a Stay that would not hold
+			if (!level().isClientSide && player != null) {
+				player.displayClientMessage(Component.translatable("chocobosreborn.command.stay.nut", getDisplayName()), true);
+			}
+			return;
+		}
 		if (command != Command.STAY) {
 			boolean wasWander = wander;
 			wander = command == Command.WANDER;
@@ -1334,10 +1347,21 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		applyColorStats(false);
 	}
 
+	/** Parents of a chick bred this tick, written to the ledger once the chick is in the world. Not saved. */
+	private record Hatch(ChocoboEntity a, ChocoboEntity b, int nut, long gameTime) {}
+
+	@Nullable
+	private Hatch pendingHatch;
+
 	@Override
 	public void onAddedToLevel() {
 		super.onAddedToLevel();
 		if (level() instanceof ServerLevel sl) {
+			if (pendingHatch != null) {
+				Hatch h = pendingHatch;
+				pendingHatch = null;
+				tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).hatched(this, h.a(), h.b(), h.nut(), h.gameTime());
+			}
 			tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(sl).applyPendingRelease(this);
 			ledgerUpdate();
 			tk.darrow.chocobosreborn.race.ChocoboWhistle.onAdded(this);
@@ -1353,6 +1377,12 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 
 	// ------------------------------------------------------------ interaction
 
+	/** Pick-block gives this bird's own colour egg (vanilla's type lookup returns the last egg registered: Nether). */
+	@Override
+	public ItemStack getPickResult() {
+		return new ItemStack(ModItems.eggItem(color()));
+	}
+
 	@Override
 	public InteractionResult mobInteract(Player player, InteractionHand hand) {
 		ItemStack stack = player.getItemInHand(hand);
@@ -1364,6 +1394,11 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 				player.displayClientMessage(Component.translatable("chocobosreborn.square.town_bird"), true);
 			}
 			return InteractionResult.sidedSuccess(level().isClientSide);
+		}
+		if (stack.getItem() instanceof tk.darrow.chocobosreborn.item.ChocoboSpawnEggItem) {
+			// the egg hatches a chick of its colour (ChocoboSpawnEggItem.interactLivingEntity), which only runs when this
+			// passes: on your own bird the click mounted it or toggled Stay instead
+			return InteractionResult.PASS;
 		}
 		if (racing()) {
 			return InteractionResult.sidedSuccess(level().isClientSide);
@@ -1706,7 +1741,9 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 		}
 		this.entityData.set(DATA_NUT, 0);
 		mate.entityData.set(DATA_NUT, 0);
-		tk.darrow.chocobosreborn.ledger.ChocoboLedger.get(level).hatched(chick, this, mate, nut.ordinal(), level.getGameTime());
+		// booked when the chick joins the world (onAddedToLevel): a mod that cancels or swaps the baby left a
+		// living record of a bird that never existed
+		chick.pendingHatch = new Hatch(this, mate, nut.ordinal(), level.getGameTime());
 		return chick;
 	}
 
@@ -2648,9 +2685,16 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (tickCount % 10 == 0) {
 				tk.darrow.chocobosreborn.race.FollowAcross.towardOwner(this);
 			}
+			if (tickCount % 20 == 0 && raceTrack() >= 0 && !racing() && !Square.isSquare(level())) {
+				// a placed rider who left in the finish grace (Pocketwatch) took the bird out of teardown's reach:
+				// the stale course kept it off the whistle and out of the heats
+				setRaceTrack(-1);
+			}
 			// A nut stays until they hatch; keep the love window open so a missed path
 			// does not lock Carob/Zeio forever.
-			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove()) {
+			// not in the breeding cooldown (age > 0): vanilla clears love there every tick, and re-loving it each tick
+			// let a fresh nut skip the five minutes and sent a heart packet every tick
+			if (fedNut() != ChocoboNut.NONE && !isInLove() && canFallInLove() && getAge() == 0) {
 				setInLove(null);
 			}
 			if (townBird() && isBaby() && getAge() > -6000) {
@@ -2696,7 +2740,7 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			if (gateCooldown > 0) {
 				gateCooldown--;
 			} else if (tickCount % 5 == 0 && getControllingPassenger() instanceof net.minecraft.server.level.ServerPlayer sp
-					&& getDeltaMovement().horizontalDistanceSqr() > 0.004D) {
+					&& movedSinceGateProbe()) {
 				net.minecraft.world.phys.AABB box = getBoundingBox().inflate(0.6D, 0.0D, 0.6D);
 				for (BlockPos p : BlockPos.betweenClosed(BlockPos.containing(box.minX, box.minY, box.minZ),
 						BlockPos.containing(box.maxX, box.maxY + 1.0D, box.maxZ))) {
@@ -2710,13 +2754,27 @@ public class ChocoboEntity extends TamableAnimal implements PlayerRideableJumpin
 			}
 			// Chocobo Lure: wild birds show themselves to a player carrying one.
 			if (!isTame() && !squareProtected() && tickCount % 20 == 0) {
-				Player lurer = level().getNearestPlayer(this, 32.0D);
-				if (lurer != null && (lurer.getMainHandItem().is(ModItems.CHOCOBO_LURE.get())
-						|| lurer.getOffhandItem().is(ModItems.CHOCOBO_LURE.get()))) {
+				// the nearest player holding a lure, not the nearest player (who may not have one)
+				Player lurer = level().getNearestPlayer(getX(), getY(), getZ(), 32.0D,
+						p -> p instanceof Player pl && (pl.getMainHandItem().is(ModItems.CHOCOBO_LURE.get())
+								|| pl.getOffhandItem().is(ModItems.CHOCOBO_LURE.get())));
+				if (lurer != null) {
 					addEffect(new MobEffectInstance(MobEffects.GLOWING, 40, 0, true, false));
 				}
 			}
 		}
+	}
+
+	/** Moved over a block-third in the five ticks since the last gate probe (about 0.06 a tick, the old delta test). */
+	private boolean movedSinceGateProbe() {
+		double px = gateProbeX, pz = gateProbeZ;
+		gateProbeX = getX();
+		gateProbeZ = getZ();
+		if (Double.isNaN(px)) {
+			return false;
+		}
+		double dx = getX() - px, dz = getZ() - pz;
+		return dx * dx + dz * dz > 0.1D;
 	}
 
 	/** Minimum and spread of the gap between shed feathers: one every 5 to 10 minutes. */

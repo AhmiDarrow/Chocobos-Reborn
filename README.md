@@ -22,6 +22,8 @@ Craft a **Chocobo Almanac** (a book and a gysahl): the full guide, plus a live p
 
 Tame birds take three orders from the tabs on their equipment screen (sneak and right-click with an empty hand): **Follow** you (and come along to Whiskerwind and back), **Stay** put, or **Wander** within 24 blocks of where you left them. A plain right-click still sits a bird down or stands it back up.
 
+Craft a **Chocobo Whistle** (a feather over three gold nuggets) to call the birds following you from any distance, even from another dimension. Birds left on Stay or Wander stay put.
+
 Wild Yellows roam the Overworld. Wonderful Yellows only turn up on snow and ice. Nether birds are born in the Nether, End birds on the End's outer islands. Hold a **Chocobo Lure** and wild birds come to you and glow.
 
 ## Greens (training)

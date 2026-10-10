@@ -25,7 +25,9 @@ public final class ModEntities {
 	public static final DeferredHolder<EntityType<?>, EntityType<KinStewardEntity>> KIN_STEWARD =
 			ENTITIES.register("kin_steward", () -> EntityType.Builder.of(KinStewardEntity::new, MobCategory.MISC)
 					.sized(0.6F, 1.95F)
-					.clientTrackingRange(10)
+					// as far as the birds they ride: a jockey's range does not follow its mount's, so a race field
+					// past 160 blocks was drawn riderless
+					.clientTrackingRange(24)
 					.build("chocobosreborn:kin_steward"));
 
 	public static void attributes(EntityAttributeCreationEvent event) {
