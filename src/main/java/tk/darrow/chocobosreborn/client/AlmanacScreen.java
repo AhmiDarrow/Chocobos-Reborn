@@ -384,7 +384,8 @@ public class AlmanacScreen extends Screen {
 					g.fill(cx - cell / 2 + 2, cy, cx + cell / 2 - 2, cy + 84, 0x33FFFFFF);
 					// an adult is ADULT_H blocks tall: 18 px per block keeps the crest under the cell's top
 					drawBird(g, colors[i], false, true, cx, cy + 68, 18, mx, my);
-					g.drawCenteredString(font, Component.translatable("chocobosreborn.color." + colors[i].id()), cx, cy + 72, 0xFFFFFFFF);
+					FittedLabel.center(g, font, Component.translatable("chocobosreborn.color." + colors[i].id()),
+							cx, cy + 72, Math.max(8, cell - 8), 0xFFFFFFFF, true);
 				}
 			}
 		};
@@ -497,7 +498,11 @@ public class AlmanacScreen extends Screen {
 				int[] fed = {r.trSpeed(), r.trStamina(), r.trIntel(), r.trCoop()};
 				int[] cols = {0xFFE8A416, 0xFF4CB05A, 0xFF3A8FD0, 0xFFE078A8};
 				int labelW = 72;
+				for (String name : names) {
+					labelW = Math.max(labelW, font.width(Component.translatable(name)));
+				}
 				int numW = 36;
+				labelW = Math.min(labelW + 4, Math.max(48, tw - 24 - numW));
 				int barX = tx + labelW;
 				int barW = Math.max(24, tw - labelW - numW);
 				for (int i = 0; i < 4; i++) {
@@ -505,7 +510,7 @@ public class AlmanacScreen extends Screen {
 					int bornN = Math.max(0, Math.min(100, bornStat[i]));
 					int total = Math.min(100, bornN + Math.max(0, fed[i]));
 					int fedN = total - bornN;
-					g.drawString(font, Component.translatable(names[i]), tx, by, 0xFFBBBBBB, false);
+					FittedLabel.left(g, font, Component.translatable(names[i]), tx, by, labelW - 2, 0xFFBBBBBB, false);
 					g.fill(barX, by + 1, barX + barW, by + 8, 0xFF303030);
 					if (bornN > 0) {
 						g.fill(barX, by + 1, barX + barW * bornN / 100, by + 8, cols[i]);

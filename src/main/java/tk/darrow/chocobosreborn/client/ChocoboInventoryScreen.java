@@ -69,7 +69,7 @@ public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInven
 			g.fill(x, y, x + TAB_W - 1, y + TAB_H - 1, on ? WELL_D : EDGE_L);
 			g.fill(x + 1, y + 1, x + TAB_W - 1, y + TAB_H - 1, on ? WELL : c.ordinal() == hover ? 0xFFDADADA : PANEL);
 			Component label = Component.translatable("chocobosreborn.command." + c.id());
-			g.drawString(font, label, x + (TAB_W - font.width(label)) / 2, y + 4, on ? 0xFFFFFFFF : 0xFF404040, on);
+			FittedLabel.center(g, font, label, x + TAB_W / 2, y + 4, TAB_W - 4, on ? 0xFFFFFFFF : 0xFF404040, on);
 		}
 	}
 
@@ -91,7 +91,8 @@ public class ChocoboInventoryScreen extends AbstractContainerScreen<ChocoboInven
 				}
 			}
 		} else {
-			g.drawString(font, Component.translatable("chocobosreborn.inv.no_bags"), x + 80, y + 40, 0xFF6A6A6A, false);
+			FittedLabel.left(g, font, Component.translatable("chocobosreborn.inv.no_bags"), x + 80, y + 40,
+					imageWidth - 86, 0xFF6A6A6A, false);
 		}
 		for (int row = 0; row < 3; row++) {
 			for (int col = 0; col < 9; col++) {
