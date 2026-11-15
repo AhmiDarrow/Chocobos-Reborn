@@ -75,6 +75,6 @@ public final class RaceHud {
             return;
         }
         int y = g.guiHeight() - 68 - (overlayTicks > 0 ? 12 : 0);
-        g.drawCenteredString(mc.font, text, g.guiWidth() / 2, y - 4, 0xFFFFFFFF);
+        FittedLabel.center(g, mc.font, text, g.guiWidth() / 2, y - 4, g.guiWidth() - 8, 0xFFFFFFFF, true);
     }
 }

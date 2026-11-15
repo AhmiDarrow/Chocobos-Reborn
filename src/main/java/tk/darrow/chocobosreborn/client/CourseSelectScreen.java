@@ -204,12 +204,15 @@ public class CourseSelectScreen extends Screen {
 		super.render(g, mouseX, mouseY, partial);
 		int cy = columnsY - scroll + 1;
 		if (cy > HEADER) {
-			g.drawString(font, Component.translatable("chocobosreborn.select.col.sprints"), left + 2, cy, 0xFFE8A416);
-			g.drawString(font, Component.translatable("chocobosreborn.select.col.grands"), left + columnWidth + 6, cy, 0xFFE8A416);
+			FittedLabel.left(g, font, Component.translatable("chocobosreborn.select.col.sprints"), left + 2, cy,
+					columnWidth - 8, 0xFFE8A416, false);
+			FittedLabel.left(g, font, Component.translatable("chocobosreborn.select.col.grands"), left + columnWidth + 6, cy,
+					columnWidth - 8, 0xFFE8A416, false);
 		}
 		g.fill(0, 0, width, HEADER, 0xCC101010);
-		g.drawCenteredString(font, title, width / 2, 14, 0xFFE8A416);
-		g.drawCenteredString(font, Component.translatable("chocobosreborn.select.class", raceClass.name()), width / 2, 26, 0xFFCCCCCC);
+		FittedLabel.center(g, font, title, width / 2, 14, width - 16, 0xFFE8A416, true);
+		FittedLabel.center(g, font, Component.translatable("chocobosreborn.select.class", raceClass.name()),
+				width / 2, 26, width - 16, 0xFFCCCCCC, true);
 	}
 
 	private Component stakeLabel() {

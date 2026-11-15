@@ -43,15 +43,16 @@ public final class ChocobosRebornCommand {
 									try {
 										track = RaceTrack.valueOf(id.toUpperCase(java.util.Locale.ROOT));
 									} catch (IllegalArgumentException e) {
-										c.getSource().sendFailure(Component.literal("Unknown track. One of: "
-												+ java.util.Arrays.toString(RaceTrack.values()).toLowerCase(java.util.Locale.ROOT)));
+										String known = java.util.Arrays.stream(RaceTrack.values()).map(RaceTrack::id)
+												.collect(java.util.stream.Collectors.joining(", "));
+										c.getSource().sendFailure(Component.translatable("chocobosreborn.command.unknown_track", known));
 										return 0;
 									}
 									SquareBuilder.buildPaddock(square);
 									SquareBuilder.spawnKeepers(square);
 									SquareBuilder.requestKeeperSync();
 									SquareBuilder.buildTrack(square, track);
-									c.getSource().sendSuccess(() -> Component.literal("Built " + track.id()), true);
+									c.getSource().sendSuccess(() -> Component.translatable("chocobosreborn.command.built", track.id()), true);
 									return 1;
 								})))
 						.then(Commands.literal("race")
@@ -80,11 +81,11 @@ public final class ChocobosRebornCommand {
 			try {
 				n = Integer.parseInt(course);
 			} catch (NumberFormatException nfe) {
-				source.sendFailure(Component.literal("Unknown course. A track id (c_meadow) or 0–11 of the mounted class."));
+				source.sendFailure(Component.translatable("chocobosreborn.command.unknown_course"));
 				return 0;
 			}
 			if (n < 0 || n >= RaceTrack.MAX_COURSES_PER_CLASS) {
-				source.sendFailure(Component.literal("Course index must be 0–11 of the mounted class."));
+				source.sendFailure(Component.translatable("chocobosreborn.command.bad_index"));
 				return 0;
 			}
 			return RaceManager.startRace(player, n, ranked) ? 1 : 0;
