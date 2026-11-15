@@ -23,6 +23,9 @@ Project: https://www.curseforge.com/minecraft/mc-mods/chocobos-reborn
 - Tags: Minecraft 1.21.1, NeoForge, Client + Server, release. Display name
   `Chocobos Reborn <version> - <subtitle>`.
 
+## 1.2.0 - Your Language
+Uploaded 2026-11-15: `chocobosreborn-1.2.0.jar` as file **9638552** ("Chocobos Reborn 1.2.0 - Your Language", release, 1.21.1 / NeoForge / Client+Server). Changelog is `docs/RELEASE_1.2.0.md`. Now available in Spanish, French, German, Portuguese (Brazil), Italian, Russian, Polish, Japanese, Korean and Chinese (Simplified). Follows the Minecraft language setting. GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.2.0
+
 ## 1.1.15 - Clean Sweep
 Uploaded 2026-10-10: `chocobosreborn-1.1.15.jar` as file **9118527** ("Chocobos Reborn 1.1.15 - Clean Sweep", release, 1.21.1 / NeoForge / Client+Server). Changelog is `docs/RELEASE_1.1.15.md`. GPU-skinned birds, atlases prepared off the render thread, courses laid over the countdown, waiting bets ride their heat, field odds at least even, gauntlet bug sweep. GitHub: https://github.com/AhmiDarrow/Chocobos-Reborn/releases/tag/v1.1.15
 
